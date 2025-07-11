@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any, Callable
 class APIClient:
     """HTTP client with token middleware functionality for Spotplan API."""
     
-    def __init__(self, token: str, base_url: str = "https://localhost:5047/api"):
+    def __init__(self, token: str, base_url: str = "https://spotplanapi-hjhmgufjduhza6h0.westeurope-01.azurewebsites.net/api"):
         """
         Initialize the API client with authentication token.
         
