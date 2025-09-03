@@ -1,6 +1,14 @@
-post http://127.0.0.1:8000/api/chat
+# MCL Assistant API Test Requests
+
+### Health Check
+GET http://127.0.0.1:8000/health
+
+### Root Endpoint
+GET http://127.0.0.1:8000/
+
+### Test MCL Knowledge - Creating Checklists
+POST http://127.0.0.1:8000/api/chat
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZGQ2MDU2MC1lOTBmLTQ1OTYtOTFlMS03NDVkODRmZTRjMWYiLCJ1bmlxdWVfbmFtZSI6Ikhhcm9sZCBCYXJ0b2xvIiwiSWRDb21wYW55IjoiZmJjYTY3ZDMtZTJjZi00NzVmLWJhNjgtY2FmMjQzY2Q5ZDBiIiwianRpIjoiNjFkZTNhN2EtOWRmNi00YTI2LWJiM2UtNGM0OTExNWFjN2M5IiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3NTAwOTU0MjUsImlzcyI6IlNwb3RwbGFuIiwiYXVkIjoiaHR0cDovL2xvY2FsaG9zdDo1MjMyIn0.qQo27kJWaBSPzUPpvG1VKAnhgYE-__dn7-oj0ZNYw2A
 
 {
   "messages": [
@@ -8,7 +16,151 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZGQ2MDU2M
       "role": "user",
       "content": [
         {
-          "text": "Hi",
+          "text": "How do I create a checklist in MCL?",
+          "type": "text"
+        }
+      ]
+    }
+  ]
+}
+
+### Test MCL Knowledge - Mobile App Usage
+POST http://127.0.0.1:8000/api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": "How do I use MCL on my mobile phone?",
+          "type": "text"
+        }
+      ]
+    }
+  ]
+}
+
+### Test MCL Knowledge - User Roles
+POST http://127.0.0.1:8000/api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": "What are the different user roles in MCL?",
+          "type": "text"
+        }
+      ]
+    }
+  ]
+}
+
+### Test MCL Knowledge - Common Issues
+POST http://127.0.0.1:8000/api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": "What are the common mistakes when using the MCL app?",
+          "type": "text"
+        }
+      ]
+    }
+  ]
+}
+
+### Test MCL Knowledge - Dashboard Usage
+POST http://127.0.0.1:8000/api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": "How do I use the MCL dashboard?",
+          "type": "text"
+        }
+      ]
+    }
+  ]
+}
+
+### Test MCL Knowledge - Creating Questions
+POST http://127.0.0.1:8000/api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": "How do I create questions for a checklist in MCL?",
+          "type": "text"
+        }
+      ]
+    }
+  ]
+}
+
+### Test Conversation Flow - Follow-up Questions
+POST http://127.0.0.1:8000/api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": "Tell me about MCL tablet features",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "text": "MCL offers several tablet-specific features designed for optimal use on tablet devices...",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": "Can you give me more details about the tablet interface?",
+          "type": "text"
+        }
+      ]
+    }
+  ]
+}
+
+### Test MCL Knowledge - Setup and Configuration
+POST http://127.0.0.1:8000/api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": "How do I set up Dropbox integration in MCL?",
           "type": "text"
         }
       ]
