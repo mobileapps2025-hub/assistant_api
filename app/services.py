@@ -6,10 +6,12 @@ from io import BytesIO
 from pathlib import Path
 from app.config import client 
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
+import hashlib
 
-# Global variable to store the vector store ID
+# Global variable to store the vector store ID and document chunks
 _mcl_vector_store_id: str = None
+_document_chunks: List[Dict[str, Any]] = []
 
 def extract_text_from_pdf(file_path: str) -> str:
     """Extract text from PDF file using PyMuPDF for better text extraction."""
@@ -38,12 +40,42 @@ def extract_text_from_pdf(file_path: str) -> str:
             print(f"Error extracting text from {file_path} with PyPDF2: {e2}")
             return ""
 
-def process_mcl_documents() -> List[str]:
-    """Process all MCL documents in the documents folder and return file IDs."""
+def create_text_chunks(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
+    """Split text into overlapping chunks for better retrieval."""
+    if len(text) <= chunk_size:
+        return [text]
+    
+    chunks = []
+    start = 0
+    
+    while start < len(text):
+        end = start + chunk_size
+        
+        # Try to break at a sentence or paragraph boundary
+        if end < len(text):
+            # Look for the last period, newline, or space within the chunk
+            break_points = [text.rfind('.', start, end), text.rfind('\n', start, end), text.rfind(' ', start, end)]
+            best_break = max([bp for bp in break_points if bp > start + chunk_size // 2], default=end)
+            end = best_break + 1 if best_break != end else end
+        
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        
+        start = end - overlap if end < len(text) else end
+    
+    return chunks
+
+def process_mcl_documents_with_chunks() -> Tuple[List[str], List[Dict[str, Any]]]:
+    """Process all MCL documents and create searchable chunks with metadata."""
+    global _document_chunks
+    
     documents_path = Path("app/documents")
     file_ids = []
+    _document_chunks = []
+    chunk_id = 0
     
-    print("Processing MCL documents...")
+    print("Processing MCL documents with chunk tracking...")
     
     # Process PDF files
     pdf_files = list(documents_path.glob("*.pdf"))
@@ -57,18 +89,43 @@ def process_mcl_documents() -> List[str]:
             text_content = extract_text_from_pdf(str(pdf_file))
             
             if text_content.strip():
-                # Create a temporary text file with the extracted content
-                temp_content = f"# {pdf_file.stem}\n\n{text_content}"
-                temp_file = BytesIO(temp_content.encode('utf-8'))
+                # Create chunks from the document
+                chunks = create_text_chunks(text_content)
                 
-                # Upload to OpenAI
-                created_file = client.files.create(
-                    file=(f"{pdf_file.stem}.txt", temp_file),
-                    purpose="assistants"
-                )
+                # Process each chunk
+                for i, chunk in enumerate(chunks):
+                    # Create chunk metadata
+                    chunk_metadata = {
+                        "chunk_id": chunk_id,
+                        "document_name": pdf_file.name,
+                        "document_type": "PDF",
+                        "chunk_index": i,
+                        "total_chunks": len(chunks),
+                        "content": chunk,
+                        "content_hash": hashlib.md5(chunk.encode()).hexdigest()[:8]
+                    }
+                    _document_chunks.append(chunk_metadata)
+                    
+                    # Create a formatted chunk for OpenAI
+                    formatted_chunk = f"""Document: {pdf_file.name}
+Chunk {i+1}/{len(chunks)}
+
+{chunk}
+
+---
+Source: {pdf_file.name} (Chunk {i+1})"""
+                    
+                    # Upload chunk to OpenAI
+                    temp_file = BytesIO(formatted_chunk.encode('utf-8'))
+                    created_file = client.files.create(
+                        file=(f"{pdf_file.stem}_chunk_{i+1}.txt", temp_file),
+                        purpose="assistants"
+                    )
+                    
+                    file_ids.append(created_file.id)
+                    chunk_id += 1
                 
-                file_ids.append(created_file.id)
-                print(f"Successfully processed {pdf_file.name} -> File ID: {created_file.id}")
+                print(f"Successfully processed {pdf_file.name} -> {len(chunks)} chunks")
             else:
                 print(f"No text content extracted from {pdf_file.name}")
                 
@@ -80,32 +137,79 @@ def process_mcl_documents() -> List[str]:
     for md_file in md_files:
         try:
             print(f"Processing Markdown: {md_file.name}")
-            with open(md_file, "rb") as file_content:
+            with open(md_file, 'r', encoding='utf-8') as f:
+                text_content = f.read()
+            
+            chunks = create_text_chunks(text_content)
+            
+            for i, chunk in enumerate(chunks):
+                chunk_metadata = {
+                    "chunk_id": chunk_id,
+                    "document_name": md_file.name,
+                    "document_type": "Markdown",
+                    "chunk_index": i,
+                    "total_chunks": len(chunks),
+                    "content": chunk,
+                    "content_hash": hashlib.md5(chunk.encode()).hexdigest()[:8]
+                }
+                _document_chunks.append(chunk_metadata)
+                
+                formatted_chunk = f"""Document: {md_file.name}
+Chunk {i+1}/{len(chunks)}
+
+{chunk}
+
+---
+Source: {md_file.name} (Chunk {i+1})"""
+                
+                temp_file = BytesIO(formatted_chunk.encode('utf-8'))
                 created_file = client.files.create(
-                    file=file_content,
+                    file=(f"{md_file.stem}_chunk_{i+1}.txt", temp_file),
                     purpose="assistants"
                 )
+                
                 file_ids.append(created_file.id)
-                print(f"Successfully processed {md_file.name} -> File ID: {created_file.id}")
+                chunk_id += 1
+            
+            print(f"Successfully processed {md_file.name} -> {len(chunks)} chunks")
         except Exception as e:
             print(f"Error processing {md_file.name}: {e}")
     
-    # Process text files if any
-    txt_files = list(documents_path.glob("*.txt"))
-    for txt_file in txt_files:
-        try:
-            print(f"Processing Text: {txt_file.name}")
-            with open(txt_file, "rb") as file_content:
-                created_file = client.files.create(
-                    file=file_content,
-                    purpose="assistants"
-                )
-                file_ids.append(created_file.id)
-                print(f"Successfully processed {txt_file.name} -> File ID: {created_file.id}")
-        except Exception as e:
-            print(f"Error processing {txt_file.name}: {e}")
+    print(f"Total chunks created: {len(_document_chunks)}")
+    return file_ids, _document_chunks
+
+def find_relevant_chunks(query: str, max_chunks: int = 5) -> List[Dict[str, Any]]:
+    """Find the most relevant document chunks for a given query."""
+    query_lower = query.lower()
     
-    return file_ids
+    # Simple relevance scoring based on keyword matching
+    chunk_scores = []
+    
+    for chunk in _document_chunks:
+        content_lower = chunk["content"].lower()
+        score = 0
+        
+        # Count keyword matches
+        query_words = query_lower.split()
+        for word in query_words:
+            if len(word) > 2:  # Skip very short words
+                score += content_lower.count(word)
+        
+        # Bonus for exact phrase matches
+        if query_lower in content_lower:
+            score += 10
+        
+        # Bonus for document type relevance
+        doc_name_lower = chunk["document_name"].lower()
+        if any(keyword in doc_name_lower for keyword in ["how-to", "guide", "manual"]):
+            score += 2
+        
+        if score > 0:
+            chunk_scores.append((score, chunk))
+    
+    # Sort by score and return top chunks
+    chunk_scores.sort(key=lambda x: x[0], reverse=True)
+    return [chunk for score, chunk in chunk_scores[:max_chunks]]
 
 def start_mcl_knowledge_base() -> str:
     """Initialize the MCL knowledge base with all documents."""
@@ -113,16 +217,16 @@ def start_mcl_knowledge_base() -> str:
     
     print("Starting MCL knowledge base initialization...")
     try:
-        # Process all MCL documents
-        file_ids = process_mcl_documents()
+        # Process all MCL documents with chunk tracking
+        file_ids, chunks = process_mcl_documents_with_chunks()
         
         if not file_ids:
             print("WARNING: No files were processed for the knowledge base")
             return None
         
-        print(f"Creating vector store with {len(file_ids)} files...")
+        print(f"Creating vector store with {len(file_ids)} file chunks...")
         vector_store = client.vector_stores.create(
-            name="mcl_knowledge_base",
+            name="mcl_knowledge_base_chunked",
             file_ids=file_ids
         )
         
@@ -131,6 +235,7 @@ def start_mcl_knowledge_base() -> str:
 
         _mcl_vector_store_id = vector_store.id
         print(f"MCL knowledge base setup complete. Vector Store ID: {vector_store.id}")
+        print(f"Total document chunks indexed: {len(chunks)}")
         
         return vector_store.id
 
@@ -139,28 +244,51 @@ def start_mcl_knowledge_base() -> str:
         return None
 
 def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
-    """Get AI response for MCL-related queries using the knowledge base."""
-    global _mcl_vector_store_id
+    """Get AI response for MCL-related queries with source attribution."""
     
-    system_prompt = """You are "MCL Assistant," an expert AI assistant for the MCL (Mobile Checklist) application. 
-    Your role is to provide comprehensive, accurate, and helpful information about the MCL app based on the extensive knowledge base of documents.
+    # Extract the latest user message for relevance search
+    latest_user_message = ""
+    for msg in reversed(messages_input):
+        if msg.get("role") == "user":
+            latest_user_message = msg.get("content", "")
+            break
+    
+    # Find relevant document chunks
+    relevant_chunks = find_relevant_chunks(latest_user_message, max_chunks=5)
+    
+    # Create context from relevant chunks
+    context_parts = []
+    sources = []
+    
+    for chunk in relevant_chunks:
+        context_parts.append(f"[From {chunk['document_name']}, Chunk {chunk['chunk_index']+1}]:\n{chunk['content']}")
+        source_info = f"{chunk['document_name']} (Chunk {chunk['chunk_index']+1}/{chunk['total_chunks']})"
+        if source_info not in sources:
+            sources.append(source_info)
+    
+    context = "\n\n" + "\n\n---\n\n".join(context_parts) if context_parts else ""
+    
+    system_prompt = f"""You are "MCL Assistant," an expert AI assistant for the MCL (Mobile Checklist) application. 
 
-    Key Guidelines:
-    - Provide precise, detailed answers based on the MCL documentation
-    - If asked about features, guides, or troubleshooting, reference the relevant documentation
-    - Explain step-by-step processes clearly when providing instructions
-    - Cover all aspects of MCL including mobile app usage, dashboard functionality, tablet usage, checklists, questions, roles, and business processes
-    - If you don't find specific information in the knowledge base, clearly state that and offer to help with related topics you do know about
-    - Maintain a helpful, professional, and conversational tone
-    - Focus specifically on MCL-related topics, but you can also provide information about business cases and technical updates if they are related to MCL
-    
-    Remember: You have access to comprehensive MCL documentation including user guides, release notes, technical updates, business cases, and training materials."""
+    IMPORTANT: You must base your answers ONLY on the provided document excerpts below. If the information is not in the provided excerpts, clearly state that you don't have that specific information in the available documents.
+
+    Available Document Excerpts:
+    {context}
+
+    Guidelines:
+    - Answer based ONLY on the provided document excerpts
+    - Always cite which document(s) you're referencing
+    - If information is not in the excerpts, say so clearly
+    - Provide step-by-step instructions when available in the documents
+    - Be specific and detailed based on the actual documentation
+    - At the end of your response, list the sources you used
+
+    Remember: Only use information from the document excerpts provided above."""
     
     final_messages = [{"role": "system", "content": system_prompt}] + messages_input
 
-    print(f"Sending messages to MCL AI: {len(final_messages)} messages")
+    print(f"Sending messages to MCL AI with {len(relevant_chunks)} relevant document chunks")
     
-    # Use the standard chat completions API - more reliable and compatible
     try:
         response = client.chat.completions.create( 
             model="gpt-4o",
@@ -169,7 +297,17 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
             max_tokens=2000
         )
         
-        print(f"MCL AI response received successfully")
+        # Enhance the response with source information
+        original_content = response.choices[0].message.content
+        
+        if sources:
+            sources_text = "\n\n📚 **Sources:**\n" + "\n".join([f"• {source}" for source in sources])
+            enhanced_content = original_content + sources_text
+            
+            # Create enhanced response
+            response.choices[0].message.content = enhanced_content
+        
+        print(f"MCL AI response received successfully with {len(sources)} sources")
         return response
         
     except Exception as e:
@@ -192,8 +330,6 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
         
         fallback_content = """I apologize, but I'm currently experiencing technical difficulties accessing the MCL knowledge base. 
         
-        However, I can still help you with general MCL questions. MCL (Mobile Checklist) is an application designed for creating and managing checklists across different devices including mobile phones, tablets, and web dashboards.
-        
-        For specific technical support, please refer to your MCL documentation or contact your system administrator."""
+        Please try your question again, or contact your system administrator for technical support."""
         
         return MockResponse(fallback_content)

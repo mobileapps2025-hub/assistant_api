@@ -8,7 +8,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from app.models import ChatRequest, Message, ContentItem
-from app.services import start_mcl_knowledge_base, get_mcl_ai_response
+from app.services import start_mcl_knowledge_base, get_mcl_ai_response, _document_chunks, find_relevant_chunks
 
 # Global variable to store the vector store ID
 VECTOR_STORE_ID = None
@@ -97,7 +97,65 @@ async def health_check():
     return {
         "status": "healthy",
         "knowledge_base_loaded": VECTOR_STORE_ID is not None,
-        "vector_store_id": VECTOR_STORE_ID if VECTOR_STORE_ID else "Not loaded"
+        "vector_store_id": VECTOR_STORE_ID if VECTOR_STORE_ID else "Not loaded",
+        "total_document_chunks": len(_document_chunks)
+    }
+
+@app.get("/api/chunks")
+async def get_chunks_info():
+    """Get information about available document chunks."""
+    if not _document_chunks:
+        return {"message": "No document chunks available", "chunks": []}
+    
+    # Group chunks by document
+    documents_info = {}
+    for chunk in _document_chunks:
+        doc_name = chunk["document_name"]
+        if doc_name not in documents_info:
+            documents_info[doc_name] = {
+                "document_name": doc_name,
+                "document_type": chunk["document_type"],
+                "total_chunks": 0,
+                "chunks": []
+            }
+        documents_info[doc_name]["total_chunks"] += 1
+        documents_info[doc_name]["chunks"].append({
+            "chunk_id": chunk["chunk_id"],
+            "chunk_index": chunk["chunk_index"],
+            "content_preview": chunk["content"][:200] + "..." if len(chunk["content"]) > 200 else chunk["content"],
+            "content_hash": chunk["content_hash"]
+        })
+    
+    return {
+        "total_chunks": len(_document_chunks),
+        "total_documents": len(documents_info),
+        "documents": list(documents_info.values())
+    }
+
+@app.post("/api/search")
+async def search_chunks(query_data: dict):
+    """Search for relevant chunks based on a query."""
+    query = query_data.get("query", "")
+    max_results = query_data.get("max_results", 5)
+    
+    if not query:
+        return {"error": "Query is required"}
+    
+    relevant_chunks = find_relevant_chunks(query, max_chunks=max_results)
+    
+    return {
+        "query": query,
+        "total_results": len(relevant_chunks),
+        "results": [
+            {
+                "document_name": chunk["document_name"],
+                "chunk_index": chunk["chunk_index"],
+                "total_chunks": chunk["total_chunks"],
+                "content_preview": chunk["content"][:300] + "..." if len(chunk["content"]) > 300 else chunk["content"],
+                "content_hash": chunk["content_hash"]
+            }
+            for chunk in relevant_chunks
+        ]
     }
 
 @app.post("/api/chat")

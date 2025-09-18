@@ -6,6 +6,18 @@ GET http://127.0.0.1:8000/health
 ### Root Endpoint
 GET http://127.0.0.1:8000/
 
+### Get Document Chunks Information
+GET http://127.0.0.1:8000/api/chunks
+
+### Search for Relevant Chunks
+POST http://127.0.0.1:8000/api/search
+Content-Type: application/json
+
+{
+  "query": "How to create checklist",
+  "max_results": 3
+}
+
 ### Test MCL Knowledge - Creating Checklists
 POST http://127.0.0.1:8000/api/chat
 Content-Type: application/json
