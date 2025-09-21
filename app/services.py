@@ -4,10 +4,12 @@ import PyPDF2
 import fitz  # PyMuPDF
 from io import BytesIO
 from pathlib import Path
-from app.config import client 
+from app.config import client, AsyncSessionLocal
+from app.database.repositories import CuratedQaRepository
 from datetime import datetime
 from typing import List, Dict, Any, Tuple
 import hashlib
+import asyncio
 
 # Global variable to store the vector store ID and document chunks
 _mcl_vector_store_id: str = None
@@ -66,6 +68,17 @@ def create_text_chunks(text: str, chunk_size: int = 1000, overlap: int = 200) ->
     
     return chunks
 
+async def get_curated_qa_content() -> str:
+    """Fetch curated Q&A content from database and format for knowledge base."""
+    try:
+        async with AsyncSessionLocal() as db:
+            curated_repo = CuratedQaRepository(db)
+            content = await curated_repo.get_curated_qa_content_for_kb()
+            return content
+    except Exception as e:
+        print(f"Error fetching curated Q&A content: {e}")
+        return ""
+
 def process_mcl_documents_with_chunks() -> Tuple[List[str], List[Dict[str, Any]]]:
     """Process all MCL documents and create searchable chunks with metadata."""
     global _document_chunks
@@ -76,6 +89,46 @@ def process_mcl_documents_with_chunks() -> Tuple[List[str], List[Dict[str, Any]]
     chunk_id = 0
     
     print("Processing MCL documents with chunk tracking...")
+    
+    # First, try to get curated Q&A content from database
+    try:
+        curated_content = asyncio.run(get_curated_qa_content())
+        if curated_content:
+            print("Processing curated Q&A content from database...")
+            chunks = create_text_chunks(curated_content)
+            
+            for i, chunk in enumerate(chunks):
+                chunk_metadata = {
+                    "chunk_id": chunk_id,
+                    "document_name": "Curated_QA.md",
+                    "document_type": "Curated Q&A",
+                    "chunk_index": i,
+                    "total_chunks": len(chunks),
+                    "content": chunk,
+                    "content_hash": hashlib.md5(chunk.encode()).hexdigest()[:8]
+                }
+                _document_chunks.append(chunk_metadata)
+                
+                formatted_chunk = f"""Document: Curated Q&A (High Priority)
+Chunk {i+1}/{len(chunks)}
+
+{chunk}
+
+---
+Source: Curated Q&A Database (Chunk {i+1})"""
+                
+                temp_file = BytesIO(formatted_chunk.encode('utf-8'))
+                created_file = client.files.create(
+                    file=(f"curated_qa_chunk_{i+1}.txt", temp_file),
+                    purpose="assistants"
+                )
+                
+                file_ids.append(created_file.id)
+                chunk_id += 1
+            
+            print(f"Successfully processed curated Q&A -> {len(chunks)} chunks")
+    except Exception as e:
+        print(f"Error processing curated Q&A: {e}")
     
     # Process PDF files
     pdf_files = list(documents_path.glob("*.pdf"))
