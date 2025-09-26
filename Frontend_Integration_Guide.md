@@ -1,4 +1,4 @@
-# Unified Assistant API - Frontend Integration Guide
+#  Unified Assistant API - Frontend Integration Guide
 
 ## Overview
 
