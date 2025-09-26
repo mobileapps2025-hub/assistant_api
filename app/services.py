@@ -3,7 +3,12 @@ import requests
 from io import BytesIO
 import os
 import PyPDF2
-import fitz  # PyMuPDF
+try:
+    import fitz  # PyMuPDF
+    HAS_PYMUPDF = True
+except ImportError:
+    HAS_PYMUPDF = False
+    print("PyMuPDF not available, will use PyPDF2 only for PDF processing")
 from pathlib import Path
 from app.config import client, AsyncSessionLocal
 from app.models import EventsBetweenWeeksRequest
@@ -180,30 +185,32 @@ def get_spotplan_ai_response(messages_input):
 
 def extract_text_from_pdf(file_path: str) -> str:
     """Extract text from PDF file using PyMuPDF for better text extraction."""
-    try:
-        text_content = ""
-        # Try PyMuPDF first (better text extraction)
-        doc = fitz.open(file_path)
-        for page_num in range(len(doc)):
-            page = doc.load_page(page_num)
-            page_text = page.get_text()
-            if page_text:
-                text_content += page_text + "\n\n"
-        doc.close()
-        return text_content.strip()
-    except Exception as e:
-        print(f"Error extracting text from {file_path} with PyMuPDF: {e}")
-        # Fallback to PyPDF2
+    text_content = ""
+    
+    # Try PyMuPDF first if available (better text extraction)
+    if HAS_PYMUPDF:
         try:
-            text_content = ""
-            with open(file_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                for page in pdf_reader.pages:
-                    text_content += page.extract_text() + "\n\n"
+            doc = fitz.open(file_path)
+            for page_num in range(len(doc)):
+                page = doc.load_page(page_num)
+                page_text = page.get_text()
+                if page_text:
+                    text_content += page_text + "\n\n"
+            doc.close()
             return text_content.strip()
-        except Exception as e2:
-            print(f"Error extracting text from {file_path} with PyPDF2: {e2}")
-            return ""
+        except Exception as e:
+            print(f"Error extracting text from {file_path} with PyMuPDF: {e}")
+    
+    # Fallback to PyPDF2 (or use directly if PyMuPDF not available)
+    try:
+        with open(file_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            for page in pdf_reader.pages:
+                text_content += page.extract_text() + "\n\n"
+        return text_content.strip()
+    except Exception as e2:
+        print(f"Error extracting text from {file_path} with PyPDF2: {e2}")
+        return ""
 
 def create_text_chunks(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
     """Split text into overlapping chunks for better retrieval."""
