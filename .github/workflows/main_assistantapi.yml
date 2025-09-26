@@ -25,6 +25,11 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Install system dependencies for ODBC
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unixodbc-dev g++
+      
       - name: Create and start virtual environment
         run: |
           python -m venv venv
