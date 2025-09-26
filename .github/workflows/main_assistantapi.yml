@@ -81,4 +81,5 @@ jobs:
         with:
           app-name: 'AssistantAPI'
           slot-name: 'Production'
+          runtime-version: 'python|3.11'
           
