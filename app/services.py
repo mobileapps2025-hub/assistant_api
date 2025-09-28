@@ -495,6 +495,37 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
     
     context = "\n\n" + "\n\n---\n\n".join(context_parts) if context_parts else ""
     
+    # Detect user's language from the latest message
+    user_language = "English"
+    if latest_user_message:
+        # Enhanced German language detection
+        german_indicators = [
+            'ich', 'du', 'der', 'die', 'das', 'und', 'ist', 'eine', 'wie', 'kann', 'mit', 'für', 
+            'auf', 'kannst', 'mir', 'erklären', 'anlegen', 'erstellen', 'bin', 'haben', 'aber',
+            'auch', 'nach', 'werden', 'bei', 'über', 'nur', 'noch', 'aus', 'so', 'wenn', 
+            'checkliste', 'prüfliste', 'aufgaben', 'fragen', 'dashboard', 'tablet', 'mobile',
+            'ausführen', 'verwenden', 'funktioniert', 'anleitung', 'hilfe', 'unterstützung'
+        ]
+        
+        # Count German indicators in the message
+        message_lower = latest_user_message.lower()
+        german_count = sum(1 for word in german_indicators if word in message_lower)
+        total_words = len(message_lower.split())
+        
+        # If we find enough German indicators relative to message length
+        if german_count >= 2 and (total_words < 5 or german_count / total_words > 0.2):
+            user_language = "German"
+    
+    language_instruction = ""
+    if user_language == "German":
+        language_instruction = """
+
+🌐 LANGUAGE INSTRUCTION: The user is asking in German. You MUST respond in German (Deutsch). 
+- Translate and adapt the information from the English documents into clear, natural German responses
+- Use German terminology (e.g., "Checkliste" for checklist, "Aufgabe" for task, "Frage" for question)
+- Maintain technical accuracy while providing natural German explanations
+- If you find information about creating checklists, explain the process clearly in German"""
+    
     system_prompt = f"""You are "MCL Assistant," an expert AI assistant for the MCL (Mobile Checklist) application. 
 
     IMPORTANT: You must base your answers ONLY on the provided document excerpts below. If the information is not in the provided excerpts, clearly state that you don't have that specific information in the available documents.
@@ -504,13 +535,17 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
 
     Guidelines:
     - Answer based ONLY on the provided document excerpts
-    - Always cite which document(s) you're referencing
+    - Always cite which document(s) you're referencing  
     - If information is not in the excerpts, say so clearly
     - Provide step-by-step instructions when available in the documents
     - Be specific and detailed based on the actual documentation
     - At the end of your response, list the sources you used
+    - RESPOND IN THE SAME LANGUAGE as the user's question
+    - If the user asks in German, respond in German and translate the information from the English documents
+    - If the user asks in English, respond in English
+    - Pay special attention to documents about "Creating Checklists" when users ask about checklist creation{language_instruction}
 
-    Remember: Only use information from the document excerpts provided above."""
+    Remember: Only use information from the document excerpts provided above, but adapt the language to match the user's question."""
     
     final_messages = [{"role": "system", "content": system_prompt}] + messages_input
 
@@ -528,7 +563,12 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
         original_content = response.choices[0].message.content
         
         if sources:
-            sources_text = "\n\n📚 **Sources:**\n" + "\n".join([f"• {source}" for source in sources])
+            # Use language-appropriate source header
+            if user_language == "German":
+                sources_text = "\n\n📚 **Quellen:**\n" + "\n".join([f"• {source}" for source in sources])
+            else:
+                sources_text = "\n\n📚 **Sources:**\n" + "\n".join([f"• {source}" for source in sources])
+            
             enhanced_content = original_content + sources_text
             
             # Create enhanced response
@@ -555,9 +595,15 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
                 self.content = content
                 self.tool_calls = None
         
-        fallback_content = """I apologize, but I'm currently experiencing technical difficulties accessing the MCL knowledge base. 
-        
-        Please try your question again, or contact your system administrator for technical support."""
+        # Create language-appropriate fallback message
+        if user_language == "German":
+            fallback_content = """Entschuldigung, aber ich habe derzeit technische Schwierigkeiten beim Zugriff auf die MCL-Wissensdatenbank.
+            
+            Bitte stellen Sie Ihre Frage erneut, oder wenden Sie sich für technischen Support an Ihren Systemadministrator."""
+        else:
+            fallback_content = """I apologize, but I'm currently experiencing technical difficulties accessing the MCL knowledge base.
+            
+            Please try your question again, or contact your system administrator for technical support."""
         
         return MockResponse(fallback_content)
 

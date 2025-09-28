@@ -111,8 +111,13 @@ def detect_app_type(request: ChatRequest) -> str:
         
         latest_message_lower = latest_message.lower()
         
-        # MCL keywords
-        mcl_keywords = ["mcl", "mobile checklist", "checklist", "quiz", "question", "dashboard", "tablet"]
+        # MCL keywords (English and German)
+        mcl_keywords = [
+            "mcl", "mobile checklist", "checklist", "quiz", "question", "dashboard", "tablet",
+            # German keywords
+            "checkliste", "prüfliste", "kontrollliste", "aufgaben", "fragen", "quiz", 
+            "dashboard", "tablet", "mobile", "anlegen", "erstellen", "ausfüllen"
+        ]
         # Spotplan keywords  
         spotplan_keywords = ["spotplan", "store", "event", "sales area", "week", "planning", "unplanned"]
         
@@ -287,9 +292,25 @@ async def handle_mcl_chat(body: ChatRequest) -> ChatResponse:
     global MCL_VECTOR_STORE_ID
     
     if not MCL_VECTOR_STORE_ID:
+        # Detect language for appropriate error message
+        user_message = ""
+        if body.messages:
+            for msg in body.messages:
+                if msg.role == "user" and msg.content:
+                    if isinstance(msg.content, list):
+                        user_message = " ".join([item.text for item in msg.content if hasattr(item, 'text')])
+                    else:
+                        user_message = str(msg.content)
+                    break
+        
+        # Simple German detection for error message
+        error_message = "MCL knowledge base is not available. Please try again later."
+        if user_message and any(word in user_message.lower() for word in ['ich', 'du', 'der', 'die', 'das', 'kannst', 'mir']):
+            error_message = "MCL-Wissensdatenbank ist nicht verfügbar. Bitte versuchen Sie es später erneut."
+        
         raise HTTPException(
             status_code=503, 
-            detail="MCL knowledge base is not available. Please try again later."
+            detail=error_message
         )
 
     try:
