@@ -405,9 +405,106 @@ Source: {md_file.name} (Chunk {i+1})"""
     print(f"Total chunks created: {len(_document_chunks)}")
     return file_ids, _document_chunks
 
+def translate_query_to_english(query: str) -> str:
+    """Translate German query to English for better document matching."""
+    try:
+        # Common German-to-English translations for MCL domain
+        translations = {
+            # Questions words
+            'wie': 'how',
+            'was': 'what',
+            'wo': 'where',
+            'wann': 'when',
+            'warum': 'why',
+            'wer': 'who',
+            'kannst du': 'can you',
+            'kannst': 'can',
+            'können': 'can',
+            'kann ich': 'can i',
+            'mir': 'me',
+            'ich': 'i',
+            
+            # MCL specific terms
+            'checkliste': 'checklist',
+            'prüfliste': 'checklist',
+            'kontrollliste': 'checklist',
+            'aufgabe': 'task',
+            'aufgaben': 'tasks',
+            'frage': 'question',
+            'fragen': 'questions',
+            'quiz': 'quiz',
+            'dashboard': 'dashboard',
+            'tablet': 'tablet',
+            'mobile': 'mobile',
+            'telefon': 'phone',
+            'handy': 'phone',
+            
+            # Actions
+            'erstellen': 'create',
+            'anlegen': 'create',
+            'erklären': 'explain',
+            'hinzufügen': 'add',
+            'löschen': 'delete',
+            'bearbeiten': 'edit',
+            'ausführen': 'execute',
+            'verwenden': 'use',
+            'funktioniert': 'works',
+            'öffnen': 'open',
+            
+            # Common words
+            'eine': 'a',
+            'der': 'the',
+            'die': 'the',
+            'das': 'the',
+            'und': 'and',
+            'oder': 'or',
+            'für': 'for',
+            'mit': 'with',
+            'in': 'in',
+            'auf': 'on',
+            'zu': 'to',
+            'von': 'from',
+            'bei': 'at',
+            
+            # Other useful terms
+            'anleitung': 'guide',
+            'hilfe': 'help',
+            'unterstützung': 'support',
+            'benutzer': 'user',
+            'administrator': 'administrator',
+            'einstellungen': 'settings'
+        }
+        
+        query_lower = query.lower()
+        translated_query = query_lower
+        
+        # Replace German words with English equivalents
+        for german, english in translations.items():
+            translated_query = translated_query.replace(german, english)
+        
+        print(f"[TRANSLATION] Original: '{query}' → Translated: '{translated_query}'")
+        return translated_query
+        
+    except Exception as e:
+        print(f"[TRANSLATION ERROR] {e}")
+        return query
+
 def find_relevant_chunks(query: str, max_chunks: int = 5) -> List[Dict[str, Any]]:
     """Find the most relevant document chunks for a given query."""
-    query_lower = query.lower()
+    print(f"\n[CHUNK SEARCH] Starting search for query: '{query}'")
+    
+    # Detect if query is in German and translate for better matching
+    is_german_query = detect_german_language(query)
+    search_query = query
+    
+    if is_german_query:
+        print(f"[CHUNK SEARCH] Detected German query, translating for better matching...")
+        translated_query = translate_query_to_english(query)
+        # Use both original and translated for searching
+        search_query = query + " " + translated_query
+    
+    query_lower = search_query.lower()
+    print(f"[CHUNK SEARCH] Searching with: '{query_lower}'")
     
     # Simple relevance scoring based on keyword matching
     chunk_scores = []
@@ -418,25 +515,45 @@ def find_relevant_chunks(query: str, max_chunks: int = 5) -> List[Dict[str, Any]
         
         # Count keyword matches
         query_words = query_lower.split()
+        matched_words = []
         for word in query_words:
             if len(word) > 2:  # Skip very short words
-                score += content_lower.count(word)
+                word_count = content_lower.count(word)
+                score += word_count
+                if word_count > 0:
+                    matched_words.append(word)
         
         # Bonus for exact phrase matches
         if query_lower in content_lower:
             score += 10
+            matched_words.append("[EXACT_PHRASE]")
         
         # Bonus for document type relevance
         doc_name_lower = chunk["document_name"].lower()
-        if any(keyword in doc_name_lower for keyword in ["how-to", "guide", "manual"]):
+        if any(keyword in doc_name_lower for keyword in ["how-to", "guide", "manual", "creating"]):
             score += 2
         
+        # Extra bonus for "Creating Checklists" document if query is about creating
+        if "creat" in query_lower and "creating" in doc_name_lower and "checklist" in doc_name_lower:
+            score += 5
+            print(f"[CHUNK SEARCH] Bonus for 'Creating Checklists' document")
+        
         if score > 0:
-            chunk_scores.append((score, chunk))
+            chunk_scores.append((score, chunk, matched_words))
+            print(f"[CHUNK SEARCH] Document: {chunk['document_name']}, Chunk {chunk['chunk_index']+1}, Score: {score}, Matched: {matched_words[:5]}")
     
     # Sort by score and return top chunks
     chunk_scores.sort(key=lambda x: x[0], reverse=True)
-    return [chunk for score, chunk in chunk_scores[:max_chunks]]
+    top_chunks = [chunk for score, chunk, words in chunk_scores[:max_chunks]]
+    
+    print(f"[CHUNK SEARCH] Found {len(chunk_scores)} chunks with matches, returning top {len(top_chunks)}")
+    for i, (score, chunk, words) in enumerate(chunk_scores[:max_chunks]):
+        print(f"[CHUNK SEARCH] Top {i+1}: {chunk['document_name']} (Chunk {chunk['chunk_index']+1}) - Score: {score}")
+    
+    if len(top_chunks) == 0:
+        print(f"[CHUNK SEARCH WARNING] No relevant chunks found! This may cause poor responses.")
+    
+    return top_chunks
 
 def start_mcl_knowledge_base() -> str:
     """Initialize the MCL knowledge base with all documents."""
@@ -470,8 +587,77 @@ def start_mcl_knowledge_base() -> str:
         print(f"FATAL: An error occurred during MCL knowledge base setup: {e}")
         return None
 
+def detect_german_language(text: str) -> bool:
+    """Improved German language detection using multiple strategies."""
+    if not text or len(text.strip()) < 2:
+        return False
+    
+    text_lower = text.lower()
+    
+    # Strategy 1: Check for German-specific characters
+    german_chars = ['ä', 'ö', 'ü', 'ß']
+    if any(char in text_lower for char in german_chars):
+        return True
+    
+    # Strategy 2: Enhanced German word detection with more comprehensive lists
+    # Common German words that are unlikely to appear in English
+    strong_german_indicators = [
+        'ich', 'kannst', 'mir', 'checkliste', 'prüfliste', 'anlegen', 
+        'erstellen', 'erklären', 'funktioniert', 'anleitung', 'hilfe',
+        'bitte', 'danke', 'wie', 'was', 'warum', 'wo', 'wann', 'wer',
+        'können', 'müssen', 'sollen', 'möchte', 'würde', 'hätte'
+    ]
+    
+    # Medium German indicators (common words)
+    medium_german_indicators = [
+        'der', 'die', 'das', 'und', 'ist', 'eine', 'mit', 'für', 
+        'auf', 'bin', 'haben', 'aber', 'auch', 'nach', 'werden', 
+        'bei', 'über', 'nur', 'noch', 'aus', 'so', 'wenn', 'kann'
+    ]
+    
+    # Context-specific German words for MCL
+    mcl_german_terms = [
+        'aufgaben', 'fragen', 'dashboard', 'tablet', 'mobile',
+        'ausführen', 'verwenden', 'unterstützung', 'benutzer'
+    ]
+    
+    # Count different types of indicators
+    words = text_lower.split()
+    total_words = len(words)
+    
+    strong_count = sum(1 for word in strong_german_indicators if word in text_lower)
+    medium_count = sum(1 for word in medium_german_indicators if word in text_lower)
+    mcl_count = sum(1 for word in mcl_german_terms if word in text_lower)
+    
+    # Strategy 3: Decision logic
+    # If we find any strong indicator, it's likely German
+    if strong_count >= 1:
+        return True
+    
+    # If we find MCL-specific German terms
+    if mcl_count >= 1:
+        return True
+    
+    # For medium indicators, use ratio-based detection
+    if total_words > 0:
+        german_ratio = medium_count / total_words
+        # If more than 30% of words are German indicators
+        if german_ratio > 0.3 and medium_count >= 2:
+            return True
+    
+    # Strategy 4: Check for German question patterns
+    german_question_patterns = ['wie kann', 'was ist', 'wie funktioniert', 'wo finde', 'kannst du']
+    if any(pattern in text_lower for pattern in german_question_patterns):
+        return True
+    
+    return False
+
 def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
     """Get AI response for MCL-related queries with source attribution."""
+    
+    print("\n" + "="*80)
+    print("[MCL AI] Starting MCL AI Response Generation")
+    print("="*80)
     
     # Extract the latest user message for relevance search
     latest_user_message = ""
@@ -480,6 +666,8 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
             latest_user_message = msg.get("content", "")
             break
     
+    print(f"[MCL AI] User message: '{latest_user_message}'")
+    
     # Find relevant document chunks
     relevant_chunks = find_relevant_chunks(latest_user_message, max_chunks=5)
     
@@ -487,7 +675,11 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
     context_parts = []
     sources = []
     
-    for chunk in relevant_chunks:
+    print(f"\n[MCL AI] Building context from {len(relevant_chunks)} relevant chunks:")
+    for i, chunk in enumerate(relevant_chunks):
+        print(f"[MCL AI] Context Chunk {i+1}: {chunk['document_name']} (Chunk {chunk['chunk_index']+1}/{chunk['total_chunks']})")
+        print(f"[MCL AI] Preview: {chunk['content'][:150]}...")
+        
         context_parts.append(f"[From {chunk['document_name']}, Chunk {chunk['chunk_index']+1}]:\n{chunk['content']}")
         source_info = f"{chunk['document_name']} (Chunk {chunk['chunk_index']+1}/{chunk['total_chunks']})"
         if source_info not in sources:
@@ -495,72 +687,93 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
     
     context = "\n\n" + "\n\n---\n\n".join(context_parts) if context_parts else ""
     
-    # Detect user's language from the latest message
-    user_language = "English"
-    if latest_user_message:
-        # Enhanced German language detection
-        german_indicators = [
-            'ich', 'du', 'der', 'die', 'das', 'und', 'ist', 'eine', 'wie', 'kann', 'mit', 'für', 
-            'auf', 'kannst', 'mir', 'erklären', 'anlegen', 'erstellen', 'bin', 'haben', 'aber',
-            'auch', 'nach', 'werden', 'bei', 'über', 'nur', 'noch', 'aus', 'so', 'wenn', 
-            'checkliste', 'prüfliste', 'aufgaben', 'fragen', 'dashboard', 'tablet', 'mobile',
-            'ausführen', 'verwenden', 'funktioniert', 'anleitung', 'hilfe', 'unterstützung'
-        ]
-        
-        # Count German indicators in the message
-        message_lower = latest_user_message.lower()
-        german_count = sum(1 for word in german_indicators if word in message_lower)
-        total_words = len(message_lower.split())
-        
-        # If we find enough German indicators relative to message length
-        if german_count >= 2 and (total_words < 5 or german_count / total_words > 0.2):
-            user_language = "German"
+    if not context:
+        print("[MCL AI WARNING] No context available! AI will have no document excerpts to work with.")
+    else:
+        print(f"[MCL AI] Total context length: {len(context)} characters")
     
-    language_instruction = ""
+    # Detect user's language using improved detection
+    is_german = detect_german_language(latest_user_message)
+    user_language = "German" if is_german else "English"
+    
+    print(f"\n[MCL AI] Detected language: {user_language}")
+    
+    # Create language-specific system prompt
     if user_language == "German":
-        language_instruction = """
+        print("[MCL AI] Creating German-language system prompt")
+        system_prompt = f"""🇩🇪 WICHTIG: Du musst auf DEUTSCH antworten! Der Benutzer stellt eine Frage auf Deutsch.
 
-🌐 LANGUAGE INSTRUCTION: The user is asking in German. You MUST respond in German (Deutsch). 
-- Translate and adapt the information from the English documents into clear, natural German responses
-- Use German terminology (e.g., "Checkliste" for checklist, "Aufgabe" for task, "Frage" for question)
-- Maintain technical accuracy while providing natural German explanations
-- If you find information about creating checklists, explain the process clearly in German"""
-    
-    system_prompt = f"""You are "MCL Assistant," an expert AI assistant for the MCL (Mobile Checklist) application. 
+You are "MCL Assistant," an expert AI assistant for the MCL (Mobile Checklist) application.
 
-    IMPORTANT: You must base your answers ONLY on the provided document excerpts below. If the information is not in the provided excerpts, clearly state that you don't have that specific information in the available documents.
+⚠️ CRITICAL LANGUAGE RULE: The user is writing in GERMAN. You MUST respond in GERMAN (Deutsch).
+- Translate ALL information from the English documents into clear, natural German
+- Use proper German terminology:
+  * "Checklist" → "Checkliste" or "Prüfliste"
+  * "Task" → "Aufgabe"
+  * "Question" → "Frage"
+  * "Dashboard" → "Dashboard" (same)
+  * "Create" → "erstellen" or "anlegen"
+  * "User" → "Benutzer"
+  * "Wizard" → "Assistent"
+  * "Click" → "Klicken"
+  * "Button" → "Schaltfläche" or "Button"
+- Write complete sentences in German with proper grammar
+- Provide step-by-step instructions in German
 
-    Available Document Excerpts:
-    {context}
+Available Document Excerpts (in English - you must translate):
+{context}
 
-    Guidelines:
-    - Answer based ONLY on the provided document excerpts
-    - Always cite which document(s) you're referencing  
-    - If information is not in the excerpts, say so clearly
-    - Provide step-by-step instructions when available in the documents
-    - Be specific and detailed based on the actual documentation
-    - At the end of your response, list the sources you used
-    - RESPOND IN THE SAME LANGUAGE as the user's question
-    - If the user asks in German, respond in German and translate the information from the English documents
-    - If the user asks in English, respond in English
-    - Pay special attention to documents about "Creating Checklists" when users ask about checklist creation{language_instruction}
+Guidelines:
+- Answer based ONLY on the provided document excerpts above
+- TRANSLATE the information into German before presenting it
+- Always cite which document(s) you're referencing (in German: "Quelle:" or "Aus:")
+- If information is not in the excerpts, say clearly in German: "Diese Information finde ich nicht in den verfügbaren Dokumenten."
+- Provide step-by-step instructions in German when available
+- Be specific and detailed based on the actual documentation
+- At the end of your response, list the sources in German: "📚 Quellen:"
 
-    Remember: Only use information from the document excerpts provided above, but adapt the language to match the user's question."""
+REMEMBER: Your ENTIRE response must be in GERMAN (Deutsch)!"""
+    else:
+        print("[MCL AI] Creating English-language system prompt")
+        system_prompt = f"""You are "MCL Assistant," an expert AI assistant for the MCL (Mobile Checklist) application. 
+
+IMPORTANT: You must base your answers ONLY on the provided document excerpts below. If the information is not in the provided excerpts, clearly state that you don't have that specific information in the available documents.
+
+Available Document Excerpts:
+{context}
+
+Guidelines:
+- Answer based ONLY on the provided document excerpts
+- Always cite which document(s) you're referencing  
+- If information is not in the excerpts, say so clearly
+- Provide step-by-step instructions when available in the documents
+- Be specific and detailed based on the actual documentation
+- At the end of your response, list the sources you used
+- Pay special attention to documents about "Creating Checklists" when users ask about checklist creation
+
+Remember: Only use information from the document excerpts provided above."""
     
     final_messages = [{"role": "system", "content": system_prompt}] + messages_input
-
-    print(f"Sending messages to MCL AI with {len(relevant_chunks)} relevant document chunks")
     
+    print(f"\n[MCL AI] System prompt length: {len(system_prompt)} characters")
+    print(f"[MCL AI] Total messages to send: {len(final_messages)}")
+    print(f"[MCL AI] Sending request to OpenAI (Language: {user_language})...")
+
     try:
         response = client.chat.completions.create( 
             model="gpt-4o",
             messages=final_messages,
-            temperature=0.1,
+            temperature=0.1,  # Low temperature for consistent translation
             max_tokens=2000
         )
         
+        print(f"[MCL AI] Received response from OpenAI")
+        
         # Enhance the response with source information
         original_content = response.choices[0].message.content
+        
+        print(f"[MCL AI] Response content length: {len(original_content)} characters")
+        print(f"[MCL AI] Response preview: {original_content[:200]}...")
         
         if sources:
             # Use language-appropriate source header
@@ -574,11 +787,17 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
             # Create enhanced response
             response.choices[0].message.content = enhanced_content
         
-        print(f"MCL AI response received successfully with {len(sources)} sources")
+        print(f"[MCL AI] ✓ Response generation completed successfully")
+        print(f"[MCL AI] Sources attached: {len(sources)}")
+        print("="*80 + "\n")
+        
         return response
         
     except Exception as e:
-        print(f"Error in MCL AI response: {e}")
+        print(f"[MCL AI ERROR] Exception occurred: {e}")
+        import traceback
+        traceback.print_exc()
+        print("="*80 + "\n")
         
         # Create a fallback response
         class MockResponse:
