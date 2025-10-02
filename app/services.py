@@ -405,103 +405,23 @@ Source: {md_file.name} (Chunk {i+1})"""
     print(f"Total chunks created: {len(_document_chunks)}")
     return file_ids, _document_chunks
 
-def translate_query_to_english(query: str) -> str:
-    """Translate German query to English for better document matching."""
-    try:
-        # Common German-to-English translations for MCL domain
-        translations = {
-            # Questions words
-            'wie': 'how',
-            'was': 'what',
-            'wo': 'where',
-            'wann': 'when',
-            'warum': 'why',
-            'wer': 'who',
-            'kannst du': 'can you',
-            'kannst': 'can',
-            'können': 'can',
-            'kann ich': 'can i',
-            'mir': 'me',
-            'ich': 'i',
-            
-            # MCL specific terms
-            'checkliste': 'checklist',
-            'prüfliste': 'checklist',
-            'kontrollliste': 'checklist',
-            'aufgabe': 'task',
-            'aufgaben': 'tasks',
-            'frage': 'question',
-            'fragen': 'questions',
-            'quiz': 'quiz',
-            'dashboard': 'dashboard',
-            'tablet': 'tablet',
-            'mobile': 'mobile',
-            'telefon': 'phone',
-            'handy': 'phone',
-            
-            # Actions
-            'erstellen': 'create',
-            'anlegen': 'create',
-            'erklären': 'explain',
-            'hinzufügen': 'add',
-            'löschen': 'delete',
-            'bearbeiten': 'edit',
-            'ausführen': 'execute',
-            'verwenden': 'use',
-            'funktioniert': 'works',
-            'öffnen': 'open',
-            
-            # Common words
-            'eine': 'a',
-            'der': 'the',
-            'die': 'the',
-            'das': 'the',
-            'und': 'and',
-            'oder': 'or',
-            'für': 'for',
-            'mit': 'with',
-            'in': 'in',
-            'auf': 'on',
-            'zu': 'to',
-            'von': 'from',
-            'bei': 'at',
-            
-            # Other useful terms
-            'anleitung': 'guide',
-            'hilfe': 'help',
-            'unterstützung': 'support',
-            'benutzer': 'user',
-            'administrator': 'administrator',
-            'einstellungen': 'settings'
-        }
-        
-        query_lower = query.lower()
-        translated_query = query_lower
-        
-        # Replace German words with English equivalents
-        for german, english in translations.items():
-            translated_query = translated_query.replace(german, english)
-        
-        print(f"[TRANSLATION] Original: '{query}' → Translated: '{translated_query}'")
-        return translated_query
-        
-    except Exception as e:
-        print(f"[TRANSLATION ERROR] {e}")
-        return query
-
 def find_relevant_chunks(query: str, max_chunks: int = 5) -> List[Dict[str, Any]]:
-    """Find the most relevant document chunks for a given query."""
+    """Find the most relevant document chunks for a given query.
+    
+    This function now uses GPT-based translation for better cross-language matching.
+    """
     print(f"\n[CHUNK SEARCH] Starting search for query: '{query}'")
     
-    # Detect if query is in German and translate for better matching
-    is_german_query = detect_german_language(query)
+    # Detect language and translate if needed
+    detected_lang = detect_language(query)
     search_query = query
     
-    if is_german_query:
-        print(f"[CHUNK SEARCH] Detected German query, translating for better matching...")
-        translated_query = translate_query_to_english(query)
-        # Use both original and translated for searching
-        search_query = query + " " + translated_query
+    if detected_lang != 'en':
+        print(f"[CHUNK SEARCH] Detected non-English query ({detected_lang}), translating for better matching...")
+        translated_query = translate_query_to_english(query, detected_lang)
+        # Use translated query for searching (English documents)
+        search_query = translated_query
+        print(f"[CHUNK SEARCH] Will search with translated query: '{search_query}'")
     
     query_lower = search_query.lower()
     print(f"[CHUNK SEARCH] Searching with: '{query_lower}'")
@@ -587,70 +507,86 @@ def start_mcl_knowledge_base() -> str:
         print(f"FATAL: An error occurred during MCL knowledge base setup: {e}")
         return None
 
-def detect_german_language(text: str) -> bool:
-    """Improved German language detection using multiple strategies."""
+def detect_language(text: str) -> str:
+    """Detect the language of the user's query using GPT-4.
+    Returns language code: 'de' for German, 'en' for English, etc.
+    """
     if not text or len(text.strip()) < 2:
-        return False
+        return 'en'  # Default to English
     
-    text_lower = text.lower()
+    try:
+        # Quick heuristic check first (fast path)
+        text_lower = text.lower()
+        
+        # Check for German-specific characters
+        if any(char in text_lower for char in ['ä', 'ö', 'ü', 'ß']):
+            return 'de'
+        
+        # Check for obvious German words
+        strong_german_words = ['ich', 'kannst', 'mir', 'checkliste', 'erstellen', 'anlegen', 
+                               'wie', 'was', 'warum', 'erklären', 'hilfe', 'bitte']
+        if any(word in text_lower for word in strong_german_words):
+            return 'de'
+        
+        # If still uncertain and text is long enough, use GPT for detection
+        if len(text.split()) > 3:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",  # Faster and cheaper for language detection
+                messages=[
+                    {"role": "system", "content": "Detect the language of the following text. Respond with ONLY the ISO 639-1 language code (e.g., 'en' for English, 'de' for German, 'es' for Spanish, etc.). No explanation."},
+                    {"role": "user", "content": text}
+                ],
+                temperature=0,
+                max_tokens=10
+            )
+            detected_lang = response.choices[0].message.content.strip().lower()
+            return detected_lang if detected_lang in ['de', 'en', 'es', 'fr', 'it'] else 'en'
+        
+        return 'en'  # Default to English
+        
+    except Exception as e:
+        print(f"Error detecting language: {e}")
+        return 'en'  # Default to English on error
+
+def translate_query_to_english(query: str, source_language: str) -> str:
+    """Translate a user query to English for document search.
     
-    # Strategy 1: Check for German-specific characters
-    german_chars = ['ä', 'ö', 'ü', 'ß']
-    if any(char in text_lower for char in german_chars):
-        return True
+    Args:
+        query: The user's query in any language
+        source_language: The detected source language code
     
-    # Strategy 2: Enhanced German word detection with more comprehensive lists
-    # Common German words that are unlikely to appear in English
-    strong_german_indicators = [
-        'ich', 'kannst', 'mir', 'checkliste', 'prüfliste', 'anlegen', 
-        'erstellen', 'erklären', 'funktioniert', 'anleitung', 'hilfe',
-        'bitte', 'danke', 'wie', 'was', 'warum', 'wo', 'wann', 'wer',
-        'können', 'müssen', 'sollen', 'möchte', 'würde', 'hätte'
-    ]
+    Returns:
+        English translation of the query
+    """
+    if source_language == 'en':
+        return query  # Already in English
     
-    # Medium German indicators (common words)
-    medium_german_indicators = [
-        'der', 'die', 'das', 'und', 'ist', 'eine', 'mit', 'für', 
-        'auf', 'bin', 'haben', 'aber', 'auch', 'nach', 'werden', 
-        'bei', 'über', 'nur', 'noch', 'aus', 'so', 'wenn', 'kann'
-    ]
-    
-    # Context-specific German words for MCL
-    mcl_german_terms = [
-        'aufgaben', 'fragen', 'dashboard', 'tablet', 'mobile',
-        'ausführen', 'verwenden', 'unterstützung', 'benutzer'
-    ]
-    
-    # Count different types of indicators
-    words = text_lower.split()
-    total_words = len(words)
-    
-    strong_count = sum(1 for word in strong_german_indicators if word in text_lower)
-    medium_count = sum(1 for word in medium_german_indicators if word in text_lower)
-    mcl_count = sum(1 for word in mcl_german_terms if word in text_lower)
-    
-    # Strategy 3: Decision logic
-    # If we find any strong indicator, it's likely German
-    if strong_count >= 1:
-        return True
-    
-    # If we find MCL-specific German terms
-    if mcl_count >= 1:
-        return True
-    
-    # For medium indicators, use ratio-based detection
-    if total_words > 0:
-        german_ratio = medium_count / total_words
-        # If more than 30% of words are German indicators
-        if german_ratio > 0.3 and medium_count >= 2:
-            return True
-    
-    # Strategy 4: Check for German question patterns
-    german_question_patterns = ['wie kann', 'was ist', 'wie funktioniert', 'wo finde', 'kannst du']
-    if any(pattern in text_lower for pattern in german_question_patterns):
-        return True
-    
-    return False
+    try:
+        print(f"🔄 Translating query from {source_language} to English...")
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Fast and accurate for translation
+            messages=[
+                {
+                    "role": "system", 
+                    "content": "You are a professional translator. Translate the following text to English. Preserve the meaning and intent. Respond with ONLY the English translation, no explanations or additional text."
+                },
+                {
+                    "role": "user", 
+                    "content": f"Translate to English: {query}"
+                }
+            ],
+            temperature=0.3,
+            max_tokens=200
+        )
+        
+        translated = response.choices[0].message.content.strip()
+        print(f"✅ Translation: '{query}' → '{translated}'")
+        return translated
+        
+    except Exception as e:
+        print(f"❌ Error translating query: {e}")
+        return query  # Return original on error
 
 def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
     """Get AI response for MCL-related queries with source attribution."""
@@ -692,14 +628,20 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
     else:
         print(f"[MCL AI] Total context length: {len(context)} characters")
     
-    # Detect user's language using improved detection
-    is_german = detect_german_language(latest_user_message)
-    user_language = "German" if is_german else "English"
+    # Detect user's language
+    detected_lang = detect_language(latest_user_message)
+    user_language_name = {
+        'de': 'German',
+        'en': 'English',
+        'es': 'Spanish',
+        'fr': 'French',
+        'it': 'Italian'
+    }.get(detected_lang, 'English')
     
-    print(f"\n[MCL AI] Detected language: {user_language}")
+    print(f"\n[MCL AI] Detected language: {user_language_name} ({detected_lang})")
     
     # Create language-specific system prompt
-    if user_language == "German":
+    if detected_lang == 'de':
         print("[MCL AI] Creating German-language system prompt")
         system_prompt = f"""🇩🇪 WICHTIG: Du musst auf DEUTSCH antworten! Der Benutzer stellt eine Frage auf Deutsch.
 
@@ -757,13 +699,13 @@ Remember: Only use information from the document excerpts provided above."""
     
     print(f"\n[MCL AI] System prompt length: {len(system_prompt)} characters")
     print(f"[MCL AI] Total messages to send: {len(final_messages)}")
-    print(f"[MCL AI] Sending request to OpenAI (Language: {user_language})...")
+    print(f"[MCL AI] Sending request to OpenAI (Language: {user_language_name})...")
 
     try:
         response = client.chat.completions.create( 
             model="gpt-4o",
             messages=final_messages,
-            temperature=0.1,  # Low temperature for consistent translation
+            temperature=0.2,  # Slightly higher for more natural translations
             max_tokens=2000
         )
         
@@ -777,10 +719,14 @@ Remember: Only use information from the document excerpts provided above."""
         
         if sources:
             # Use language-appropriate source header
-            if user_language == "German":
-                sources_text = "\n\n📚 **Quellen:**\n" + "\n".join([f"• {source}" for source in sources])
-            else:
-                sources_text = "\n\n📚 **Sources:**\n" + "\n".join([f"• {source}" for source in sources])
+            source_headers = {
+                'de': "\n\n📚 **Quellen:**\n",
+                'en': "\n\n📚 **Sources:**\n",
+                'es': "\n\n📚 **Fuentes:**\n",
+                'fr': "\n\n📚 **Sources:**\n"
+            }
+            sources_header = source_headers.get(detected_lang, source_headers['en'])
+            sources_text = sources_header + "\n".join([f"• {source}" for source in sources])
             
             enhanced_content = original_content + sources_text
             
@@ -815,15 +761,19 @@ Remember: Only use information from the document excerpts provided above."""
                 self.tool_calls = None
         
         # Create language-appropriate fallback message
-        if user_language == "German":
-            fallback_content = """Entschuldigung, aber ich habe derzeit technische Schwierigkeiten beim Zugriff auf die MCL-Wissensdatenbank.
+        fallback_messages = {
+            'de': """Entschuldigung, aber ich habe derzeit technische Schwierigkeiten beim Zugriff auf die MCL-Wissensdatenbank.
             
-            Bitte stellen Sie Ihre Frage erneut, oder wenden Sie sich für technischen Support an Ihren Systemadministrator."""
-        else:
-            fallback_content = """I apologize, but I'm currently experiencing technical difficulties accessing the MCL knowledge base.
+            Bitte stellen Sie Ihre Frage erneut, oder wenden Sie sich für technischen Support an Ihren Systemadministrator.""",
+            'en': """I apologize, but I'm currently experiencing technical difficulties accessing the MCL knowledge base.
             
-            Please try your question again, or contact your system administrator for technical support."""
+            Please try your question again, or contact your system administrator for technical support.""",
+            'es': """Lo siento, pero actualmente tengo dificultades técnicas para acceder a la base de conocimientos de MCL.
+            
+            Por favor, intente su pregunta nuevamente o contacte a su administrador del sistema para soporte técnico."""
+        }
         
+        fallback_content = fallback_messages.get(detected_lang, fallback_messages['en'])
         return MockResponse(fallback_content)
 
 def get_ai_format(messages_input, request: BaseModel):
