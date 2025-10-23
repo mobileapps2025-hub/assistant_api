@@ -21,7 +21,7 @@ from app.services import (
     get_company_unplanned_events, get_store_sales_areas, get_unplanned_sales_areas_on_week,
     start_spotplan_knowledge_base, get_spotplan_ai_response, set_api_client_token,
     # MCL functions
-    start_mcl_knowledge_base, get_mcl_ai_response, _document_chunks, find_relevant_chunks
+    start_mcl_knowledge_base, get_mcl_ai_response, _mcl_document_chunks, find_relevant_chunks
 )
 from app.config import get_db
 
@@ -204,18 +204,18 @@ async def health_check():
         "mcl_knowledge_base_loaded": MCL_VECTOR_STORE_ID is not None,
         "spotplan_vector_store_id": SPOTPLAN_VECTOR_STORE_ID if SPOTPLAN_VECTOR_STORE_ID else "Not loaded",
         "mcl_vector_store_id": MCL_VECTOR_STORE_ID if MCL_VECTOR_STORE_ID else "Not loaded",
-        "total_mcl_document_chunks": len(_document_chunks)
+        "total_mcl_document_chunks": len(_mcl_document_chunks)
     }
 
 @app.get("/api/chunks")
 async def get_chunks_info():
     """Get information about available MCL document chunks."""
-    if not _document_chunks:
+    if not _mcl_document_chunks:
         return {"message": "No MCL document chunks available", "chunks": []}
     
     # Group chunks by document
     documents_info = {}
-    for chunk in _document_chunks:
+    for chunk in _mcl_document_chunks:
         doc_name = chunk["document_name"]
         if doc_name not in documents_info:
             documents_info[doc_name] = {
@@ -233,7 +233,7 @@ async def get_chunks_info():
         })
     
     return {
-        "total_chunks": len(_document_chunks),
+        "total_chunks": len(_mcl_document_chunks),
         "total_documents": len(documents_info),
         "documents": list(documents_info.values())
     }
