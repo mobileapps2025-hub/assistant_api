@@ -1,1 +1,0 @@
-# Database package for MCL AI Assistant

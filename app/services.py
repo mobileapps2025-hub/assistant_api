@@ -46,8 +46,8 @@ except ImportError:
 from pathlib import Path
 from app.config import client, AsyncSessionLocal
 from app.models import EventsBetweenWeeksRequest
-from app.utils import FUNCTION_TOOLS 
-from app.clients.api_client import APIClient
+# from app.utils import FUNCTION_TOOLS  # Commented out - utils.py removed
+# from app.clients.api_client import APIClient  # Commented out - clients/ removed
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Dict, Any, Tuple
@@ -56,7 +56,7 @@ import asyncio
 import traceback
 
 # Global API client instance - will be set by the middleware for Spotplan
-_api_client: APIClient = None
+# _api_client: APIClient = None  # Commented out - APIClient removed
 
 # Global variables for MCL knowledge base - SEPARATED FROM SPOTPLAN
 _mcl_vector_store_id: str = None
@@ -69,160 +69,11 @@ _mcl_embedding_model = None
 _spotplan_vector_store_id: str = None
 _spotplan_document_chunks: List[Dict[str, Any]] = []
 
-def set_api_client_token(token: str):
-    """Set the global API client with the provided token for Spotplan operations."""
-    global _api_client
-    _api_client = APIClient(token)
+# --- SPOTPLAN CODE REMOVED (clients/ and database/ directories removed) ---
+# All Spotplan-specific functions have been deleted.
+# This assistant now only handles MCL (My Checklist) document processing.
 
-# --- Spotplan API Functions ---
-
-async def get_stores():
-    return await _api_client.make_request("GET", "Store/GetUserStores")
-
-async def get_events_between_weeks(store_id: str, starting_week: int, ending_week: int, year: int):
-    json_body = {
-        "StoreId": store_id,
-        "StartingWeek": starting_week,
-        "EndingWeek": ending_week,
-        "Year": year
-    }
-    print(f"Requesting events between weeks with body: {json_body}")
-    return await _api_client.make_request("POST", "Event/GetEventsBetweenWeeks", json_body=json_body)
-
-async def get_unplanned_events_between_weeks(store_id: str, starting_week: int, ending_week: int, year: int):
-    json_body = {
-        "StoreId": store_id,
-        "StartingWeek": starting_week,
-        "EndingWeek": ending_week,
-        "Year": year
-    }
-    print(f"Requesting unplanned events between weeks with body: {json_body}")
-    return await _api_client.make_request("POST", "Event/GetUnplannedEventsBetweenWeeks", json_body=json_body)
-
-async def get_week_events(store_id: str, week: int, year: int):
-    query_params = {
-        "idStore": store_id,
-        "week": week,
-        "year": year
-    }
-    print(f"Requesting week events with body: {query_params}")
-    return await _api_client.make_request("GET", "Event/GetWeekEvents", query_params=query_params)
-
-async def get_events_by_name(event_name):
-    query_params = {"name": event_name}
-    return await _api_client.make_request("GET", "Event/GetEventsByName", query_params=query_params)
-        
-async def get_event_details(event_id):
-    query_params = {"id": event_id}
-    return await _api_client.make_request("GET", "Event/GetEvent", query_params=query_params)
-
-async def get_store_unplanned_events(store_id):
-    query_params = {"idStore": store_id}
-    return await _api_client.make_request("GET", "Event/GetStoreUnplannedEvents", query_params=query_params)
-
-async def get_company_unplanned_events():
-    return await _api_client.make_request("POST", "Event/GetCompanyUnplannedEvents")
-
-async def get_store_sales_areas(store_id):
-    query_params = {"storeId": store_id}
-    return await _api_client.make_request("GET", "Store/GetStoreSalesAreas", query_params=query_params)
-
-async def get_unplanned_sales_areas_on_week(store_id, year, week):
-    query_params = {"storeId": store_id, "year": year, "week": week}
-    return await _api_client.make_request("GET", "Store/GetUnplannedSalesAreasOnWeek", query_params=query_params)
-
-# --- Spotplan Knowledge Base Functions ---
-
-def create_file(openai_client, file_path):
-    print(f"Attempting to create OpenAI file from: {file_path}")
-    if file_path.startswith("http://") or file_path.startswith("https://"):
-        try:
-            response = requests.get(file_path, timeout=30)
-            response.raise_for_status()  
-
-            file_content = BytesIO(response.content)
-            file_name = os.path.basename(file_path) or "downloaded_knowledge_file.pdf"
-            
-            created_file = openai_client.files.create(
-                file=(file_name, file_content),
-                purpose="assistants"
-            )
-
-        except requests.RequestException as e:
-            print(f"Error downloading file from URL {file_path}: {e}")
-            raise
-    else:
-        if not os.path.exists(file_path):
-            print(f"Local file {file_path} not found.")
-            raise FileNotFoundError(f"Local file {file_path} not found.")
-        with open(file_path, "rb") as file_content_stream:
-            created_file = openai_client.files.create(
-                file=file_content_stream,
-                purpose="assistants"
-            )
-    print(f"File created successfully with ID: {created_file.id}")
-    return created_file.id
-
-def start_spotplan_knowledge_base():
-    global _spotplan_vector_store_id
-    print("Starting Spotplan knowledge base initialization...")
-    try:
-        file_path = "spotplan_guide.md" 
-        print(f"Creating file object for: {file_path}")
-        
-        with open(file_path, "rb") as file_content_stream:
-            knowledge_file = client.files.create(
-                file=file_content_stream,
-                purpose="assistants"
-            )
-        
-        print(f"File created successfully with ID: {knowledge_file.id}")
-
-        print(f"Creating vector store named 'spotplan_knowledge_base'...")
-        vector_store = client.vector_stores.create(
-            name="spotplan_knowledge_base",
-            file_ids=[knowledge_file.id]
-        )
-        
-        if not vector_store.id:
-            raise ValueError("Failed to create a vector store with a valid ID.")
-
-        _spotplan_vector_store_id = vector_store.id
-        print(f"Spotplan knowledge base setup complete. Vector Store ID: {vector_store.id} is ready.")
-        
-        return vector_store.id
-
-    except Exception as e:
-        print(f"FATAL: An error occurred during Spotplan knowledge base setup: {e}")
-        return None
-
-def get_spotplan_ai_response(messages_input):
-    current_year = datetime.now().year
-    current_week = datetime.now().isocalendar()[1]  # Get the current week number
-
-    system_prompt = f"""You are "Spotplan Assistant," an expert AI partner for the Spotplan application. 
-    Your goal is to help users by calling the available API function tools. Follow the workflow instructions in your function descriptions.
-
-    - **The Golden Rule of Clarification:** If a user's data request is ambiguous, you MUST default to the `get_stores()` workflow to ask the user for clarification.
-    - **Use Your Memory:** Before asking the user for information (like a `store_id`).
-    - **If user does not specify the year, default to the current year that is {current_year}**
-    - **If user does not specify a week, default to the current week of the year that is {current_week}.**
-    """
-    
-    final_messages = [{"role": "system", "content": system_prompt}] + messages_input
-
-    print(f"Sending messages to Spotplan AI for function-calling: {final_messages}")
-    
-    response = client.chat.completions.create( 
-        model="gpt-4o",
-        messages=final_messages, 
-        tools=FUNCTION_TOOLS,
-        tool_choice="auto"
-    )
-    print(f"Received Spotplan AI response object: {type(response)}") 
-    return response
-
-# --- Enhanced Document Processing Functions ---
+# --- Enhanced Document Processing Functions (SHARED BY MCL) ---
 
 def extract_text_from_docx(file_path: str) -> str:
     """Extract text from DOCX file."""
@@ -431,20 +282,6 @@ def create_text_chunks(text: str, chunk_size: int = 1000, overlap: int = 200) ->
     
     return chunks
 
-async def get_curated_qa_content() -> str:
-    """Fetch curated Q&A content from database and format for knowledge base."""
-    try:
-        if not AsyncSessionLocal:
-            return ""
-        async with AsyncSessionLocal() as db:
-            from app.database.repositories import CuratedQaRepository
-            curated_repo = CuratedQaRepository(db)
-            content = await curated_repo.get_curated_qa_content_for_kb()
-            return content
-    except Exception as e:
-        print(f"Error fetching curated Q&A content: {e}")
-        return ""
-
 # --- MCL Knowledge Base Functions (SEPARATED FROM SPOTPLAN) ---
 
 def extract_text_from_pdf(file_path: str) -> str:
@@ -513,8 +350,10 @@ def create_text_chunks(text: str, chunk_size: int = 1200, overlap: int = 300) ->
     
     return chunks
 
+'''
+# Commented out - database/ directory removed
 async def get_curated_qa_content() -> str:
-    """Fetch curated Q&A content from database and format for knowledge base."""
+    #Fetch curated Q&A content from database and format for knowledge base.
     try:
         if not AsyncSessionLocal:
             return ""
@@ -526,6 +365,7 @@ async def get_curated_qa_content() -> str:
     except Exception as e:
         print(f"Error fetching curated Q&A content: {e}")
         return ""
+'''
 
 def is_mcl_document(file_path: Path) -> bool:
     """Determine if a document is MCL-related (not Spotplan)."""
@@ -562,46 +402,8 @@ def process_mcl_documents_with_enhanced_chunking() -> Tuple[List[str], List[Dict
     # Initialize semantic search
     semantic_available = initialize_semantic_search()
     
-    # First, try to get curated Q&A content from database
-    try:
-        curated_content = asyncio.run(get_curated_qa_content())
-        if curated_content:
-            print("📊 Processing curated Q&A content from database...")
-            chunks = create_text_chunks(curated_content)
-            
-            for i, chunk in enumerate(chunks):
-                chunk_metadata = {
-                    "chunk_id": chunk_id,
-                    "document_name": "Curated_QA.md",
-                    "document_type": "Curated Q&A",
-                    "chunk_index": i,
-                    "total_chunks": len(chunks),
-                    "content": chunk,
-                    "content_hash": hashlib.md5(chunk.encode()).hexdigest()[:8],
-                    "file_path": "database"
-                }
-                _mcl_document_chunks.append(chunk_metadata)
-                
-                formatted_chunk = f"""Document: Curated Q&A (High Priority)
-Chunk {i+1}/{len(chunks)}
-
-{chunk}
-
----
-Source: Curated Q&A Database (Chunk {i+1})"""
-                
-                temp_file = BytesIO(formatted_chunk.encode('utf-8'))
-                created_file = client.files.create(
-                    file=(f"curated_qa_chunk_{i+1}.txt", temp_file),
-                    purpose="assistants"
-                )
-                
-                file_ids.append(created_file.id)
-                chunk_id += 1
-            
-            print(f"✅ Processed curated Q&A → {len(chunks)} chunks")
-    except Exception as e:
-        print(f"⚠️ Error processing curated Q&A: {e}")
+    # Database content loading removed (database/ directory removed)
+    # Previously loaded curated Q&A from database, now loads only from files
     
     # Process all file types in the documents directory
     if documents_path.exists():
