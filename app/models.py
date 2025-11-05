@@ -6,16 +6,44 @@ import uuid
 # --- Unified Pydantic Models for Multi-Agent Assistant ---
 
 class ContentItem(BaseModel):
-    text: str
-    type: str
+    """Content item for multimodal messages (text or image)."""
+    type: str  # "text" or "image_url"
+    text: Optional[str] = None  # For text content
+    image_url: Optional[Dict[str, str]] = None  # For image content: {"url": "data:image/png;base64,..."}
+    
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {"type": "text", "text": "What is this screen?"},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgo..."}}
+            ]
+        }
 
 class Message(BaseModel):
-    role: str
-    content: Optional[List[ContentItem] | str] = None
+    """Message in a chat conversation, supporting text and images."""
+    role: str  # "user", "assistant", "system"
+    content: Optional[List[ContentItem] | str] = None  # Supports multimodal content
     tool_call_id: Optional[str] = None 
     name: Optional[str] = None
     tool_calls: Optional[List[Any]] = None 
-    annotations: Optional[str] = None  # Fixed typo
+    annotations: Optional[str] = None
+    
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "role": "user",
+                    "content": "Hello, how can I create a checklist?"
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What can I do on this screen?"},
+                        {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+                    ]
+                }
+            ]
+        }
 
 class ChatRequest(BaseModel):
     messages: List[Message]

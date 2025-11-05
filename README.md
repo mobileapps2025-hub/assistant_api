@@ -1,15 +1,23 @@
 # MCL Assistant API
 
-An AI-powered knowledge base assistant for the **MCL (Mobile Checklist)** application. This intelligent assistant uses advanced RAG (Retrieval-Augmented Generation) techniques to answer questions based on MCL documentation.
+An AI-powered knowledge base assistant for the **MCL (Mobile Checklist)** application. This intelligent assistant uses advanced RAG (Retrieval-Augmented Generation) techniques to answer questions based on MCL documentation, and now includes **Vision AI** capabilities for screenshot analysis.
 
 ## Features
 
+### Text-Based Assistant
 - 🌍 **Multilingual Support**: Automatically detects and responds in German, English, Spanish, French, and Italian
 - 🔍 **Advanced Semantic Search**: Uses sentence transformers and FAISS for intelligent document retrieval
 - 📚 **Multi-format Support**: Processes PDF, DOCX, PPTX, and Markdown documents
 - 🎯 **Query Expansion**: Generates alternative phrasings for better search coverage
 - 🤖 **GPT-4o Powered**: Uses OpenAI's latest GPT-4o model for accurate responses
 - ⚡ **Fast & Efficient**: Hybrid search combining semantic and keyword matching
+
+### Vision Assistant (NEW!)
+- 👁️ **Screenshot Analysis**: Upload MCL App screenshots for contextual help
+- 🎯 **Screen Identification**: Automatically identifies which MCL screen is shown
+- 📝 **Step-by-Step Guidance**: Provides detailed instructions based on visual context
+- 💬 **Multi-Query Support**: Ask multiple questions about the same screenshot
+- 🔒 **Secure & Private**: Images processed via OpenAI's secure API
 
 ## Architecture
 
@@ -81,7 +89,39 @@ python -m uvicorn app.main:app --reload
 
 Server will start on `http://localhost:8000`
 
-### API Endpoints
+### Vision Assistant (Screenshot Analysis)
+
+For analyzing MCL App screenshots, see the **[Vision Assistant Documentation](VISION_ASSISTANT_README.md)**.
+
+**Quick Start:**
+```python
+from app.vision_assistant import MCLVisionAssistant
+
+# Initialize assistant
+assistant = MCLVisionAssistant()
+
+# Analyze a screenshot
+result = assistant.analyze_screenshot(
+    image_path="./screenshots/mcl-dashboard.png",
+    user_query="What can I do on this screen?"
+)
+
+print(result["response"])
+```
+
+**Interactive Demo:**
+```bash
+python demo_vision.py
+```
+
+**Simple Example:**
+```bash
+python simple_vision_example.py
+```
+
+For complete documentation, examples, and API reference, see **[VISION_ASSISTANT_README.md](VISION_ASSISTANT_README.md)**.
+
+### Text-Based API Endpoints
 
 #### 1. Chat (Main Endpoint)
 ```http
@@ -198,11 +238,15 @@ Static/
 │   ├── services.py          # Core AI services
 │   ├── models.py            # Pydantic models
 │   ├── config.py            # Configuration
+│   ├── vision_assistant.py  # NEW: Vision AI for screenshots
 │   ├── documents/           # MCL documentation files
 │   └── __init__.py
+├── demo_vision.py           # NEW: Interactive vision demo
+├── simple_vision_example.py # NEW: Simple vision example
 ├── .env                     # Environment variables
 ├── requirements.txt         # Python dependencies
-└── README.md               # This file
+├── README.md               # This file
+└── VISION_ASSISTANT_README.md  # NEW: Vision assistant docs
 ```
 
 ### Key Functions (services.py)
@@ -214,6 +258,18 @@ Static/
 - `detect_language(text)`: Detect user's language
 - `translate_query_to_english(query, lang)`: Translate for search
 - `get_mcl_ai_response(messages)`: Generate AI response
+
+### Vision Assistant Functions (vision_assistant.py)
+
+- `MCLVisionAssistant()`: Initialize vision assistant
+- `analyze_screenshot(image_path, user_query)`: Complete workflow (recommended)
+- `get_or_create_assistant(name, instructions, model)`: Setup assistant
+- `upload_image_for_vision(image_path)`: Upload screenshot
+- `create_thread_and_add_message(text, file_id)`: Create multimodal conversation
+- `run_assistant_and_wait(thread_id, assistant_id)`: Execute analysis
+- `get_assistant_response(thread_id)`: Retrieve results
+
+See **[VISION_ASSISTANT_README.md](VISION_ASSISTANT_README.md)** for detailed API reference.
 
 ### Testing
 
@@ -315,7 +371,16 @@ For issues or questions:
 
 ## Changelog
 
-### v3.0.0 (Current)
+### v3.1.0 (Current)
+- ✅ **NEW: Vision Assistant** - Screenshot analysis with GPT-4o vision
+- ✅ **NEW: Interactive demos** - `demo_vision.py` and `simple_vision_example.py`
+- ✅ **NEW: Complete documentation** - `VISION_ASSISTANT_README.md`
+- ✅ **NEW: Multimodal support** - Text + image input for contextual help
+- ✅ Clean, modular code structure
+- ✅ Comprehensive error handling
+- ✅ Step-by-step workflow support
+
+### v3.0.0
 - ✅ Removed Spotplan agent and dependencies
 - ✅ Simplified to MCL-only knowledge base
 - ✅ Advanced RAG with query expansion

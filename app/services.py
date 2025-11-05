@@ -1093,3 +1093,187 @@ def get_ai_format(messages_input, request: BaseModel):
     )
     print(f"Received AI response object: {type(response)}")
     return response
+
+
+# ========================================================================
+# Vision-Enabled Chat Support
+# ========================================================================
+
+def get_vision_enabled_response(messages: list, vector_store_id: str) -> dict:
+    """
+    Handle chat messages with optional image attachments using GPT-4o vision.
+    
+    This function processes messages that may contain both text and images,
+    similar to ChatGPT/Gemini interfaces. It:
+    1. Detects if any message contains images
+    2. If images present, uses vision-enabled response
+    3. If no images, falls back to regular RAG response
+    4. Supports multimodal conversations
+    
+    Args:
+        messages: List of message dicts with role and content (may include images)
+        vector_store_id: MCL knowledge base vector store ID
+    
+    Returns:
+        dict with 'response', 'success', 'has_vision', and optional 'metadata'
+    """
+    print("\n" + "="*80)
+    print("🔍 VISION-ENABLED CHAT ANALYSIS")
+    print("="*80)
+    
+    # Check if any message contains images
+    has_images = False
+    image_messages = []
+    
+    for msg in messages:
+        if isinstance(msg.get('content'), list):
+            for item in msg['content']:
+                if isinstance(item, dict) and item.get('type') == 'image_url':
+                    has_images = True
+                    image_messages.append(msg)
+                    print(f"📷 Image detected in {msg.get('role', 'unknown')} message")
+    
+    if not has_images:
+        print("ℹ️ No images detected - using standard RAG response")
+        print("="*80 + "\n")
+        # Fall back to regular MCL AI response
+        response_obj = get_mcl_ai_response(messages)
+        return {
+            "response": response_obj.choices[0].message.content,
+            "success": True,
+            "has_vision": False
+        }
+    
+    print(f"🖼️ Vision mode activated - {len(image_messages)} message(s) with images")
+    
+    try:
+        # Extract the latest user query and images
+        latest_user_message = None
+        for msg in reversed(messages):
+            if msg.get('role') == 'user':
+                latest_user_message = msg
+                break
+        
+        if not latest_user_message:
+            return {
+                "response": "No user message found",
+                "success": False,
+                "has_vision": True,
+                "error": "No user message in conversation"
+            }
+        
+        # Extract text query from multimodal content
+        user_query = ""
+        image_data_list = []
+        
+        if isinstance(latest_user_message.get('content'), list):
+            for item in latest_user_message['content']:
+                if isinstance(item, dict):
+                    if item.get('type') == 'text':
+                        user_query = item.get('text', '')
+                    elif item.get('type') == 'image_url':
+                        img_url = item.get('image_url', {}).get('url', '')
+                        if img_url:
+                            image_data_list.append(img_url)
+        elif isinstance(latest_user_message.get('content'), str):
+            user_query = latest_user_message['content']
+        
+        print(f"💬 User query: {user_query[:100]}..." if len(user_query) > 100 else f"💬 User query: {user_query}")
+        print(f"🖼️ Images to analyze: {len(image_data_list)}")
+        
+        # Build vision-enabled messages for OpenAI
+        vision_messages = []
+        
+        # Add system context from MCL knowledge base
+        system_prompt = """You are the MCL App Assistant with vision capabilities. When analyzing screenshots:
+
+1. Identify if the image is from the MCL (Mobile Checklist) App
+2. If yes, describe what screen/feature is shown
+3. Answer the user's question based on both the visual context and your MCL knowledge
+4. If no, politely inform the user you can only help with MCL App screenshots
+5. Provide clear, step-by-step guidance when needed
+
+Be helpful, concise, and accurate."""
+        
+        vision_messages.append({
+            "role": "system",
+            "content": system_prompt
+        })
+        
+        # Add conversation history (excluding images from history to save tokens)
+        for msg in messages[:-1]:  # All except the latest
+            if msg.get('role') in ['user', 'assistant', 'system']:
+                content = msg.get('content', '')
+                # Extract text only from multimodal messages
+                if isinstance(content, list):
+                    text_parts = [item.get('text', '') for item in content if item.get('type') == 'text']
+                    content = ' '.join(text_parts)
+                
+                vision_messages.append({
+                    "role": msg['role'],
+                    "content": content
+                })
+        
+        # Add the latest user message with images
+        multimodal_content = []
+        
+        if user_query:
+            multimodal_content.append({
+                "type": "text",
+                "text": user_query
+            })
+        
+        for img_data in image_data_list:
+            multimodal_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": img_data,
+                    "detail": "high"  # Use high detail for better analysis
+                }
+            })
+        
+        vision_messages.append({
+            "role": "user",
+            "content": multimodal_content
+        })
+        
+        print(f"📨 Sending {len(vision_messages)} messages to GPT-4o vision...")
+        
+        # Call OpenAI with vision support
+        response = client.chat.completions.create(
+            model="gpt-4o",  # GPT-4o supports vision
+            messages=vision_messages,
+            max_tokens=1500,
+            temperature=0.7
+        )
+        
+        ai_response = response.choices[0].message.content
+        
+        print(f"✅ Vision response received ({len(ai_response)} characters)")
+        print(f"📝 Response preview: {ai_response[:150]}..." if len(ai_response) > 150 else f"📝 Response: {ai_response}")
+        print("="*80 + "\n")
+        
+        return {
+            "response": ai_response,
+            "success": True,
+            "has_vision": True,
+            "metadata": {
+                "model": "gpt-4o",
+                "images_analyzed": len(image_data_list),
+                "query": user_query
+            }
+        }
+        
+    except Exception as e:
+        print(f"❌ ERROR in vision processing: {e}")
+        import traceback
+        traceback.print_exc()
+        print("="*80 + "\n")
+        
+        return {
+            "response": f"I encountered an error processing the image: {str(e)}",
+            "success": False,
+            "has_vision": True,
+            "error": str(e)
+        }
+
