@@ -10,6 +10,12 @@ client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
 )
 
+# MCL Image Validation Configuration
+# DISABLED by default - GPT-4o Vision cannot reliably identify proprietary apps like MCL
+# Enable only if you have reference MCL screenshots for comparison
+ENABLE_MCL_IMAGE_VALIDATION = os.getenv("ENABLE_MCL_IMAGE_VALIDATION", "false").lower() == "true"
+MCL_VALIDATION_CONFIDENCE_THRESHOLD = float(os.getenv("MCL_VALIDATION_CONFIDENCE_THRESHOLD", "0.5"))
+
 # Database configuration for MCL feedback system
 DATABASE_CONNECTION_STRING = os.getenv(
     "DATABASE_CONNECTION_STRING",

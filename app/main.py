@@ -2,11 +2,17 @@ import uvicorn
 from contextlib import asynccontextmanager
 import tempfile
 import os
+from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy import exc
 
-from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id
+from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse
+from app.config import ENABLE_MCL_IMAGE_VALIDATION, get_db
+from app.database import Feedback, Base
 from app.services import (
     start_mcl_knowledge_base, 
     get_mcl_ai_response, 
@@ -20,11 +26,21 @@ MCL_VECTOR_STORE_ID = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize MCL knowledge base on startup."""
+    """Initialize MCL knowledge base and database on startup."""
     global MCL_VECTOR_STORE_ID
     print("MCL Assistant startup sequence initiated...")
     
     try:
+        # Initialize database tables
+        print("Initializing database...")
+        from app.config import engine
+        if engine:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            print("✓ Database tables initialized")
+        else:
+            print("⚠ WARNING: Database not available - feedback system disabled")
+        
         # Initialize MCL knowledge base
         print("Initializing MCL knowledge base...")
         MCL_VECTOR_STORE_ID = start_mcl_knowledge_base()
@@ -38,9 +54,13 @@ async def lifespan(app: FastAPI):
         yield
     except Exception as e:
         print(f"✗ FATAL ERROR during MCL Assistant startup: {e}")
+        import traceback
+        traceback.print_exc()
         yield
     finally:
         print("MCL Assistant shutting down...")
+        if engine:
+            await engine.dispose()
 
 # --- FastAPI Application Initialization ---
 app = FastAPI(
@@ -75,6 +95,7 @@ async def root():
         ],
         "endpoints": {
             "chat": "/api/chat",
+            "feedback": "/api/feedback",
             "health": "/health",
             "chunks": "/api/chunks",
             "search": "/api/search"
@@ -256,9 +277,14 @@ async def chat(body: ChatRequest) -> ChatResponse:
         print(f"[CHAT API] User question: {user_question[:100]}..." if len(user_question) > 100 else f"[CHAT API] User question: {user_question}")
         print(f"[CHAT API] Has images: {'Yes 🖼️' if has_images else 'No 📝'}")
         print(f"[CHAT API] Total messages: {len(messages_for_ai)}")
+        print(f"[CHAT API] MCL validation: {'Enabled ✅' if ENABLE_MCL_IMAGE_VALIDATION else 'Disabled ⚠️'}")
         
         # Use vision-enabled response handler (handles both text-only and multimodal)
-        result = get_vision_enabled_response(messages_for_ai, MCL_VECTOR_STORE_ID)
+        result = get_vision_enabled_response(
+            messages_for_ai, 
+            MCL_VECTOR_STORE_ID,
+            validate_mcl=ENABLE_MCL_IMAGE_VALIDATION
+        )
         
         if result["success"]:
             ai_response_text = result["response"]
@@ -287,6 +313,108 @@ async def chat(body: ChatRequest) -> ChatResponse:
         traceback.print_exc()
         print("="*80 + "\n")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
+# --- Feedback Endpoint ---
+
+@app.post("/api/feedback", response_model=FeedbackResponse)
+async def submit_feedback(
+    feedback: FeedbackRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Submit user feedback for an AI response.
+    
+    Args:
+        feedback: Feedback request containing response_id, feedback_type, and optional comment
+        db: Database session
+    
+    Returns:
+        FeedbackResponse with the created feedback record
+    
+    Raises:
+        400: If feedback already exists for this response_id
+        404: If response_id is not found (optional validation)
+        422: If feedback_type is invalid
+        500: If database error occurs
+    """
+    print("\n" + "="*80)
+    print(f"[FEEDBACK API] New feedback submission received")
+    print("="*80)
+    print(f"[FEEDBACK API] Response ID: {feedback.response_id}")
+    print(f"[FEEDBACK API] Feedback Type: {feedback.feedback_type}")
+    print(f"[FEEDBACK API] Has Comment: {'Yes' if feedback.user_comment else 'No'}")
+    
+    # Validate feedback type
+    if feedback.feedback_type not in ["positive", "negative"]:
+        print(f"[FEEDBACK API] ❌ Invalid feedback type: {feedback.feedback_type}")
+        print("="*80 + "\n")
+        raise HTTPException(
+            status_code=422,
+            detail="feedback_type must be 'positive' or 'negative'"
+        )
+    
+    try:
+        # Check if feedback already exists for this response
+        result = await db.execute(
+            select(Feedback).where(Feedback.response_id == feedback.response_id)
+        )
+        existing_feedback = result.scalar_one_or_none()
+        
+        if existing_feedback:
+            print(f"[FEEDBACK API] ❌ Duplicate feedback for response: {feedback.response_id}")
+            print("="*80 + "\n")
+            raise HTTPException(
+                status_code=400,
+                detail="Feedback already submitted for this response"
+            )
+        
+        # Create new feedback record
+        db_feedback = Feedback(
+            response_id=feedback.response_id,
+            feedback_type=feedback.feedback_type,
+            user_comment=feedback.user_comment,
+            created_at=datetime.utcnow(),
+            processed=False
+        )
+        
+        db.add(db_feedback)
+        await db.commit()
+        await db.refresh(db_feedback)
+        
+        print(f"[FEEDBACK API] ✅ Feedback saved successfully (ID: {db_feedback.id})")
+        print(f"[FEEDBACK API] Created at: {db_feedback.created_at}")
+        print("="*80 + "\n")
+        
+        # Return the feedback response
+        return FeedbackResponse(
+            id=db_feedback.id,
+            response_id=db_feedback.response_id,
+            feedback_type=db_feedback.feedback_type,
+            user_comment=db_feedback.user_comment,
+            created_at=db_feedback.created_at,
+            processed=db_feedback.processed
+        )
+        
+    except exc.IntegrityError as e:
+        await db.rollback()
+        print(f"[FEEDBACK API] ❌ Database integrity error: {e}")
+        print("="*80 + "\n")
+        raise HTTPException(
+            status_code=400,
+            detail="Feedback already submitted for this response"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        print(f"[FEEDBACK API] ❌ Database error: {e}")
+        import traceback
+        traceback.print_exc()
+        print("="*80 + "\n")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
 
 # --- Vision Assistant Endpoint ---
 

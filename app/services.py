@@ -1099,20 +1099,22 @@ def get_ai_format(messages_input, request: BaseModel):
 # Vision-Enabled Chat Support
 # ========================================================================
 
-def get_vision_enabled_response(messages: list, vector_store_id: str) -> dict:
+def get_vision_enabled_response(messages: list, vector_store_id: str, validate_mcl: bool = True) -> dict:
     """
     Handle chat messages with optional image attachments using GPT-4o vision.
     
     This function processes messages that may contain both text and images,
     similar to ChatGPT/Gemini interfaces. It:
     1. Detects if any message contains images
-    2. If images present, uses vision-enabled response
-    3. If no images, falls back to regular RAG response
-    4. Supports multimodal conversations
+    2. Validates images are from MCL app (if validate_mcl=True)
+    3. If images present, uses vision-enabled response
+    4. If no images, falls back to regular RAG response
+    5. Supports multimodal conversations
     
     Args:
         messages: List of message dicts with role and content (may include images)
         vector_store_id: MCL knowledge base vector store ID
+        validate_mcl: Whether to validate images are from MCL app (default: True)
     
     Returns:
         dict with 'response', 'success', 'has_vision', and optional 'metadata'
@@ -1124,6 +1126,7 @@ def get_vision_enabled_response(messages: list, vector_store_id: str) -> dict:
     # Check if any message contains images
     has_images = False
     image_messages = []
+    image_data_urls = []
     
     for msg in messages:
         if isinstance(msg.get('content'), list):
@@ -1131,6 +1134,9 @@ def get_vision_enabled_response(messages: list, vector_store_id: str) -> dict:
                 if isinstance(item, dict) and item.get('type') == 'image_url':
                     has_images = True
                     image_messages.append(msg)
+                    img_url = item.get('image_url', {}).get('url', '')
+                    if img_url:
+                        image_data_urls.append(img_url)
                     print(f"📷 Image detected in {msg.get('role', 'unknown')} message")
     
     if not has_images:
@@ -1145,6 +1151,49 @@ def get_vision_enabled_response(messages: list, vector_store_id: str) -> dict:
         }
     
     print(f"🖼️ Vision mode activated - {len(image_messages)} message(s) with images")
+    
+    # Validate images are from MCL app
+    if validate_mcl and image_data_urls:
+        print(f"🔍 Validating {len(image_data_urls)} image(s) as MCL screenshots...")
+        
+        from app.mcl_image_validator import validate_mcl_image
+        
+        validation_results = []
+        for idx, img_url in enumerate(image_data_urls):
+            try:
+                validation = validate_mcl_image(img_url, confidence_threshold=0.6)
+                validation_results.append(validation)
+                
+                print(f"  Image {idx+1}: {'✅ MCL' if validation['is_mcl'] else '❌ Not MCL'} (confidence: {validation['confidence']:.2f})")
+                
+                # If any image is definitely not MCL, return early with helpful message
+                if not validation['is_mcl'] and validation['confidence'] >= 0.7:
+                    print(f"❌ Image validation failed: {validation['reason']}")
+                    print("="*80 + "\n")
+                    
+                    return {
+                        "response": validation['suggestion'],
+                        "success": True,
+                        "has_vision": True,
+                        "is_mcl": False,
+                        "validation": validation,
+                        "metadata": {
+                            "validation_failed": True,
+                            "identified_app": validation.get('identified_app', 'Unknown')
+                        }
+                    }
+            except Exception as e:
+                print(f"  ⚠️ Warning: Could not validate image {idx+1}: {e}")
+                # Continue anyway - don't block on validation errors
+        
+        # Log validation summary
+        mcl_count = sum(1 for v in validation_results if v['is_mcl'])
+        print(f"📊 Validation summary: {mcl_count}/{len(validation_results)} images confirmed as MCL")
+        
+        # If low confidence but not explicitly rejected, add a warning to response
+        low_confidence = any(v['confidence'] < 0.6 for v in validation_results if not v['is_mcl'])
+        if low_confidence:
+            print("⚠️ Low confidence in MCL validation - will add warning to response")
     
     try:
         # Extract the latest user query and images
