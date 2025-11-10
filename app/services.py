@@ -4,6 +4,7 @@ import requests
 from io import BytesIO
 import os
 import sys
+from typing import List, Dict, Any, Optional
 
 # Configure stdout encoding for emoji support
 if hasattr(sys.stdout, 'reconfigure'):
