@@ -41,6 +41,10 @@ try:
     print("✅ Semantic search capabilities available")
 except ImportError:
     HAS_SEMANTIC_SEARCH = False
+    # Create dummy numpy for type hints
+    class DummyNumpy:
+        ndarray = Any
+    np = DummyNumpy()
     print("⚠️ Semantic search libraries not available, falling back to keyword search")
 
 from pathlib import Path
@@ -50,7 +54,7 @@ from app.models import EventsBetweenWeeksRequest
 # from app.clients.api_client import APIClient  # Commented out - clients/ removed
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import hashlib
 import asyncio
 import traceback
@@ -61,7 +65,7 @@ import traceback
 # Global variables for MCL knowledge base - SEPARATED FROM SPOTPLAN
 _mcl_vector_store_id: str = None
 _mcl_document_chunks: List[Dict[str, Any]] = []
-_mcl_embeddings: np.ndarray = None
+_mcl_embeddings: Optional[Any] = None  # Use Any instead of np.ndarray for compatibility
 _mcl_faiss_index = None
 _mcl_embedding_model = None
 
@@ -167,7 +171,7 @@ def initialize_semantic_search():
         print(f"❌ Error loading semantic search model: {e}")
         return False
 
-def create_embeddings_for_chunks(chunks: List[Dict[str, Any]]) -> Tuple[np.ndarray, Any]:
+def create_embeddings_for_chunks(chunks: List[Dict[str, Any]]) -> Tuple[Any, Any]:
     """Create embeddings for document chunks and build FAISS index."""
     if not HAS_SEMANTIC_SEARCH or not _mcl_embedding_model:
         return None, None
@@ -197,7 +201,7 @@ def create_embeddings_for_chunks(chunks: List[Dict[str, Any]]) -> Tuple[np.ndarr
         return None, None
 
 def semantic_search_chunks(query: str, chunks: List[Dict[str, Any]], 
-                          embeddings: np.ndarray, faiss_index, max_chunks: int = 5) -> List[Dict[str, Any]]:
+                          embeddings: Any, faiss_index, max_chunks: int = 5) -> List[Dict[str, Any]]:
     """Perform semantic search using FAISS."""
     if not HAS_SEMANTIC_SEARCH or not _mcl_embedding_model or faiss_index is None:
         return []
