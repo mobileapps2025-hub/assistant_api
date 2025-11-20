@@ -18,8 +18,10 @@ from app.services import (
     get_mcl_ai_response, 
     get_vision_enabled_response,
     _mcl_document_chunks, 
-    find_relevant_chunks
+    find_relevant_chunks,
+    detect_language
 )
+from app.context_manager import analyze_situational_context
 
 # Global variable for MCL knowledge base
 MCL_VECTOR_STORE_ID = None
@@ -274,16 +276,32 @@ async def chat(body: ChatRequest) -> ChatResponse:
                         "content": content_text
                     })
 
+        context_analysis = analyze_situational_context(messages_for_ai)
+        detected_lang = detect_language(user_question or context_analysis.latest_question or "")
         print(f"[CHAT API] User question: {user_question[:100]}..." if len(user_question) > 100 else f"[CHAT API] User question: {user_question}")
         print(f"[CHAT API] Has images: {'Yes 🖼️' if has_images else 'No 📝'}")
         print(f"[CHAT API] Total messages: {len(messages_for_ai)}")
+        print(f"[CHAT API] Context summary: {context_analysis.build_summary()}")
         print(f"[CHAT API] MCL validation: {'Enabled ✅' if ENABLE_MCL_IMAGE_VALIDATION else 'Disabled ⚠️'}")
+
+        if context_analysis.needs_clarification():
+            clarification = context_analysis.clarification_prompt(language=detected_lang)
+            print("[CHAT API] ❔ Insufficient situational context – requesting clarification")
+            print("="*80 + "\n")
+            return ChatResponse(
+                response=clarification or "Could you share whether you are on the app or the web version?",
+                response_id=response_id,
+                sources=[],
+                app_type="mcl"
+            )
         
         # Use vision-enabled response handler (handles both text-only and multimodal)
         result = get_vision_enabled_response(
             messages_for_ai, 
             MCL_VECTOR_STORE_ID,
-            validate_mcl=ENABLE_MCL_IMAGE_VALIDATION
+            validate_mcl=ENABLE_MCL_IMAGE_VALIDATION,
+            situational_context=context_analysis,
+            detected_lang=detected_lang
         )
         
         if result["success"]:

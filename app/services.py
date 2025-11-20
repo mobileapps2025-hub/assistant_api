@@ -4,7 +4,7 @@ import requests
 from io import BytesIO
 import os
 import sys
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple, TYPE_CHECKING
 
 # Configure stdout encoding for emoji support
 if hasattr(sys.stdout, 'reconfigure'):
@@ -55,10 +55,12 @@ from app.models import EventsBetweenWeeksRequest
 # from app.clients.api_client import APIClient  # Commented out - clients/ removed
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Dict, Any, Tuple, Optional
 import hashlib
 import asyncio
 import traceback
+
+if TYPE_CHECKING:
+    from app.context_manager import ContextAnalysis
 
 # Global API client instance - will be set by the middleware for Spotplan
 # _api_client: APIClient = None  # Commented out - APIClient removed
@@ -856,7 +858,11 @@ def translate_query_to_english(query: str, source_language: str) -> str:
         print(f"❌ Error translating query: {e}")
         return query  # Return original on error
 
-def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
+def get_mcl_ai_response(
+    messages_input: List[Dict[str, Any]],
+    situational_context: Optional["ContextAnalysis"] = None,
+    detected_lang: Optional[str] = None,
+) -> Any:
     """Get AI response for MCL-related queries with source attribution."""
     
     print("\n" + "="*80)
@@ -897,7 +903,8 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
         print(f"[MCL AI] Total context length: {len(context)} characters")
     
     # Detect user's language
-    detected_lang = detect_language(latest_user_message)
+    if not detected_lang:
+        detected_lang = detect_language(latest_user_message)
     user_language_name = {
         'de': 'German',
         'en': 'English',
@@ -911,6 +918,11 @@ def get_mcl_ai_response(messages_input: List[Dict[str, Any]]) -> Any:
     # Create language-specific system prompt with enhanced reasoning capabilities
     if detected_lang == 'de':
         print("[MCL AI] Creating German-language system prompt")
+        context_block = (
+            situational_context.prompt_block(language="de")
+            if situational_context
+            else "Situationsanalyse: Keine zusätzlichen Hinweise vorhanden."
+        )
         system_prompt = f"""🇩🇪 WICHTIG: Du musst auf DEUTSCH antworten! Der Benutzer stellt eine Frage auf Deutsch.
 
 You are "MCL Assistant," an expert AI assistant for the MCL (Mobile Checklist) application.
@@ -930,6 +942,9 @@ You are "MCL Assistant," an expert AI assistant for the MCL (Mobile Checklist) a
 - Write complete sentences in German with proper grammar
 - Provide step-by-step instructions in German
 
+Situationshinweise:
+{context_block}
+
 Available Document Excerpts (in English - you must translate):
 {context}
 
@@ -947,9 +962,17 @@ Guidelines:
 REMEMBER: Your ENTIRE response must be in GERMAN (Deutsch)!"""
     else:
         print("[MCL AI] Creating English-language system prompt")
+        context_block = (
+            situational_context.prompt_block(language="en")
+            if situational_context
+            else "Situational context assessment: No additional signals detected."
+        )
         system_prompt = f"""You are "MCL Assistant," an expert AI assistant for the MCL (Mobile Checklist) application. 
 
 Your goal is to provide helpful, accurate answers based on the MCL documentation provided below.
+
+Situational context derived from the conversation:
+{context_block}
 
 Available Document Excerpts:
 {context}
@@ -1104,7 +1127,13 @@ def get_ai_format(messages_input, request: BaseModel):
 # Vision-Enabled Chat Support
 # ========================================================================
 
-def get_vision_enabled_response(messages: list, vector_store_id: str, validate_mcl: bool = True) -> dict:
+def get_vision_enabled_response(
+    messages: list,
+    vector_store_id: str,
+    validate_mcl: bool = True,
+    situational_context: Optional["ContextAnalysis"] = None,
+    detected_lang: Optional[str] = None,
+) -> dict:
     """
     Handle chat messages with optional image attachments using GPT-4o vision.
     
@@ -1120,6 +1149,8 @@ def get_vision_enabled_response(messages: list, vector_store_id: str, validate_m
         messages: List of message dicts with role and content (may include images)
         vector_store_id: MCL knowledge base vector store ID
         validate_mcl: Whether to validate images are from MCL app (default: True)
+        situational_context: Optional context analysis for prompt guardrails
+        detected_lang: Reuse detected language to avoid re-detection
     
     Returns:
         dict with 'response', 'success', 'has_vision', and optional 'metadata'
@@ -1148,7 +1179,9 @@ def get_vision_enabled_response(messages: list, vector_store_id: str, validate_m
         print("ℹ️ No images detected - using standard RAG response")
         print("="*80 + "\n")
         # Fall back to regular MCL AI response
-        response_obj = get_mcl_ai_response(messages)
+        response_obj = get_mcl_ai_response(
+            messages, situational_context=situational_context, detected_lang=detected_lang
+        )
         return {
             "response": response_obj.choices[0].message.content,
             "success": True,
@@ -1239,7 +1272,18 @@ def get_vision_enabled_response(messages: list, vector_store_id: str, validate_m
         vision_messages = []
         
         # Add system context from MCL knowledge base
-        system_prompt = """You are the MCL App Assistant with vision capabilities. When analyzing screenshots:
+        context_block = None
+        lang_hint = "de" if detected_lang == "de" else "en"
+        if situational_context:
+            context_block = situational_context.prompt_block(language=lang_hint)
+        else:
+            context_block = (
+                "Situational context assessment: No additional hints detected."
+                if lang_hint == "en"
+                else "Situationsanalyse: Keine zusätzlichen Hinweise."
+            )
+
+        system_prompt = f"""You are the MCL App Assistant with vision capabilities. When analyzing screenshots:
 
 1. Identify if the image is from the MCL (Mobile Checklist) App
 2. If yes, describe what screen/feature is shown
@@ -1247,7 +1291,11 @@ def get_vision_enabled_response(messages: list, vector_store_id: str, validate_m
 4. If no, politely inform the user you can only help with MCL App screenshots
 5. Provide clear, step-by-step guidance when needed
 
-Be helpful, concise, and accurate."""
+Be helpful, concise, and accurate.
+
+Situational guardrails:
+{context_block}
+"""
         
         vision_messages.append({
             "role": "system",

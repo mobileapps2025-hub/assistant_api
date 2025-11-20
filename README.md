@@ -11,6 +11,7 @@ An AI-powered knowledge base assistant for the **MCL (Mobile Checklist)** applic
 - 🎯 **Query Expansion**: Generates alternative phrasings for better search coverage
 - 🤖 **GPT-4o Powered**: Uses OpenAI's latest GPT-4o model for accurate responses
 - ⚡ **Fast & Efficient**: Hybrid search combining semantic and keyword matching
+- 🧭 **Situational Guardrails**: Detects app/web context, device type, and confidence, then asks for clarification when signals are missing
 
 ### Vision Assistant (NEW!)
 - 👁️ **Screenshot Analysis**: Upload MCL App screenshots for contextual help
@@ -36,9 +37,10 @@ An AI-powered knowledge base assistant for the **MCL (Mobile Checklist)** applic
 
 ### Response Generation
 1. **Context Building**: Top 15 chunks assembled with source attribution
-2. **Prompt Engineering**: Language-specific system prompts with reasoning guidelines
-3. **GPT-4o Generation**: Context-aware response with cited sources
-4. **Source Attribution**: Automatic listing of referenced documents
+2. **Situational Awareness**: Heuristic analysis captures interface/OS assumptions and enforces guardrails
+3. **Prompt Engineering**: Language-specific system prompts with reasoning guidelines
+4. **GPT-4o Generation**: Context-aware response with cited sources
+5. **Source Attribution**: Automatic listing of referenced documents
 
 ## Installation
 
@@ -376,6 +378,7 @@ For issues or questions:
 - ✅ **NEW: Interactive demos** - `demo_vision.py` and `simple_vision_example.py`
 - ✅ **NEW: Complete documentation** - `VISION_ASSISTANT_README.md`
 - ✅ **NEW: Multimodal support** - Text + image input for contextual help
+- ✅ **NEW: Situational context engine** - Clarification prompts and prompt guardrails to avoid mixed answers
 - ✅ Clean, modular code structure
 - ✅ Comprehensive error handling
 - ✅ Step-by-step workflow support
