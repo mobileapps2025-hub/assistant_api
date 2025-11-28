@@ -36,3 +36,9 @@ desktop.ini
 build/
 dist/
 *.egg-info/
+
+# --- Application Data & Caches ---
+# Ignore generated vector store and cache files
+mcl_vector_store/
+mcl_image_cache.json
+test_cache.json
