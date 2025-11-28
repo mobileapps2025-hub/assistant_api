@@ -11,56 +11,59 @@ from sqlalchemy.future import select
 from sqlalchemy import exc
 
 from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse
-from app.config import ENABLE_MCL_IMAGE_VALIDATION, get_db
-from app.database import Feedback, Base
-from app.services import (
-    start_mcl_knowledge_base, 
-    get_mcl_ai_response, 
-    get_vision_enabled_response,
-    _mcl_document_chunks, 
-    find_relevant_chunks,
-    detect_language
-)
-from app.context_manager import analyze_situational_context
+from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH
+from app.core.database import Feedback, Base
+from app.core.dependencies import get_vector_store_service, get_chat_service
+from app.services.chat_service import ChatService
+from app.services.vector_store import VectorStoreService
+from app.core.context import analyze_situational_context
+from app.routers import vision
+from app.core.logging import setup_logging, get_logger
 
-# Global variable for MCL knowledge base
-MCL_VECTOR_STORE_ID = None
+# Setup logging
+setup_logging()
+logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize MCL knowledge base and database on startup."""
-    global MCL_VECTOR_STORE_ID
-    print("MCL Assistant startup sequence initiated...")
+    logger.info("MCL Assistant startup sequence initiated...")
     
     try:
         # Initialize database tables
-        print("Initializing database...")
-        from app.config import engine
+        logger.info("Initializing database...")
         if engine:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
-            print("✓ Database tables initialized")
+            logger.info("Database tables initialized")
         else:
-            print("⚠ WARNING: Database not available - feedback system disabled")
+            logger.warning("Database not available - feedback system disabled")
         
         # Initialize MCL knowledge base
-        print("Initializing MCL knowledge base...")
-        MCL_VECTOR_STORE_ID = start_mcl_knowledge_base()
-        if MCL_VECTOR_STORE_ID:
-            print(f"✓ MCL knowledge base loaded successfully. Vector Store ID: {MCL_VECTOR_STORE_ID}")
-            print(f"✓ Total document chunks: {len(_mcl_document_chunks)}")
+        logger.info("Initializing MCL knowledge base...")
+        vector_store = get_vector_store_service()
+        
+        if vector_store.index_exists():
+            if vector_store.load_index():
+                logger.info(f"MCL knowledge base loaded successfully. Total chunks: {len(vector_store.chunks)}")
+            else:
+                logger.error("Failed to load MCL knowledge base index.")
         else:
-            print("⚠ WARNING: Failed to initialize MCL knowledge base")
+            logger.info("Index not found. Building index from documents...")
+            # Assuming documents are in app/documents
+            result = vector_store.build_index("app/documents")
+            if result["success"]:
+                logger.info(f"Index built successfully. Total chunks: {result['total_chunks']}")
+            else:
+                logger.error(f"Failed to build index: {result.get('error')}")
 
-        print("MCL Assistant startup completed.")
+        logger.info("MCL Assistant startup completed.")
         yield
     except Exception as e:
-        print(f"✗ FATAL ERROR during MCL Assistant startup: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"FATAL ERROR during MCL Assistant startup: {e}", exc_info=True)
         yield
     finally:
-        print("MCL Assistant shutting down...")
+        logger.info("MCL Assistant shutting down...")
         if engine:
             await engine.dispose()
 
@@ -79,6 +82,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(vision.router)
 
 # --- API Endpoints ---
 
@@ -105,25 +110,28 @@ async def root():
     }
 
 @app.get("/health")
-async def health_check():
+async def health_check(vector_store: VectorStoreService = Depends(get_vector_store_service)):
     """Health check endpoint."""
+    is_loaded = vector_store.index is not None
+    chunks = vector_store.chunks
+    
     return {
         "status": "healthy",
-        "knowledge_base_loaded": MCL_VECTOR_STORE_ID is not None,
-        "vector_store_id": MCL_VECTOR_STORE_ID if MCL_VECTOR_STORE_ID else "Not loaded",
-        "total_document_chunks": len(_mcl_document_chunks),
-        "documents_processed": len(set(chunk['document_name'] for chunk in _mcl_document_chunks))
+        "knowledge_base_loaded": is_loaded,
+        "total_document_chunks": len(chunks),
+        "documents_processed": len(set(chunk['document_name'] for chunk in chunks)) if chunks else 0
     }
 
 @app.get("/api/chunks")
-async def get_chunks_info():
+async def get_chunks_info(vector_store: VectorStoreService = Depends(get_vector_store_service)):
     """Get information about available MCL document chunks."""
-    if not _mcl_document_chunks:
+    chunks = vector_store.chunks
+    if not chunks:
         return {"message": "No MCL document chunks available", "chunks": []}
     
     # Group chunks by document
     documents_info = {}
-    for chunk in _mcl_document_chunks:
+    for chunk in chunks:
         doc_name = chunk["document_name"]
         if doc_name not in documents_info:
             documents_info[doc_name] = {
@@ -141,13 +149,16 @@ async def get_chunks_info():
         })
     
     return {
-        "total_chunks": len(_mcl_document_chunks),
+        "total_chunks": len(chunks),
         "total_documents": len(documents_info),
         "documents": list(documents_info.values())
     }
 
 @app.post("/api/search")
-async def search_chunks(query_data: dict):
+async def search_chunks(
+    query_data: dict,
+    vector_store: VectorStoreService = Depends(get_vector_store_service)
+):
     """Search for relevant MCL chunks based on a query."""
     query = query_data.get("query", "")
     max_results = query_data.get("max_results", 5)
@@ -155,7 +166,7 @@ async def search_chunks(query_data: dict):
     if not query:
         return {"error": "Query is required"}
     
-    relevant_chunks = find_relevant_chunks(query, max_chunks=max_results)
+    relevant_chunks = vector_store.search(query, limit=max_results)
     
     return {
         "query": query,
@@ -166,80 +177,32 @@ async def search_chunks(query_data: dict):
                 "chunk_index": chunk["chunk_index"],
                 "total_chunks": chunk["total_chunks"],
                 "content_preview": chunk["content"][:300] + "..." if len(chunk["content"]) > 300 else chunk["content"],
-                "content_hash": chunk["content_hash"]
+                "content_hash": chunk["content_hash"],
+                "similarity_score": chunk.get("similarity_score", 0)
             }
             for chunk in relevant_chunks
         ]
     }
 
 @app.post("/api/chat")
-async def chat(body: ChatRequest) -> ChatResponse:
+async def chat(
+    body: ChatRequest,
+    chat_service: ChatService = Depends(get_chat_service)
+) -> ChatResponse:
     """
     Chat endpoint for MCL Assistant with vision support.
     
     Supports both text-only and multimodal (text + images) messages.
     Images should be sent as base64-encoded data URLs in the content array.
-    
-    Example text-only message:
-    {
-        "messages": [
-            {"role": "user", "content": "How do I create a checklist?"}
-        ]
-    }
-    
-    Example multimodal message:
-    {
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "What can I do on this screen?"},
-                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
-                ]
-            }
-        ]
-    }
     """
-    global MCL_VECTOR_STORE_ID
-    
-    if not MCL_VECTOR_STORE_ID:
-        # Detect language for appropriate error message
-        user_message = ""
-        if body.messages:
-            for msg in body.messages:
-                if msg.role == "user" and msg.content:
-                    if isinstance(msg.content, list):
-                        user_message = " ".join([
-                            item.text for item in msg.content 
-                            if hasattr(item, 'text') and item.text
-                        ])
-                    else:
-                        user_message = str(msg.content)
-                    break
-        
-        # Simple German detection for error message
-        error_message = "MCL knowledge base is not available. Please try again later."
-        if user_message and any(word in user_message.lower() for word in ['ich', 'du', 'der', 'die', 'das', 'kannst', 'mir']):
-            error_message = "MCL-Wissensdatenbank ist nicht verfügbar. Bitte versuchen Sie es später erneut."
-        
-        raise HTTPException(
-            status_code=503, 
-            detail=error_message
-        )
-
     try:
         # Generate unique response ID for tracking
         response_id = generate_response_id()
         
-        print("\n" + "="*80)
-        print(f"[CHAT API] New chat request received (ID: {response_id})")
-        print("="*80)
+        logger.info(f"[CHAT API] New chat request received (ID: {response_id})")
         
         # Convert Pydantic messages to dicts for the AI service
         messages_for_ai = []
-        user_question = ""
-        has_images = False
-        
         for msg in body.messages:
             if msg.content:
                 # Handle multimodal content (text + images)
@@ -252,14 +215,11 @@ async def chat(body: ChatRequest) -> ChatResponse:
                                     "type": "text",
                                     "text": item.text
                                 })
-                                if msg.role == "user":
-                                    user_question = item.text
                             elif item.type == 'image_url' and item.image_url:
                                 content_items.append({
                                     "type": "image_url",
                                     "image_url": item.image_url
                                 })
-                                has_images = True
                     
                     messages_for_ai.append({
                         "role": msg.role,
@@ -268,68 +228,34 @@ async def chat(body: ChatRequest) -> ChatResponse:
                 else:
                     # Simple text content
                     content_text = str(msg.content)
-                    if msg.role == "user":
-                        user_question = content_text
-                    
                     messages_for_ai.append({
                         "role": msg.role,
                         "content": content_text
                     })
 
         context_analysis = analyze_situational_context(messages_for_ai)
-        detected_lang = detect_language(user_question or context_analysis.latest_question or "")
-        print(f"[CHAT API] User question: {user_question[:100]}..." if len(user_question) > 100 else f"[CHAT API] User question: {user_question}")
-        print(f"[CHAT API] Has images: {'Yes 🖼️' if has_images else 'No 📝'}")
-        print(f"[CHAT API] Total messages: {len(messages_for_ai)}")
-        print(f"[CHAT API] Context summary: {context_analysis.build_summary()}")
-        print(f"[CHAT API] MCL validation: {'Enabled ✅' if ENABLE_MCL_IMAGE_VALIDATION else 'Disabled ⚠️'}")
-
-        if context_analysis.needs_clarification():
-            clarification = context_analysis.clarification_prompt(language=detected_lang)
-            print("[CHAT API] ❔ Insufficient situational context – requesting clarification")
-            print("="*80 + "\n")
-            return ChatResponse(
-                response=clarification or "Could you share whether you are on the app or the web version?",
-                response_id=response_id,
-                sources=[],
-                app_type="mcl"
-            )
         
-        # Use vision-enabled response handler (handles both text-only and multimodal)
-        result = get_vision_enabled_response(
+        result = await chat_service.process_chat_request(
             messages_for_ai, 
-            MCL_VECTOR_STORE_ID,
-            validate_mcl=ENABLE_MCL_IMAGE_VALIDATION,
-            situational_context=context_analysis,
-            detected_lang=detected_lang
+            situational_context=context_analysis
         )
         
         if result["success"]:
-            ai_response_text = result["response"]
-            
-            print(f"[CHAT API] ✅ Response generated successfully")
-            print(f"[CHAT API] Response length: {len(ai_response_text)} characters")
-            print(f"[CHAT API] Vision mode: {'Yes' if result.get('has_vision') else 'No'}")
-            print("="*80 + "\n")
-            
             return ChatResponse(
-                response=ai_response_text,
+                response=result["response"],
                 response_id=response_id,
-                sources=[],
+                sources=[], # Sources are embedded in response text now
                 app_type="mcl"
             )
         else:
             error_msg = result.get("error", "Unknown error occurred")
-            print(f"[CHAT API] ❌ Error: {error_msg}")
-            print("="*80 + "\n")
+            logger.error(f"[CHAT API] Error: {error_msg}")
             raise HTTPException(status_code=500, detail=error_msg)
 
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print("="*80 + "\n")
+        logger.error(f"An unexpected error occurred: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 # --- Feedback Endpoint ---
@@ -355,17 +281,14 @@ async def submit_feedback(
         422: If feedback_type is invalid
         500: If database error occurs
     """
-    print("\n" + "="*80)
-    print(f"[FEEDBACK API] New feedback submission received")
-    print("="*80)
-    print(f"[FEEDBACK API] Response ID: {feedback.response_id}")
-    print(f"[FEEDBACK API] Feedback Type: {feedback.feedback_type}")
-    print(f"[FEEDBACK API] Has Comment: {'Yes' if feedback.user_comment else 'No'}")
+    logger.info(f"[FEEDBACK API] New feedback submission received")
+    logger.info(f"[FEEDBACK API] Response ID: {feedback.response_id}")
+    logger.info(f"[FEEDBACK API] Feedback Type: {feedback.feedback_type}")
+    logger.info(f"[FEEDBACK API] Has Comment: {'Yes' if feedback.user_comment else 'No'}")
     
     # Validate feedback type
     if feedback.feedback_type not in ["positive", "negative"]:
-        print(f"[FEEDBACK API] ❌ Invalid feedback type: {feedback.feedback_type}")
-        print("="*80 + "\n")
+        logger.warning(f"[FEEDBACK API] Invalid feedback type: {feedback.feedback_type}")
         raise HTTPException(
             status_code=422,
             detail="feedback_type must be 'positive' or 'negative'"
@@ -379,8 +302,7 @@ async def submit_feedback(
         existing_feedback = result.scalar_one_or_none()
         
         if existing_feedback:
-            print(f"[FEEDBACK API] ❌ Duplicate feedback for response: {feedback.response_id}")
-            print("="*80 + "\n")
+            logger.warning(f"[FEEDBACK API] Duplicate feedback for response: {feedback.response_id}")
             raise HTTPException(
                 status_code=400,
                 detail="Feedback already submitted for this response"
@@ -399,9 +321,7 @@ async def submit_feedback(
         await db.commit()
         await db.refresh(db_feedback)
         
-        print(f"[FEEDBACK API] ✅ Feedback saved successfully (ID: {db_feedback.id})")
-        print(f"[FEEDBACK API] Created at: {db_feedback.created_at}")
-        print("="*80 + "\n")
+        logger.info(f"[FEEDBACK API] Feedback saved successfully (ID: {db_feedback.id})")
         
         # Return the feedback response
         return FeedbackResponse(
@@ -415,8 +335,7 @@ async def submit_feedback(
         
     except exc.IntegrityError as e:
         await db.rollback()
-        print(f"[FEEDBACK API] ❌ Database integrity error: {e}")
-        print("="*80 + "\n")
+        logger.error(f"[FEEDBACK API] Database integrity error: {e}")
         raise HTTPException(
             status_code=400,
             detail="Feedback already submitted for this response"
@@ -425,172 +344,13 @@ async def submit_feedback(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"[FEEDBACK API] ❌ Database error: {e}")
-        import traceback
-        traceback.print_exc()
-        print("="*80 + "\n")
+        logger.error(f"[FEEDBACK API] Database error: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Database error: {str(e)}"
         )
 
-# --- Vision Assistant Endpoint ---
 
-@app.post("/api/vision/analyze-screenshot")
-async def analyze_screenshot(
-    file: UploadFile = File(...),
-    query: str = Form(...)
-):
-    """
-    Analyze an MCL App screenshot and provide contextual help using GPT-4o vision.
-    
-    Args:
-        file: Screenshot image file (PNG, JPG, JPEG, GIF, WEBP)
-        query: User's question about the screenshot
-    
-    Returns:
-        {
-            "response": str,        # AI response text
-            "success": bool,        # Whether analysis succeeded
-            "metadata": {           # Optional metadata
-                "assistant_id": str,
-                "thread_id": str,
-                "file_id": str
-            },
-            "error": str           # Error message if failed
-        }
-    """
-    
-    print("\n" + "="*80)
-    print("[VISION API] New screenshot analysis request received")
-    print("="*80)
-    
-    # Log request details
-    print(f"[VISION API] File name: {file.filename}")
-    print(f"[VISION API] Content type: {file.content_type}")
-    print(f"[VISION API] Query: {query[:100]}..." if len(query) > 100 else f"[VISION API] Query: {query}")
-    
-    # Validate file type
-    allowed_types = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"]
-    if file.content_type not in allowed_types:
-        print(f"[VISION API] ❌ ERROR: Invalid file type: {file.content_type}")
-        print(f"[VISION API] Allowed types: {', '.join(allowed_types)}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid file type '{file.content_type}'. Allowed: {', '.join(allowed_types)}"
-        )
-    
-    print(f"[VISION API] ✅ File type validated: {file.content_type}")
-    
-    # Validate file size (max 20MB)
-    file_size = 0
-    chunk_size = 1024 * 1024  # 1MB chunks
-    temp_file_path = None
-    
-    try:
-        print(f"[VISION API] 📥 Saving uploaded file temporarily...")
-        
-        # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
-            temp_file_path = temp_file.name
-            print(f"[VISION API] Temp file path: {temp_file_path}")
-            
-            while chunk := await file.read(chunk_size):
-                file_size += len(chunk)
-                if file_size > 20 * 1024 * 1024:  # 20MB limit
-                    print(f"[VISION API] ❌ ERROR: File too large: {file_size / (1024*1024):.2f}MB (max 20MB)")
-                    raise HTTPException(status_code=400, detail="File too large (max 20MB)")
-                temp_file.write(chunk)
-        
-        print(f"[VISION API] ✅ File saved successfully ({file_size / 1024:.2f}KB)")
-        
-        # Initialize vision assistant
-        print(f"[VISION API] 🤖 Initializing MCL Vision Assistant...")
-        from app.vision_assistant import MCLVisionAssistant
-        
-        try:
-            assistant = MCLVisionAssistant()
-            print(f"[VISION API] ✅ Vision Assistant initialized")
-        except Exception as e:
-            print(f"[VISION API] ❌ ERROR: Failed to initialize Vision Assistant: {e}")
-            import traceback
-            traceback.print_exc()
-            raise HTTPException(status_code=500, detail=f"Failed to initialize Vision Assistant: {str(e)}")
-        
-        # Analyze the screenshot
-        print(f"[VISION API] 🔍 Starting screenshot analysis...")
-        print(f"[VISION API] This may take 10-20 seconds...")
-        
-        try:
-            result = assistant.analyze_screenshot(
-                image_path=temp_file_path,
-                user_query=query
-            )
-            
-            print(f"[VISION API] 📊 Analysis completed")
-            print(f"[VISION API] Success: {result.get('success', False)}")
-            
-            if result["success"]:
-                response_length = len(result.get("response", ""))
-                print(f"[VISION API] ✅ Response generated ({response_length} characters)")
-                print(f"[VISION API] Assistant ID: {result.get('assistant_id', 'N/A')}")
-                print(f"[VISION API] Thread ID: {result.get('thread_id', 'N/A')}")
-                print(f"[VISION API] File ID: {result.get('file_id', 'N/A')}")
-                
-                # Preview response
-                response_preview = result["response"][:200] + "..." if len(result["response"]) > 200 else result["response"]
-                print(f"[VISION API] Response preview: {response_preview}")
-                
-                print("="*80)
-                print("[VISION API] ✅ Request completed successfully")
-                print("="*80 + "\n")
-                
-                return {
-                    "response": result["response"],
-                    "success": True,
-                    "metadata": {
-                        "assistant_id": result.get("assistant_id"),
-                        "thread_id": result.get("thread_id"),
-                        "file_id": result.get("file_id"),
-                        "image_name": file.filename,
-                        "query": query
-                    }
-                }
-            else:
-                error_msg = result.get("error", "Unknown error occurred")
-                print(f"[VISION API] ❌ Analysis failed: {error_msg}")
-                print("="*80 + "\n")
-                raise HTTPException(
-                    status_code=500,
-                    detail=error_msg
-                )
-                
-        except HTTPException:
-            raise
-        except Exception as e:
-            print(f"[VISION API] ❌ ERROR during analysis: {e}")
-            import traceback
-            traceback.print_exc()
-            print("="*80 + "\n")
-            raise HTTPException(status_code=500, detail=f"Error analyzing screenshot: {str(e)}")
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"[VISION API] ❌ FATAL ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        print("="*80 + "\n")
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
-    
-    finally:
-        # Clean up temporary file
-        if temp_file_path and os.path.exists(temp_file_path):
-            try:
-                os.unlink(temp_file_path)
-                print(f"[VISION API] 🗑️ Cleaned up temporary file: {temp_file_path}")
-            except Exception as e:
-                print(f"[VISION API] ⚠️ Warning: Could not delete temp file: {e}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
