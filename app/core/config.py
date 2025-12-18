@@ -3,12 +3,18 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+import dspy
 
 load_dotenv()
 
+# Configure OpenAI Client
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
 )
+
+# Configure DSPy Global LM
+dspy_lm = dspy.LM(model="gpt-4o", max_tokens=1000, api_key=os.getenv("OPENAI_API_KEY"))
+dspy.settings.configure(lm=dspy_lm)
 
 # MCL Image Validation Configuration
 # DISABLED by default - GPT-4o Vision cannot reliably identify proprietary apps like MCL
@@ -18,6 +24,12 @@ MCL_VALIDATION_CONFIDENCE_THRESHOLD = float(os.getenv("MCL_VALIDATION_CONFIDENCE
 
 # Vector Store Configuration
 VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "mcl_vector_store")
+WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
+WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY", "")
+
+# Cohere Configuration
+COHERE_API_KEY = os.getenv("COHERE_API_KEY", "")
+
 
 # Database configuration for MCL feedback system
 DATABASE_CONNECTION_STRING = os.getenv(

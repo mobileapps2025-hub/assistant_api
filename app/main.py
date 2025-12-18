@@ -17,7 +17,7 @@ from app.core.dependencies import get_vector_store_service, get_chat_service
 from app.services.chat_service import ChatService
 from app.services.vector_store import VectorStoreService
 from app.core.context import analyze_situational_context
-from app.routers import vision
+from app.routers import vision, admin
 from app.core.logging import setup_logging, get_logger
 
 # Setup logging
@@ -43,19 +43,8 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing MCL knowledge base...")
         vector_store = get_vector_store_service()
         
-        if vector_store.index_exists():
-            if vector_store.load_index():
-                logger.info(f"MCL knowledge base loaded successfully. Total chunks: {len(vector_store.chunks)}")
-            else:
-                logger.error("Failed to load MCL knowledge base index.")
-        else:
-            logger.info("Index not found. Building index from documents...")
-            # Assuming documents are in app/documents
-            result = vector_store.build_index("app/documents")
-            if result["success"]:
-                logger.info(f"Index built successfully. Total chunks: {result['total_chunks']}")
-            else:
-                logger.error(f"Failed to build index: {result.get('error')}")
+        # Weaviate service is initialized on first access
+        logger.info("MCL knowledge base service (Weaviate) initialized.")
 
         logger.info("MCL Assistant startup completed.")
         yield
@@ -84,6 +73,7 @@ app.add_middleware(
 )
 
 app.include_router(vision.router)
+app.include_router(admin.router)
 
 # --- API Endpoints ---
 

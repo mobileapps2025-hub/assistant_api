@@ -1,0 +1,65 @@
+{
+  "generate.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "context": "To reset your password, go to Settings > Account > Security and click 'Reset Password'.",
+        "question": "How do I reset my password?",
+        "reasoning": "The context provides a step-by-step guide on how to reset a password. It involves navigating to the Settings menu, selecting Account, then Security, and finally clicking on 'Reset Password'. This process is straightforward and directly answers the question.",
+        "answer": "To reset your password, go to Settings, then select Account, followed by Security, and click on 'Reset Password'."
+      },
+      {
+        "augmented": true,
+        "context": "The MCL (Mobile Checklist) app is a tool for store managers to complete daily operational checks.",
+        "question": "What is the MCL app?",
+        "reasoning": "The context provides a brief description of the MCL app, indicating its purpose and primary users. It is designed for store managers to facilitate the completion of daily operational checks, suggesting its role in ensuring that store operations run smoothly and efficiently.",
+        "answer": "The MCL app, or Mobile Checklist app, is a tool designed for store managers to complete daily operational checks."
+      },
+      {
+        "augmented": true,
+        "context": "Yes, the app supports offline mode. Data will sync when connection is restored.",
+        "question": "Can I use the app offline?",
+        "reasoning": "The context states that the app supports offline mode, which means you can use it without an internet connection. Once the connection is restored, any data generated or modified while offline will sync automatically.",
+        "answer": "Yes, you can use the app offline. The data will sync when the connection is restored."
+      },
+      {
+        "augmented": true,
+        "context": "The secret codename for the next release is MCL Crazy",
+        "question": "What is the secret codename for the next release?",
+        "reasoning": "The context directly states the secret codename for the next release, so the answer can be derived straightforwardly from the provided information.",
+        "answer": "The secret codename for the next release is MCL Crazy."
+      }
+    ],
+    "signature": {
+      "instructions": "Answer the user's question based on the retrieved context.",
+      "fields": [
+        {
+          "prefix": "Context:",
+          "description": "Relevant facts and documents retrieved from the knowledge base."
+        },
+        {
+          "prefix": "Question:",
+          "description": "The user's question."
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Answer:",
+          "description": "A helpful, accurate, and concise answer to the question."
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.13",
+      "dspy": "2.6.27",
+      "cloudpickle": "3.1"
+    }
+  }
+}

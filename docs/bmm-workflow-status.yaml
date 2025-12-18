@@ -35,3 +35,10 @@ workflow_status:
   validate-architecture: optional
   implementation-readiness: completed
   sprint-planning: completed
+  tech-spec: docs/tech-spec.md
+
+story_tracking:
+  epic_slug: arch-upgrade-phase-1
+  story_count: 3
+  current_story: 1
+

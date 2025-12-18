@@ -6,7 +6,7 @@ An AI-powered knowledge base assistant for the **MCL (Mobile Checklist)** applic
 
 ### Text-Based Assistant
 - 🌍 **Multilingual Support**: Automatically detects and responds in German, English, Spanish, French, and Italian
-- 🔍 **Advanced Semantic Search**: Uses sentence transformers and FAISS for intelligent document retrieval
+- 🔍 **Advanced Semantic Search**: Uses Weaviate for intelligent document retrieval
 - 📚 **Multi-format Support**: Processes PDF, DOCX, PPTX, and Markdown documents
 - 🎯 **Query Expansion**: Generates alternative phrasings for better search coverage
 - 🤖 **GPT-4o Powered**: Uses OpenAI's latest GPT-4o model for accurate responses
@@ -26,13 +26,13 @@ An AI-powered knowledge base assistant for the **MCL (Mobile Checklist)** applic
 1. **Document Ingestion**: Supports PDF (PyPDF2/PyMuPDF), DOCX, PPTX, and Markdown
 2. **Text Chunking**: Splits documents into 1200-character chunks with 300-character overlap
 3. **Embedding Creation**: Uses sentence-transformers (all-MiniLM-L6-v2) for semantic embeddings
-4. **Vector Indexing**: FAISS IndexFlatIP for efficient cosine similarity search
+4. **Vector Indexing**: Weaviate for efficient vector and hybrid search
 
 ### Query Processing
 1. **Language Detection**: Automatic detection using heuristics + GPT fallback
 2. **Query Translation**: Non-English queries translated to English for search
 3. **Query Expansion**: GPT-4o-mini generates 2-3 alternative phrasings
-4. **Hybrid Search**: Combines semantic search (FAISS) with enhanced keyword matching
+4. **Hybrid Search**: Combines semantic search (Weaviate) with keyword matching
 5. **Re-ranking**: Results scored using 60% keyword + 40% semantic weights
 
 ### Response Generation
@@ -332,9 +332,9 @@ _mcl_embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 **Solution**: Ensure MCL documents are placed in `app/documents/` and follow naming conventions.
 
 ### Issue: "Semantic search not available"
-**Solution**: Install sentence-transformers and faiss:
+**Solution**: Install Weaviate client:
 ```bash
-pip install sentence-transformers faiss-cpu
+pip install weaviate-client langchain-weaviate
 ```
 
 ### Issue: "DOCX/PPTX processing failed"
