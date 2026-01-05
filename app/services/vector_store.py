@@ -27,8 +27,9 @@ class VectorStoreService:
         try:
             # Connect to Weaviate Cloud or Local
             headers = {}
-            if WEAVIATE_API_KEY:
-                headers["X-OpenAI-Api-Key"] = os.getenv("OPENAI_API_KEY") # Pass OpenAI key for vectorization if using Weaviate's module
+            # Always pass OpenAI key if available, as it's needed for the text2vec-openai module
+            if os.getenv("OPENAI_API_KEY"):
+                headers["X-OpenAI-Api-Key"] = os.getenv("OPENAI_API_KEY")
             
             auth_config = weaviate.auth.AuthApiKey(api_key=WEAVIATE_API_KEY) if WEAVIATE_API_KEY else None
 
@@ -131,11 +132,13 @@ class VectorStoreService:
             limit: Number of results.
         """
         if not self.client:
+            logger.warning("Weaviate client is not initialized. Skipping search.")
             return []
 
         collection = self.client.collections.get(self.COLLECTION_NAME)
         
         try:
+            logger.info(f"Executing hybrid search in Weaviate. Query: '{query}', Alpha: {alpha}, Limit: {limit}")
             response = collection.query.hybrid(
                 query=query,
                 alpha=alpha,
@@ -153,6 +156,10 @@ class VectorStoreService:
                     "uuid": str(obj.uuid)
                 })
             
+            logger.info(f"Weaviate returned {len(results)} results.")
+            if len(results) > 0:
+                logger.debug(f"Top result score: {results[0]['score']}")
+                
             return results
             
         except Exception as e:

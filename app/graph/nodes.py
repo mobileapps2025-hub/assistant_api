@@ -41,9 +41,12 @@ class AgentNodes:
         query = state["query"]
         existing_docs = state.get("documents", []) # Preserve existing docs (e.g. curated knowledge)
         
+        logger.info(f"Retrieving documents for query: '{query}'")
+        
         try:
             # 1. Hybrid Search
             initial_results = self.vector_store.hybrid_search(query, limit=25, alpha=0.5)
+            logger.info(f"Hybrid search found {len(initial_results)} documents.")
             
             # 2. Re-ranking
             final_results = initial_results
@@ -63,15 +66,18 @@ class AgentNodes:
                             original["rerank_score"] = hit.relevance_score
                             reranked.append(original)
                     final_results = reranked
+                    logger.info(f"Re-ranking kept {len(final_results)} documents (score > 0.7).")
                 except Exception as e:
                     logger.error(f"Re-ranking failed: {e}")
                     final_results = initial_results[:10]
             else:
                 final_results = initial_results[:10]
+                logger.info(f"Re-ranking skipped or disabled. Using top {len(final_results)} results.")
             
             # Merge with existing docs (Curated Knowledge should take precedence or be included)
             # We prepend existing docs so they appear first in context
             merged_results = existing_docs + final_results
+            logger.info(f"Total documents passed to generation: {len(merged_results)} (Curated: {len(existing_docs)}, Retrieved: {len(final_results)})")
                 
             return {"documents": merged_results}
         except Exception as e:
@@ -123,8 +129,13 @@ class AgentNodes:
         query = state["query"]
         retry_count = state.get("retry_count", 0)
         
-        system_prompt = """You a question re-writer that converts an input question to a better version that is optimized 
-        for vectorstore retrieval. Look at the input and try to reason about the underlying semantic intent / meaning."""
+        system_prompt = """You are MarieClaire, an expert AI assistant for the MCL mobile app and dashboard.
+        Your task is to rewrite user questions to be optimized for vectorstore retrieval within the MCL knowledge base.
+        
+        Focus on standard MCL terminology (Tasks, Checklists, Inspections, Sync, Filters).
+        Do NOT hallucinate features.
+        Do NOT assume specific mappings for unknown terms like "event" unless semantically obvious in the MCL context.
+        """
         
         user_prompt = f"Initial question: {query}. Formulate an improved question."
 
@@ -143,35 +154,119 @@ class AgentNodes:
             logger.error(f"Query rewrite failed: {e}")
             return {"retry_count": retry_count + 1} # Return original query but increment count
 
+    async def clarify_ambiguity(self, state: AgentState) -> Dict[str, Any]:
+        """
+        Ask the user for clarification when retrieval fails.
+        """
+        query = state["query"]
+        lang = state.get("language", "en")
+        
+        system_prompt = """You are MarieClaire, the MCL Support Specialist.
+        The user has asked a question that is not found in the MCL documentation or is unrelated to the MCL app.
+        
+        Your goal is to politely state that you cannot find the information and ask for clarification, strictly following the Source-Based Truth guideline.
+        
+        Guideline:
+        "I cannot find information regarding that specific topic in the current MCL guides. I can help you only with MCL related information. If this is related to the app, could you please clarify what are you asking for?"
+        
+        Adapt the language to {lang} if necessary, but keep the meaning identical.
+        """
+        
+        user_prompt = f"User Question: {query}. Generate the clarification response."
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0
+            )
+            clarification = response.choices[0].message.content.strip()
+            return {"answer": clarification}
+        except Exception as e:
+            logger.error(f"Clarification generation failed: {e}")
+            return {"answer": "I cannot find information regarding that specific topic in the current MCL guides. I can help you only with MCL related information."}
+
     async def generate_answer(self, state: AgentState) -> Dict[str, Any]:
         lang = state.get("language", "en")
         documents = state.get("documents", [])
         query = state.get("query", "")
         
-        # Prepare context list for DSPy
-        context_list = []
+        # Prepare context list
+        context_text = ""
         if documents:
             for c in documents:
                 source = c.get('source', 'Unknown')
                 header_path = c.get('header_path', 'Root')
                 text = c.get('text', '')
-                context_list.append(f"[Source: {source} | Section: {header_path}]: {text}")
+                context_text += f"\n[Source: {source} | Section: {header_path}]: {text}\n"
         
+        # STRICT GROUNDING CHECK
+        if not context_text:
+            logger.warning(f"No context available for query: '{query}'. Returning fallback response.")
+            # Fallback to clarification node logic if we somehow got here without docs
+            return {"answer": "I cannot find information regarding that specific topic in the current MCL guides. I can help you only with MCL related information."}
+
+        system_prompt = """# Role & Persona
+You are MarieClaire, the MCL Support Specialist, an expert AI assistant dedicated to helping users navigate the MCL ecosystem. Your knowledge base covers the **MCL Mobile App (iOS/Android, Phone/Tablet)**, the **MCL Dashboard**, and the **Checklist Wizard**.
+
+Your goal is to provide clear, step-by-step instructions to troubleshoot issues, guide users through features, and explain role-based permissions.
+
+# Core Guidelines
+
+1.  **Source-Based Truth:** Answer **only** using the provided context. If a user asks a question not covered by the documentation (e.g., pricing, API integration not mentioned), politely state: *"I cannot find information regarding that specific topic in the current MCL guides. I can help you only with MCL related information. If this is related to the app, could you please clarify what are you asking for?"*
+2.  **Platform Disambiguation:**
+    * Many features (e.g., "Creating a Task," "Filtering") exist in both the **Mobile App** and the **Dashboard**.
+    * **Always** determine which platform the user is asking about. If it is ambiguous, ask for clarification (e.g., *"Are you trying to create a task in the Mobile App or via the Web Dashboard?"*) or provide instructions for both, clearly labeled.
+3.  **Device Specifics (Crucial):**
+    * **Mobile vs. Tablet:** Watch for UI differences (e.g., Tasks are displayed in Portrait on phones but Landscape on tablets; "Swipe" actions may differ).
+    * **iOS vs. Android:** Note specific functional differences mentioned in the text (e.g., "Copying text" works differently on Android vs. iOS; Notification badges differ).
+4.  **Formatting:**
+    * Use **Bold** for UI elements (buttons, icons, menu names), e.g., "Tap the **Camera icon**."
+    * Use Bullet points for lists and numbered lists for sequential steps.
+    * Use > Blockquotes for important warnings (e.g., "Data will be lost if you do not use the Door icon").
+
+# Handling Specific Scenarios
+
+## 1. Troubleshooting & "Missing" Items
+If a user claims something is missing (tasks, checklists, photos), you must check the following "Common Culprits" defined in the docs:
+* **Sync Status:** Advise the user to go to the "Checklist" or "Task" overview to trigger auto-sync, or log out and back in.
+* **Filters:** Remind them to check "Creation Date" vs. "Due Date" filters.
+* **Permissions/Roles:** Verify if their role allows the action (e.g., "Only Company Admins can edit tasks that are In Progress").
+* **Connectivity:** Remind them that tasks cannot be created in the "Tasks" menu while **Offline**.
+
+## 2. Terminology Handling
+* **N.Z. / N.A.:** Treat "N.Z." (German context) and "N.A." (English context) as synonymous ("Not Applicable").
+* **"Wischen" (Swiping):** Explain that swiping to complete a task only works if no mandatory photo/comment is required.
+
+## 3. Creating & Editing Content
+* **Checklists:** Differentiate between "Routine" and "Special" inspections.
+* **Tasks:** Differentiate between creating a task *inside* a checklist (offline capable) vs. the *Task Menu* (online only).
+
+# Tone
+* Professional, helpful, and concise.
+* Empathetic to technical frustrations (e.g., "I understand you are having trouble seeing your tasks. Let's check your filter settings first.").
+"""
+
+        user_prompt = f"""Context Information:
+{context_text}
+
+User Question: {query}
+
+Answer as MarieClaire:"""
+
         try:
-            # Use DSPy Module
-            # Note: DSPy modules are synchronous by default, but we can run them in a thread if needed.
-            # For now, direct call is fine as it's just an API call wrapper.
-            
-            # If language is German, we might need to adjust the prompt or handle it.
-            # The current DSPy signature is English-centric. 
-            # For MVP, we'll append a language instruction to the query if needed.
-            
-            final_query = query
-            if lang == 'de':
-                final_query += " (Please answer in German)"
-            
-            prediction = self.rag_module.forward(question=final_query, context=context_list)
-            content = prediction.answer
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0
+            )
+            content = response.choices[0].message.content.strip()
             
             # Append sources
             if documents:

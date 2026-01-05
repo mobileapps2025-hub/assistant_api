@@ -67,14 +67,14 @@ async def main():
     print("\n[4] Testing Retrieval...")
     query = "test content"
     try:
-        # We use the private method _find_relevant_chunks to test retrieval directly
-        results = chat_service._find_relevant_chunks(query, "en")
+        # We use the vector_store directly to test retrieval
+        results = vector_store.hybrid_search(query, alpha=0.5, limit=5)
         
         print(f"   - Query: '{query}'")
         print(f"   - Found {len(results)} results.")
         
         for i, res in enumerate(results):
-            score = res.get('rerank_score', res.get('score', 'N/A'))
+            score = res.get('score', 'N/A')
             print(f"     {i+1}. [Score: {score}] {res.get('text')[:50]}...")
             
         if len(results) > 0:

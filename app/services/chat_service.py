@@ -130,8 +130,11 @@ class ChatService:
                 "error": str(e)
             }
 
-    async def _get_curated_knowledge(self) -> List[Dict[str, Any]]:
-        """Fetch curated Q&A pairs to use as fallback context."""
+    async def _get_curated_knowledge(self, query: str) -> List[Dict[str, Any]]:
+        """
+        Fetch curated Q&A pairs to use as fallback context.
+        Performs simple keyword filtering to avoid polluting context with irrelevant facts.
+        """
         if not AsyncSessionLocal:
             return []
             
@@ -141,14 +144,39 @@ class ChatService:
                 rows = result.scalars().all()
                 
                 docs = []
+                # Simple keyword extraction (lowercase, split by space)
+                # We use a set for O(1) lookups
+                query_words = set(query.lower().split())
+                
+                # Expanded stop words list to prevent false positives
+                stop_words = {
+                    "the", "is", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", 
+                    "what", "how", "why", "when", "where", "who", "which",
+                    "i", "you", "he", "she", "it", "we", "they", "my", "your", "his", "her", "its", "our", "their",
+                    "do", "does", "did", "can", "could", "will", "would", "should", "have", "has", "had", "be", "am", "are", "was", "were"
+                }
+                keywords = query_words - stop_words
+                
                 for row in rows:
-                    docs.append({
-                        "text": f"Question: {row.question}\nAnswer: {row.answer}",
-                        "source": "Learned Knowledge",
-                        "header_path": "Curated QA",
-                        "chunk_index": 0,
-                        "score": 1.0 # High confidence
-                    })
+                    # Tokenize the curated question to ensure we match whole words, not substrings
+                    question_words = set(row.question.lower().split())
+                    
+                    is_relevant = False
+                    if not keywords:
+                        # If query has no keywords (e.g. "Hello"), don't inject anything
+                        is_relevant = False
+                    elif not keywords.isdisjoint(question_words):
+                        # Check for intersection between query keywords and question words
+                        is_relevant = True
+                    
+                    if is_relevant:
+                        docs.append({
+                            "text": f"Question: {row.question}\nAnswer: {row.answer}",
+                            "source": "Learned Knowledge",
+                            "header_path": "Curated QA",
+                            "chunk_index": 0,
+                            "score": 1.0 # High confidence
+                        })
                 return docs
         except Exception as e:
             logger.error(f"Failed to fetch curated knowledge: {e}")
@@ -184,8 +212,8 @@ class ChatService:
                 lc_messages.append(SystemMessage(content=content))
 
         # Fetch Curated Knowledge (Fallback/Augmentation)
-        # This ensures the agent knows these facts even if Vector Store is down or retrieval fails
-        curated_docs = await self._get_curated_knowledge()
+        # Filtered by query keywords to prevent context pollution
+        curated_docs = await self._get_curated_knowledge(user_query)
 
         # Invoke Graph
         inputs = {

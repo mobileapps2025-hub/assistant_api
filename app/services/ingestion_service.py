@@ -1,15 +1,52 @@
 import os
 import glob
 from typing import List, Dict, Any
-from langchain_text_splitters import MarkdownHeaderTextSplitter
+from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from app.services.vector_store import VectorStoreService
 from app.core.logging import get_logger
+import pypdf
 
 logger = get_logger(__name__)
 
 class IngestionService:
     def __init__(self, vector_store_service: VectorStoreService):
         self.vector_store = vector_store_service
+
+    def load_pdf_document(self, file_path: str) -> List[Dict[str, Any]]:
+        """
+        Load a PDF file and split it into chunks.
+        """
+        try:
+            reader = pypdf.PdfReader(file_path)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+            
+            # Split text into chunks
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1000,
+                chunk_overlap=200,
+                length_function=len,
+            )
+            docs = text_splitter.create_documents([text])
+            
+            chunks = []
+            filename = os.path.basename(file_path)
+            
+            for i, doc in enumerate(docs):
+                chunk = {
+                    "text": doc.page_content,
+                    "header_path": "PDF Content", # PDFs don't have structured headers like MD
+                    "source": filename,
+                    "chunk_index": i
+                }
+                chunks.append(chunk)
+                
+            return chunks
+            
+        except Exception as e:
+            logger.error(f"Error processing PDF file {file_path}: {e}")
+            return []
 
     def load_and_split_document(self, file_path: str) -> List[Dict[str, Any]]:
         """
@@ -71,12 +108,20 @@ class IngestionService:
         processed_files = 0
         failed_files = 0
 
-        # Find all markdown files
+        # Find all markdown and PDF files
         md_files = glob.glob(os.path.join(directory_path, "**/*.md"), recursive=True)
+        pdf_files = glob.glob(os.path.join(directory_path, "**/*.pdf"), recursive=True)
         
-        for file_path in md_files:
+        all_files = md_files + pdf_files
+        
+        for file_path in all_files:
             logger.info(f"Processing {file_path}...")
-            chunks = self.load_and_split_document(file_path)
+            
+            if file_path.lower().endswith('.pdf'):
+                chunks = self.load_pdf_document(file_path)
+            else:
+                chunks = self.load_and_split_document(file_path)
+                
             if chunks:
                 all_chunks.extend(chunks)
                 processed_files += 1
