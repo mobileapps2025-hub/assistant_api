@@ -1,0 +1,31 @@
+import base64
+
+config = """version: '3.4'
+services:
+  app:
+    image: mclassistant.azurecr.io/mcl-assistant:v1
+    ports:
+      - "8000:8000"
+    environment:
+      - WEAVIATE_URL=http://weaviate:8080
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DATABASE_CONNECTION_STRING=
+      - COHERE_API_KEY=
+    depends_on:
+      - weaviate
+    restart: on-failure
+
+  weaviate:
+    image: semitechnologies/weaviate:1.27.0
+    expose:
+      - "8080"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: 'text2vec-openai,generative-openai'
+      CLUSTER_HOSTNAME: 'node1'
+"""
+
+print('COMPOSE|' + base64.b64encode(config.encode('utf-8')).decode('utf-8'))

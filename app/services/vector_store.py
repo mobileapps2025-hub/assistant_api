@@ -42,14 +42,21 @@ class VectorStoreService:
                 )
             else:
                 # Local connection
-                host = WEAVIATE_URL.replace("http://", "").replace("https://", "").split(":")[0]
+                # The weaviate client v4 handles http/https/port better if we are explicit about ports/schema
+                import urllib.parse
+                parsed = urllib.parse.urlparse(WEAVIATE_URL)
+                host_only = parsed.hostname or "localhost"
+                port_only = parsed.port or 8080
+                
                 self.client = weaviate.connect_to_local(
-                    host=host,
+                    host=host_only,
+                    port=port_only,
                     headers=headers
                 )
             
             logger.info(f"Connected to Weaviate at {WEAVIATE_URL}")
-            self.ensure_schema()
+            # Do NOT call ensure_schema() in constructor as it might block/fail if Weaviate is not ready yet
+            # self.ensure_schema()
             
         except Exception as e:
             logger.error(f"Failed to connect to Weaviate: {e}")
@@ -82,6 +89,31 @@ class VectorStoreService:
                 logger.info(f"Collection {self.COLLECTION_NAME} already exists.")
         except Exception as e:
             logger.error(f"Error ensuring schema: {e}")
+
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about the vector store.
+        """
+        if not self.client:
+            return {"status": "disconnected", "count": 0}
+
+        try:
+            if not self.client.collections.exists(self.COLLECTION_NAME):
+                return {"status": "connected", "schema_exists": False, "count": 0}
+            
+            collection = self.client.collections.get(self.COLLECTION_NAME)
+            # Aggregate count
+            count_result = collection.aggregate.over_all(total_count=True)
+            count = count_result.total_count
+            
+            return {
+                "status": "connected", 
+                "schema_exists": True, 
+                "count": count
+            }
+        except Exception as e:
+            logger.error(f"Error getting stats: {e}")
+            return {"status": "error", "error": str(e), "count": 0}
 
     def add_documents(self, chunks: List[Dict[str, Any]]) -> bool:
         """

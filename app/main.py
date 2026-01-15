@@ -16,6 +16,7 @@ from app.core.database import Feedback, Base
 from app.core.dependencies import get_vector_store_service, get_chat_service
 from app.services.chat_service import ChatService
 from app.services.vector_store import VectorStoreService
+from app.services.ingestion_service import IngestionService
 from app.core.context import analyze_situational_context
 from app.routers import vision, admin
 from app.core.logging import setup_logging, get_logger
@@ -41,10 +42,24 @@ async def lifespan(app: FastAPI):
         
         # Initialize MCL knowledge base
         logger.info("Initializing MCL knowledge base...")
+        # Just initialize the service holder - specific connection happens lazily
         vector_store = get_vector_store_service()
         
-        # Weaviate service is initialized on first access
-        logger.info("MCL knowledge base service (Weaviate) initialized.")
+        if vector_store.client:
+            logger.info("Verifying Weaviate schema...")
+            vector_store.ensure_schema()
+            
+            logger.info("Checking for documents to ingest...")
+            stats = vector_store.get_stats()
+            if stats.get("count", 0) == 0:
+                logger.info("Vector store is empty. Triggering initial ingestion...")
+                ingestion_service = IngestionService(vector_store)
+                # In docs folder
+                ingestion_service.ingest_all("app/documents")
+            else:
+                logger.info(f"Vector store already contains {stats['count']} documents. Skipping ingestion.")
+        
+        logger.info("MCL knowledge base service initialized.")
 
         logger.info("MCL Assistant startup completed.")
         yield
@@ -102,46 +117,21 @@ async def root():
 @app.get("/health")
 async def health_check(vector_store: VectorStoreService = Depends(get_vector_store_service)):
     """Health check endpoint."""
-    is_loaded = vector_store.index is not None
-    chunks = vector_store.chunks
+    stats = vector_store.get_stats()
     
     return {
         "status": "healthy",
-        "knowledge_base_loaded": is_loaded,
-        "total_document_chunks": len(chunks),
-        "documents_processed": len(set(chunk['document_name'] for chunk in chunks)) if chunks else 0
+        "knowledge_base": stats
     }
 
 @app.get("/api/chunks")
 async def get_chunks_info(vector_store: VectorStoreService = Depends(get_vector_store_service)):
     """Get information about available MCL document chunks."""
-    chunks = vector_store.chunks
-    if not chunks:
-        return {"message": "No MCL document chunks available", "chunks": []}
-    
-    # Group chunks by document
-    documents_info = {}
-    for chunk in chunks:
-        doc_name = chunk["document_name"]
-        if doc_name not in documents_info:
-            documents_info[doc_name] = {
-                "document_name": doc_name,
-                "document_type": chunk["document_type"],
-                "total_chunks": 0,
-                "chunks": []
-            }
-        documents_info[doc_name]["total_chunks"] += 1
-        documents_info[doc_name]["chunks"].append({
-            "chunk_id": chunk["chunk_id"],
-            "chunk_index": chunk["chunk_index"],
-            "content_preview": chunk["content"][:200] + "..." if len(chunk["content"]) > 200 else chunk["content"],
-            "content_hash": chunk["content_hash"]
-        })
+    stats = vector_store.get_stats()
     
     return {
-        "total_chunks": len(chunks),
-        "total_documents": len(documents_info),
-        "documents": list(documents_info.values())
+        "message": "Detailed chunk listing is available via search endpoint",
+        "stats": stats
     }
 
 @app.post("/api/search")

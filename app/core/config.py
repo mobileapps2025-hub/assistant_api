@@ -32,17 +32,27 @@ COHERE_API_KEY = os.getenv("COHERE_API_KEY", "")
 
 
 # Database configuration for MCL feedback system
-DATABASE_CONNECTION_STRING = os.getenv(
-    "DATABASE_CONNECTION_STRING",
-    "mssql+aioodbc://adminMCLeu:%2BWorkappsadmin%21@mcleu-testdbserver.database.windows.net/MCLEU-SQLDB?driver=ODBC+Driver+17+for+SQL+Server"
-)
+# Default to EMPTY string to prevent accidental connection attempts if drivers are missing
+# Azure on Linux often creates APPSETTING_ prefix, try both.
+DATABASE_CONNECTION_STRING = os.getenv("DATABASE_CONNECTION_STRING", "")
+if not DATABASE_CONNECTION_STRING:
+    DATABASE_CONNECTION_STRING = os.getenv("APPSETTING_DATABASE_CONNECTION_STRING", "")
 
 # Create async engine (only if database connection string is available)
 engine = None
 AsyncSessionLocal = None
 
+print("--- ENVIRONMENT DEBUG ---")
+print(f"Available Environment Keys: {[k for k in os.environ.keys()]}")
+print(f"WEAVIATE_URL value: {os.getenv('WEAVIATE_URL')}")
+print(f"DATABASE_CONNECTION_STRING raw len: {len(os.getenv('DATABASE_CONNECTION_STRING', ''))}")
+print(f"APPSETTING_DATABASE_CONNECTION_STRING raw len: {len(os.getenv('APPSETTING_DATABASE_CONNECTION_STRING', ''))}")
+print(f"Final DATABASE_CONNECTION_STRING is set: {'YES' if DATABASE_CONNECTION_STRING else 'NO'}")
+print("-------------------------")
+
 if DATABASE_CONNECTION_STRING:
     try:
+        print(f"Attempting Database Connection. String Length: {len(DATABASE_CONNECTION_STRING)}")
         engine = create_async_engine(
             DATABASE_CONNECTION_STRING,
             echo=False,
@@ -60,6 +70,8 @@ if DATABASE_CONNECTION_STRING:
         print(f"Warning: Database connection failed - feedback system will be disabled: {e}")
         engine = None
         AsyncSessionLocal = None
+else:
+    print("WARNING: DATABASE_CONNECTION_STRING environment variable is not set. Database disabled.")
 
 # Database dependency
 async def get_db():
