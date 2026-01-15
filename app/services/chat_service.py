@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 from app.services.vector_store import VectorStoreService
 from app.services.vision_service import VisionService
 from app.services.image_validator import ImageValidatorService
+from app.services.language_service import LanguageService
 from app.core.context import ContextAnalysis
 from app.core.config import client, ENABLE_MCL_IMAGE_VALIDATION, COHERE_API_KEY
 from app.core.logging import get_logger
@@ -21,11 +22,13 @@ class ChatService:
         self,
         vector_store_service: VectorStoreService,
         vision_service: VisionService,
-        image_validator_service: ImageValidatorService
+        image_validator_service: ImageValidatorService,
+        language_service: LanguageService # Injected
     ):
         self.vector_store = vector_store_service
         self.vision_service = vision_service
         self.image_validator = image_validator_service
+        self.language_service = language_service 
         
         # Initialize Cohere client if key is available
         self.cohere_client = None
@@ -39,7 +42,7 @@ class ChatService:
             logger.warning("COHERE_API_KEY not found. Re-ranking will be disabled.")
 
         # Initialize Graph
-        self.nodes = AgentNodes(self.vector_store, self.cohere_client)
+        self.nodes = AgentNodes(self.vector_store, self.language_service, self.cohere_client)
         self.workflow = create_workflow(self.nodes)
 
     async def process_chat_request(

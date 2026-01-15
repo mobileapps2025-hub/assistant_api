@@ -24,7 +24,7 @@ workflow_path: ".bmad/bmm/workflows/workflow-status/paths/method-brownfield.yaml
 workflow_status:
   document-project: completed
   brainstorm-project: skipped
-  research: completed
+  research: docs/research-technical-2026-01-15.md
   product-brief: skipped
   prd: completed
   validate-prd: optional
