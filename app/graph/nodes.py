@@ -1,12 +1,9 @@
 import logging
-import os
 from typing import Dict, Any, List, Optional
 from app.core.state import AgentState
 from app.services.vector_store import VectorStoreService
 from app.core.config import client
 from app.core.logging import get_logger
-from app.optimization.dspy_module import RAGModule
-from app.services.vector_store import VectorStoreService
 from app.services.language_service import LanguageService
 import cohere
 
@@ -22,18 +19,6 @@ class AgentNodes:
         self.vector_store = vector_store
         self.language_service = language_service
         self.cohere_client = cohere_client
-        
-        # Initialize DSPy Module
-        self.rag_module = RAGModule()
-        compiled_path = "app/optimization/compiled_rag.json"
-        if os.path.exists(compiled_path):
-            try:
-                self.rag_module.load(compiled_path)
-                logger.info(f"Loaded compiled DSPy module from {compiled_path}")
-            except Exception as e:
-                logger.error(f"Failed to load compiled DSPy module: {e}")
-        else:
-            logger.info("No compiled DSPy module found. Using default.")
 
     def detect_language(self, state: AgentState) -> Dict[str, Any]:
         query = state["query"]
@@ -124,7 +109,7 @@ class AgentNodes:
                 return {"grade": "irrelevant"}
         except Exception as e:
             logger.error(f"Grading failed: {e}")
-            return {"grade": "relevant"} # Fallback to relevant to avoid loop if error
+            return {"grade": "irrelevant"}  # Fail safe: route to clarify rather than hallucinate
 
     async def rewrite_query(self, state: AgentState) -> Dict[str, Any]:
         """
