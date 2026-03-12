@@ -8,7 +8,7 @@ class DSPyOptimizer:
         # Configure LM
         # Note: In a real scenario, we might use a cheaper model for the student
         self.lm = dspy.LM(model=teacher_model_name, max_tokens=1000)
-        dspy.settings.configure(lm=self.lm)
+        # dspy.settings.configure(lm=self.lm)  # Moved to context manager in compile for async safety
         
         self.module = RAGModule()
 
@@ -47,7 +47,8 @@ class DSPyOptimizer:
         teleprompter = BootstrapFewShot(metric=validate_answer, max_bootstrapped_demos=4, max_labeled_demos=4)
         
         print("Compiling DSPy program...")
-        self.compiled_module = teleprompter.compile(self.module, trainset=train_examples)
+        with dspy.context(lm=self.lm):
+            self.compiled_module = teleprompter.compile(self.module, trainset=train_examples)
         print("Compilation complete.")
         
         return self.compiled_module

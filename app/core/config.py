@@ -13,8 +13,10 @@ client = OpenAI(
 )
 
 # Configure DSPy Global LM
-dspy_lm = dspy.LM(model="gpt-4o", max_tokens=1000, api_key=os.getenv("OPENAI_API_KEY"))
-dspy.settings.configure(lm=dspy_lm)
+# Note: Global configuration causes issues with async execution in FastAPI/Uvicorn.
+# Use dspy.context(lm=...) in specific tasks instead.
+# dspy_lm = dspy.LM(model="gpt-4o", max_tokens=1000, api_key=os.getenv("OPENAI_API_KEY"))
+# dspy.settings.configure(lm=dspy_lm)
 
 # MCL Image Validation Configuration
 # DISABLED by default - GPT-4o Vision cannot reliably identify proprietary apps like MCL

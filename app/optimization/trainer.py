@@ -62,7 +62,9 @@ async def run_training_pipeline():
     train_examples = optimizer.load_examples(all_examples)
     
     # Compile
-    compiled_program = optimizer.compile(train_examples)
+    # Run synchronous heavy compilation in a separate thread to avoid blocking the event loop
+    # and potentially resolving DSPy async context issues.
+    compiled_program = await asyncio.to_thread(optimizer.compile, train_examples)
     
     # Save
     output_path = "app/optimization/compiled_rag.json"
