@@ -84,6 +84,7 @@ class VisionService:
                     }
                 ],
                 max_tokens=1000,
+                timeout=30,
             )
             
             return response.choices[0].message.content

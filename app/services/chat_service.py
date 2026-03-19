@@ -1,4 +1,5 @@
 import logging
+import time
 import cohere
 from typing import List, Dict, Any, Optional
 from app.services.vector_store import VectorStoreService
@@ -117,7 +118,8 @@ class ChatService:
                 model="gpt-4o",
                 messages=messages,
                 max_tokens=1500,
-                temperature=0.7
+                temperature=0.7,
+                timeout=30
             )
             return {
                 "response": response.choices[0].message.content,
@@ -191,12 +193,13 @@ class ChatService:
         latest_user_message: Dict[str, Any],
         situational_context: Optional[ContextAnalysis]
     ) -> Dict[str, Any]:
-        
+        start_time = time.monotonic()
+
         user_query = latest_user_message.get("content", "")
         if isinstance(user_query, list):
             # Extract text from list content
             user_query = " ".join([item["text"] for item in user_query if item.get("type") == "text"])
-            
+
         logger.info(f"Processing text request via Graph: {user_query[:50]}...")
         
         # Convert messages to LangChain format
@@ -228,17 +231,38 @@ class ChatService:
         
         try:
             result = await self.workflow.ainvoke(inputs)
-            
+
+            duration_ms = int((time.monotonic() - start_time) * 1000)
+            graph_path = _infer_graph_path(result)
+            logger.info(
+                f"[CHAT_SUMMARY] query='{user_query[:60]}' "
+                f"curated_docs={len(curated_docs)} "
+                f"graph_path={graph_path} "
+                f"duration_ms={duration_ms}"
+            )
+
             return {
                 "response": result.get("answer", "No response generated."),
                 "success": True,
                 "has_vision": False
             }
         except Exception as e:
-            logger.error(f"Error in graph execution: {e}")
+            duration_ms = int((time.monotonic() - start_time) * 1000)
+            logger.error(f"Error in graph execution after {duration_ms}ms: {e}")
             return {
                 "response": "I encountered an error processing your request.",
                 "success": False,
                 "has_vision": False,
                 "error": str(e)
             }
+
+
+def _infer_graph_path(result: dict) -> str:
+    """Derive which graph branch was taken from the final state."""
+    retry_count = result.get("retry_count", 0)
+    grade = result.get("grade", "")
+    if grade == "irrelevant" and retry_count == 0:
+        return "retrieve→grade→clarify"
+    if retry_count >= 1:
+        return "retrieve→grade→rewrite→retrieve→generate"
+    return "retrieve→grade→generate"
