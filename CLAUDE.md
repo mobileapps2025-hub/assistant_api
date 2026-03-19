@@ -5,12 +5,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
+# Install dev dependencies (pytest, asyncio, coverage)
+pip install -r requirements-dev.txt
+
 # Start dev server
 python -m uvicorn app.main:app --reload
 
-# Run tests
-python -m pytest tests/
-python -m pytest tests/test_chat_service.py::test_function_name -v
+# Run all tests
+python -m pytest tests/ -v
+
+# Run a single test file or class
+python -m pytest tests/test_chat_service.py::TestInferGraphPath -v
+
+# Run with coverage report
+python -m pytest tests/ --cov=app --cov-report=term-missing
 
 # Start local Weaviate
 docker-compose up weaviate

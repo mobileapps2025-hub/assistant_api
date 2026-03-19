@@ -28,6 +28,14 @@ WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY", "")
 # --- Reranking ---
 COHERE_API_KEY = os.getenv("COHERE_API_KEY", "")
 
+# --- RAG search tuning ---
+SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "25"))
+SEARCH_ALPHA = float(os.getenv("SEARCH_ALPHA", "0.5"))
+RERANK_TOP_N = int(os.getenv("RERANK_TOP_N", "10"))
+RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "0.7"))
+MIN_SEARCH_SCORE = float(os.getenv("MIN_SEARCH_SCORE", "0.0"))  # 0 = no filter; tune after testing
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "24000"))  # ~6000 tokens
+
 # --- CORS ---
 # Comma-separated list of allowed origins, e.g. "https://myapp.azurewebsites.net,http://localhost:5001"
 CORS_ORIGINS = [
@@ -73,7 +81,8 @@ else:
 
 async def get_db():
     if not AsyncSessionLocal:
-        raise Exception("Database not available")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="Feedback service unavailable — database not configured")
     async with AsyncSessionLocal() as session:
         try:
             yield session

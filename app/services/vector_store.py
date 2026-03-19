@@ -3,7 +3,7 @@ from weaviate.classes.config import Configure, Property, DataType, VectorDistanc
 from weaviate.classes.query import MetadataQuery
 from typing import List, Dict, Any, Optional
 import os
-from app.core.config import WEAVIATE_URL, WEAVIATE_API_KEY, client as openai_client
+from app.core.config import WEAVIATE_URL, WEAVIATE_API_KEY, client as openai_client, SEARCH_LIMIT, SEARCH_ALPHA, MIN_SEARCH_SCORE
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -154,7 +154,7 @@ class VectorStoreService:
             logger.error(f"Error adding documents: {e}")
             return False
 
-    def hybrid_search(self, query: str, alpha: float = 0.5, limit: int = 25) -> List[Dict[str, Any]]:
+    def hybrid_search(self, query: str, alpha: float = SEARCH_ALPHA, limit: int = SEARCH_LIMIT) -> List[Dict[str, Any]]:
         """
         Perform hybrid search (Vector + Keyword).
         
@@ -180,18 +180,21 @@ class VectorStoreService:
             
             results = []
             for obj in response.objects:
+                score = obj.metadata.score or 0.0
+                if score < MIN_SEARCH_SCORE:
+                    continue
                 results.append({
                     "text": obj.properties.get("text"),
                     "header_path": obj.properties.get("header_path"),
                     "source": obj.properties.get("source"),
-                    "score": obj.metadata.score,
+                    "score": score,
                     "uuid": str(obj.uuid)
                 })
-            
-            logger.info(f"Weaviate returned {len(results)} results.")
-            if len(results) > 0:
+
+            logger.info(f"Weaviate returned {len(results)} results (min_score={MIN_SEARCH_SCORE}).")
+            if results:
                 logger.debug(f"Top result score: {results[0]['score']}")
-                
+
             return results
             
         except Exception as e:

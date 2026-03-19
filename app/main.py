@@ -1,17 +1,19 @@
 import uvicorn
+import uuid
 from contextlib import asynccontextmanager
 import tempfile
 import os
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import exc
 
 from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse
-from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH, CORS_ORIGINS
+from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH, CORS_ORIGINS, AsyncSessionLocal
 from app.core.database import Feedback, Base
 from app.core.dependencies import get_vector_store_service, get_chat_service
 from app.services.chat_service import ChatService
@@ -19,11 +21,25 @@ from app.services.vector_store import VectorStoreService
 from app.services.ingestion_service import IngestionService
 from app.core.context import analyze_situational_context
 from app.routers import vision, admin
-from app.core.logging import setup_logging, get_logger
+from app.core.logging import setup_logging, get_logger, request_id_var
 
 # Setup logging
 setup_logging()
 logger = get_logger(__name__)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Attaches a short UUID to every request for end-to-end tracing."""
+
+    async def dispatch(self, request: Request, call_next):
+        req_id = uuid.uuid4().hex[:8]
+        token = request_id_var.set(req_id)
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = req_id
+            return response
+        finally:
+            request_id_var.reset(token)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -79,6 +95,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -116,12 +133,19 @@ async def root():
 
 @app.get("/health")
 async def health_check(vector_store: VectorStoreService = Depends(get_vector_store_service)):
-    """Health check endpoint."""
+    """Health check endpoint — reports real infrastructure status."""
     stats = vector_store.get_stats()
-    
+    weaviate_status = stats.get("status", "unknown")
+    weaviate_healthy = weaviate_status == "connected"
+    db_healthy = AsyncSessionLocal is not None
+
+    overall = "healthy" if (weaviate_healthy and db_healthy) else "degraded"
+
     return {
-        "status": "healthy",
-        "knowledge_base": stats
+        "status": overall,
+        "weaviate": weaviate_status,
+        "document_count": stats.get("count", 0),
+        "database": "connected" if db_healthy else "unavailable",
     }
 
 @app.get("/api/chunks")
@@ -224,8 +248,7 @@ async def chat(
             return ChatResponse(
                 response=result["response"],
                 response_id=response_id,
-                sources=[], # Sources are embedded in response text now
-                app_type="mcl"
+                sources=[]
             )
         else:
             error_msg = result.get("error", "Unknown error occurred")

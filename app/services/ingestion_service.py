@@ -66,11 +66,18 @@ class IngestionService:
             markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
             docs = markdown_splitter.split_text(text)
 
+            # Secondary split: long sections that exceed chunk_size get split further with overlap
+            secondary_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1000,
+                chunk_overlap=200,
+                length_function=len,
+            )
+
             chunks = []
             filename = os.path.basename(file_path)
+            chunk_index = 0
 
-            for i, doc in enumerate(docs):
-                # Construct header path from metadata
+            for doc in docs:
                 header_parts = []
                 if "Header 1" in doc.metadata:
                     header_parts.append(doc.metadata["Header 1"])
@@ -78,16 +85,23 @@ class IngestionService:
                     header_parts.append(doc.metadata["Header 2"])
                 if "Header 3" in doc.metadata:
                     header_parts.append(doc.metadata["Header 3"])
-                
+
                 header_path = " > ".join(header_parts) if header_parts else "Root"
 
-                chunk = {
-                    "text": doc.page_content,
-                    "header_path": header_path,
-                    "source": filename,
-                    "chunk_index": i
-                }
-                chunks.append(chunk)
+                # Split long sections so no single chunk exceeds the size limit
+                if len(doc.page_content) > 1000:
+                    sub_docs = secondary_splitter.create_documents([doc.page_content])
+                else:
+                    sub_docs = [doc]
+
+                for sub_doc in sub_docs:
+                    chunks.append({
+                        "text": sub_doc.page_content,
+                        "header_path": header_path,
+                        "source": filename,
+                        "chunk_index": chunk_index
+                    })
+                    chunk_index += 1
 
             return chunks
 

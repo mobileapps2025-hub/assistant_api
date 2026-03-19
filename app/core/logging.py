@@ -1,39 +1,49 @@
+import json
 import logging
 import sys
-from typing import Any
+import os
+from contextvars import ContextVar
+from datetime import datetime, timezone
 
-def setup_logging(log_level: str = "INFO") -> None:
-    """
-    Configure structured logging for the application.
-    """
+# Context variable that holds the request ID for the current async task.
+# Set by the request ID middleware; read by the JSON formatter on every log line.
+request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
+
+
+class JsonFormatter(logging.Formatter):
+    """Formats log records as single-line JSON objects."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        entry: dict = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "request_id": request_id_var.get(),
+        }
+        if record.exc_info:
+            entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(entry, ensure_ascii=False)
+
+
+def setup_logging() -> None:
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
 
-    # Remove existing handlers
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-    # Create console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(log_level)
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(log_level)
+    handler.setFormatter(JsonFormatter())
+    root_logger.addHandler(handler)
 
-    # Create formatter
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    console_handler.setFormatter(formatter)
+    # Suppress noisy third-party loggers
+    for lib in ("httpx", "httpcore", "openai", "weaviate"):
+        logging.getLogger(lib).setLevel(logging.WARNING)
 
-    # Add handler to root logger
-    root_logger.addHandler(console_handler)
-
-    # Set levels for specific libraries to reduce noise
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("openai").setLevel(logging.WARNING)
 
 def get_logger(name: str) -> logging.Logger:
-    """
-    Get a logger instance with the specified name.
-    """
     return logging.getLogger(name)
