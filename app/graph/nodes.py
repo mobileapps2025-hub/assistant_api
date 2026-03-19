@@ -2,7 +2,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from app.core.state import AgentState
 from app.services.vector_store import VectorStoreService
-from app.core.config import client, RERANK_TOP_N, RERANK_THRESHOLD, MAX_CONTEXT_CHARS
+from app.core.config import client, RERANK_TOP_N, RERANK_THRESHOLD, MAX_CONTEXT_CHARS, SEARCH_LIMIT
 from app.core.logging import get_logger
 from app.services.language_service import LanguageService
 from langchain_core.messages import HumanMessage, AIMessage
@@ -39,22 +39,100 @@ class AgentNodes:
 
     def detect_language(self, state: AgentState) -> Dict[str, Any]:
         query = state["query"]
+        lang_before = state.get("language", "<not set>")
         lang = self.language_service.detect_language(query)
-        logger.info(f"Detected language for query '{query[:20]}...': {lang}")
+        logger.info(
+            f"[TRACE] detect_language: "
+            f"query='{query[:60]}' | "
+            f"language_in_state_before='{lang_before}' | "
+            f"detected='{lang}'"
+        )
         return {"language": lang}
 
-    async def retrieve_documents(self, state: AgentState) -> Dict[str, Any]:
+    async def contextualize_query(self, state: AgentState) -> Dict[str, Any]:
+        """
+        Enrich the user's query with conversation context so retrieval is self-contained.
+        Fast-paths (no LLM call) on the first turn.
+        """
         query = state["query"]
+        messages = state.get("messages", [])
+
+        logger.info(
+            f"[TRACE] contextualize_query: "
+            f"language_in_state='{state.get('language')}' | "
+            f"messages_count={len(messages)} | "
+            f"query='{query[:60]}'"
+        )
+        # Fast-path: first turn — query is already self-contained
+        if len(messages) <= 1:
+            logger.info("[TRACE] contextualize_query: first turn fast-path, no LLM call")
+            return {"contextualized_query": query}
+
+        # Build last 4 messages (most recent first) for the prompt
+        prior_messages = messages[:-1] if messages else []
+        recent = prior_messages[-4:] if len(prior_messages) > 4 else prior_messages
+        history_lines = []
+        for msg in recent:
+            if isinstance(msg, HumanMessage):
+                history_lines.append(f"User: {msg.content}")
+            elif isinstance(msg, AIMessage):
+                history_lines.append(f"Assistant: {msg.content}")
+        last_4_messages = "\n".join(history_lines)
+
+        system_prompt = """You are a query preprocessing assistant for the MCL mobile app knowledge base.
+Rewrite the user's latest question into a self-contained search query that can retrieve
+the right documents from a vector database without conversation context.
+
+Rules:
+- Resolve all pronouns ("it", "that", "them", "this") to the actual MCL entity.
+- Expand follow-up questions into full standalone queries.
+- If already self-contained, return it unchanged.
+- Output ONLY the rewritten query, no explanation.
+- Always output in English.
+
+MCL domain: Tasks, Checklists, Routine Inspections, Special Inspections, Dashboard,
+Finish Report, Sync, Filters, Departments, iOS, Android, Tablet, Phone layout."""
+
+        user_prompt = f"""Conversation history (most recent first):
+{last_4_messages}
+
+Latest user question: {query}"""
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0,
+                timeout=15
+            )
+            contextualized = response.choices[0].message.content.strip()
+            logger.info(f"contextualize_query: '{query}' → '{contextualized}'")
+            return {"contextualized_query": contextualized}
+        except Exception as e:
+            logger.warning(f"contextualize_query failed, using original: {e}")
+            return {"contextualized_query": query}
+
+    async def retrieve_documents(self, state: AgentState) -> Dict[str, Any]:
+        query = state.get("contextualized_query") or state["query"]
         retry_count = state.get("retry_count", 0)
+        logger.info(
+            f"[TRACE] retrieve_documents: "
+            f"language_in_state='{state.get('language')}' | "
+            f"retry_count={retry_count} | "
+            f"query='{query[:60]}'"
+        )
         # On retry after rewrite, start fresh — don't prepend old irrelevant docs
         # (they would end up at positions [:3] and cause the grader to mark as irrelevant again)
         existing_docs = [] if retry_count > 0 else state.get("documents", [])
 
-        logger.info(f"Retrieving documents for query: '{query}'")
+        logger.info(f"Retrieving documents for query: '{query}' (original: '{state['query']}')" if query != state["query"] else f"Retrieving documents for query: '{query}'")
         
         try:
             # 1. Hybrid Search
-            initial_results = self.vector_store.hybrid_search(query, limit=25, alpha=0.5)
+            initial_results = self.vector_store.hybrid_search(query, limit=SEARCH_LIMIT, alpha=0.5)
             logger.info(f"Hybrid search found {len(initial_results)} documents.")
             
             # 2. Re-ranking
@@ -64,7 +142,7 @@ class AgentNodes:
                 try:
                     response = self.cohere_client.rerank(
                         model="rerank-english-v3.0",
-                        query=query,
+                        query=state.get("contextualized_query") or query,
                         documents=documents,
                         top_n=RERANK_TOP_N
                     )
@@ -100,8 +178,14 @@ class AgentNodes:
         """
         query = state["query"]
         documents = state.get("documents", [])
-        
+        logger.info(
+            f"[TRACE] grade_documents: "
+            f"language_in_state='{state.get('language')}' | "
+            f"docs_count={len(documents)}"
+        )
+
         if not documents:
+            logger.info("[TRACE] grade_documents: no documents → irrelevant")
             return {"grade": "irrelevant"}
 
         # Concatenate document content for grading
@@ -227,7 +311,11 @@ Respond with only 'yes' or 'no'."""
         """
         query = state["query"]
         lang = state.get("language", "en")
-        logger.info(f"[GRAPH] Path: clarify_ambiguity (retry_count={state.get('retry_count', 0)})")
+        logger.info(
+            f"[TRACE] clarify_ambiguity: "
+            f"language='{lang}' | "
+            f"retry_count={state.get('retry_count', 0)}"
+        )
         
         system_prompt = """You are MarieClaire, the MCL Support Specialist.
         The user has asked a question that is not found in the MCL documentation or is unrelated to the MCL app.
@@ -263,7 +351,13 @@ Respond with only 'yes' or 'no'."""
         documents = state.get("documents", [])
         query = state.get("query", "")
         messages = state.get("messages", [])
-        logger.info(f"[GRAPH] Path: generate_answer (docs={len(documents)}, retry_count={state.get('retry_count', 0)})")
+        logger.info(
+            f"[TRACE] generate_answer: "
+            f"language='{lang}' | "
+            f"docs={len(documents)} | "
+            f"retry_count={state.get('retry_count', 0)} | "
+            f"query='{query[:60]}'"
+        )
 
         # Trim documents to context budget before building the prompt
         documents = self._trim_to_budget(documents)

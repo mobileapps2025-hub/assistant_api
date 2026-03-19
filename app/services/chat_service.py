@@ -49,7 +49,8 @@ class ChatService:
     async def process_chat_request(
         self,
         messages: List[Dict[str, Any]],
-        situational_context: Optional[ContextAnalysis] = None
+        situational_context: Optional[ContextAnalysis] = None,
+        session_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Process a chat request, handling both text and vision.
@@ -88,9 +89,10 @@ class ChatService:
         
         # 3. Handle Text (RAG)
         return await self._handle_text_request(
-            messages, 
-            latest_user_message, 
-            situational_context
+            messages,
+            latest_user_message,
+            situational_context,
+            session_id=session_id
         )
 
     async def _handle_vision_request(
@@ -118,7 +120,7 @@ class ChatService:
                 model="gpt-4o",
                 messages=messages,
                 max_tokens=1500,
-                temperature=0.7,
+                temperature=0,
                 timeout=30
             )
             return {
@@ -191,7 +193,8 @@ class ChatService:
         self,
         messages: List[Dict[str, Any]],
         latest_user_message: Dict[str, Any],
-        situational_context: Optional[ContextAnalysis]
+        situational_context: Optional[ContextAnalysis],
+        session_id: Optional[str] = None
     ) -> Dict[str, Any]:
         start_time = time.monotonic()
 
@@ -222,18 +225,42 @@ class ChatService:
         curated_docs = await self._get_curated_knowledge(user_query)
 
         # Invoke Graph
+        thread_id = session_id or "anonymous"
+        logger.info(f"[SESSION] thread_id={thread_id}")
         inputs = {
+            # Full state reset on every invocation — prevents MemorySaver checkpoint
+            # from bleeding stale values (e.g. language="de") into a new request.
             "messages": lc_messages,
             "query": user_query,
-            "documents": curated_docs, # Pre-load documents with curated knowledge
-            "retry_count": 0
+            "language": "",            # detect_language will overwrite this immediately
+            "documents": curated_docs,
+            "answer": None,
+            "error": None,
+            "grade": None,
+            "retry_count": 0,
+            "contextualized_query": None,
         }
-        
+        config = {"configurable": {"thread_id": thread_id}}
+        logger.info(
+            f"[TRACE] ainvoke inputs: "
+            f"query='{user_query[:60]}' | "
+            f"language='{inputs['language']}' | "
+            f"messages_count={len(lc_messages)} | "
+            f"thread_id={thread_id}"
+        )
+
         try:
-            result = await self.workflow.ainvoke(inputs)
+            result = await self.workflow.ainvoke(inputs, config=config)
 
             duration_ms = int((time.monotonic() - start_time) * 1000)
             graph_path = _infer_graph_path(result)
+            logger.info(
+                f"[TRACE] ainvoke result: "
+                f"language='{result.get('language')}' | "
+                f"grade='{result.get('grade')}' | "
+                f"retry_count={result.get('retry_count')} | "
+                f"answer_preview='{str(result.get('answer', ''))[:80]}'"
+            )
             logger.info(
                 f"[CHAT_SUMMARY] query='{user_query[:60]}' "
                 f"curated_docs={len(curated_docs)} "

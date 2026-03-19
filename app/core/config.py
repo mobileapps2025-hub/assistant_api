@@ -29,10 +29,10 @@ WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY", "")
 COHERE_API_KEY = os.getenv("COHERE_API_KEY", "")
 
 # --- RAG search tuning ---
-SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "25"))
+SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "60"))
 SEARCH_ALPHA = float(os.getenv("SEARCH_ALPHA", "0.5"))
 RERANK_TOP_N = int(os.getenv("RERANK_TOP_N", "10"))
-RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "0.7"))
+RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "0.3"))
 MIN_SEARCH_SCORE = float(os.getenv("MIN_SEARCH_SCORE", "0.0"))  # 0 = no filter; tune after testing
 MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "24000"))  # ~6000 tokens
 
@@ -42,7 +42,7 @@ CORS_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:5000,http://localhost:5001,https://localhost:5001,https://localhost:7001"
+        "http://localhost:5000,http://localhost:5001,https://localhost:5001,https://localhost:7001,https://localhost:7241"
     ).split(",")
     if origin.strip()
 ]

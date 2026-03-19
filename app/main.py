@@ -240,8 +240,9 @@ async def chat(
         context_analysis = analyze_situational_context(messages_for_ai)
         
         result = await chat_service.process_chat_request(
-            messages_for_ai, 
-            situational_context=context_analysis
+            messages_for_ai,
+            situational_context=context_analysis,
+            session_id=body.session_id
         )
         
         if result["success"]:

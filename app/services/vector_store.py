@@ -1,6 +1,6 @@
 import weaviate
 from weaviate.classes.config import Configure, Property, DataType, VectorDistances
-from weaviate.classes.query import MetadataQuery
+from weaviate.classes.query import MetadataQuery, HybridFusion
 from typing import List, Dict, Any, Optional
 import os
 from app.core.config import WEAVIATE_URL, WEAVIATE_API_KEY, client as openai_client, SEARCH_LIMIT, SEARCH_ALPHA, MIN_SEARCH_SCORE
@@ -175,6 +175,7 @@ class VectorStoreService:
                 query=query,
                 alpha=alpha,
                 limit=limit,
+                fusion_type=HybridFusion.RELATIVE_SCORE,
                 return_metadata=MetadataQuery(score=True)
             )
             

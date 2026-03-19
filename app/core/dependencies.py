@@ -30,13 +30,18 @@ def get_image_validator_service(
 ) -> ImageValidatorService:
     return ImageValidatorService(vision_service)
 
+_chat_service_instance = None
+
 def get_chat_service(
     vector_store: VectorStoreService = Depends(get_vector_store_service),
     vision_service: VisionService = Depends(get_vision_service),
     image_validator: ImageValidatorService = Depends(get_image_validator_service),
     language_service: LanguageService = Depends(get_language_service)
 ) -> ChatService:
-    return ChatService(vector_store, vision_service, image_validator, language_service)
+    global _chat_service_instance
+    if _chat_service_instance is None:
+        _chat_service_instance = ChatService(vector_store, vision_service, image_validator, language_service)
+    return _chat_service_instance
 
 
 def get_ingestion_service(
