@@ -16,11 +16,6 @@ class TestVisionEndpoint(unittest.TestCase):
         self.mock_vector_store = MagicMock(spec=VectorStoreService)
         self.mock_get_vector_store.return_value = self.mock_vector_store
         
-        # Mock vector store methods called in lifespan
-        self.mock_vector_store.index_exists.return_value = True
-        self.mock_vector_store.load_index.return_value = True
-        self.mock_vector_store.chunks = []
-
         self.client = TestClient(app)
         
         # Mock Services

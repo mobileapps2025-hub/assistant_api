@@ -1,4 +1,5 @@
 import os
+import logging
 from dotenv import load_dotenv
 from openai import OpenAI
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -6,26 +7,54 @@ from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)
+_logger = logging.getLogger(__name__)
 
-# MCL Image Validation Configuration
-# DISABLED by default - GPT-4o Vision cannot reliably identify proprietary apps like MCL
-# Enable only if you have reference MCL screenshots for comparison
+# --- Required ---
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY environment variable is required")
+
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+# --- Optional features ---
 ENABLE_MCL_IMAGE_VALIDATION = os.getenv("ENABLE_MCL_IMAGE_VALIDATION", "false").lower() == "true"
 MCL_VALIDATION_CONFIDENCE_THRESHOLD = float(os.getenv("MCL_VALIDATION_CONFIDENCE_THRESHOLD", "0.5"))
 
-# Vector Store Configuration
+# --- Vector store ---
 VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "mcl_vector_store")
+WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
+WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY", "")
 
-# Database configuration for MCL feedback system
-DATABASE_CONNECTION_STRING = os.getenv(
-    "DATABASE_CONNECTION_STRING",
-    "mssql+aioodbc://adminMCLeu:%2BWorkappsadmin%21@mcleu-testdbserver.database.windows.net/MCLEU-SQLDB?driver=ODBC+Driver+17+for+SQL+Server"
-)
+# --- Reranking ---
+COHERE_API_KEY = os.getenv("COHERE_API_KEY", "")
 
-# Create async engine (only if database connection string is available)
+# --- RAG search tuning ---
+SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "25"))
+SEARCH_ALPHA = float(os.getenv("SEARCH_ALPHA", "0.5"))
+RERANK_TOP_N = int(os.getenv("RERANK_TOP_N", "10"))
+RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "0.7"))
+MIN_SEARCH_SCORE = float(os.getenv("MIN_SEARCH_SCORE", "0.0"))  # 0 = no filter; tune after testing
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "24000"))  # ~6000 tokens
+
+# --- CORS ---
+# Comma-separated list of allowed origins, e.g. "https://myapp.azurewebsites.net,http://localhost:5001"
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5000,http://localhost:5001,https://localhost:5001,https://localhost:7001"
+    ).split(",")
+    if origin.strip()
+]
+
+# --- Admin security ---
+ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
+
+# --- Database ---
+# Azure sometimes prefixes env vars with APPSETTING_
+DATABASE_CONNECTION_STRING = os.getenv("DATABASE_CONNECTION_STRING", "") or \
+                             os.getenv("APPSETTING_DATABASE_CONNECTION_STRING", "")
+
 engine = None
 AsyncSessionLocal = None
 
@@ -36,23 +65,24 @@ if DATABASE_CONNECTION_STRING:
             echo=False,
             future=True
         )
-
-        # Create async session factory
         AsyncSessionLocal = sessionmaker(
-            engine, 
-            class_=AsyncSession, 
+            engine,
+            class_=AsyncSession,
             expire_on_commit=False
         )
-        print("Database connection initialized successfully")
+        _logger.info("Database connection initialized")
     except Exception as e:
-        print(f"Warning: Database connection failed - feedback system will be disabled: {e}")
+        _logger.error(f"Database connection failed — feedback system disabled: {e}")
         engine = None
         AsyncSessionLocal = None
+else:
+    _logger.warning("DATABASE_CONNECTION_STRING not set — feedback system disabled")
 
-# Database dependency
+
 async def get_db():
     if not AsyncSessionLocal:
-        raise Exception("Database not available")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="Feedback service unavailable — database not configured")
     async with AsyncSessionLocal() as session:
         try:
             yield session

@@ -1,147 +1,117 @@
-import os
-import shutil
-import tempfile
-import unittest
-from pathlib import Path
+import pytest
+from unittest.mock import MagicMock, patch
 from app.services.vector_store import VectorStoreService
 
-class TestVectorStoreService(unittest.TestCase):
-    def setUp(self):
-        # Create a temporary directory for testing
-        self.test_dir = tempfile.mkdtemp()
-        self.service = VectorStoreService(self.test_dir)
 
-    def tearDown(self):
-        # Remove the directory after the test
-        shutil.rmtree(self.test_dir)
+class TestVectorStoreServiceInit:
 
-    def test_initialization_creates_directory(self):
-        """Test that the storage directory is created if it doesn't exist."""
-        new_dir = os.path.join(self.test_dir, "subdir")
-        VectorStoreService(new_dir)
-        self.assertTrue(os.path.exists(new_dir))
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
+    @patch("app.services.vector_store.WEAVIATE_API_KEY", "")
+    def test_initialization_local(self, mock_weaviate):
+        """Local URL → connect_to_local; client is stored."""
+        mock_client = MagicMock()
+        mock_weaviate.connect_to_local.return_value = mock_client
 
-    def test_index_exists_false(self):
-        """Test index_exists returns False when files are missing."""
-        self.assertFalse(self.service.index_exists())
+        service = VectorStoreService()
 
-    def test_index_exists_true(self):
-        """Test index_exists returns True when files exist."""
-        # Create dummy files
-        with open(self.service.index_path, 'w') as f:
-            f.write("dummy index")
-        with open(self.service.metadata_path, 'w') as f:
-            f.write("dummy metadata")
-            
-        self.assertTrue(self.service.index_exists())
+        mock_weaviate.connect_to_local.assert_called_once()
+        assert service.client is mock_client
 
-    def test_index_exists_partial(self):
-        """Test index_exists returns False when only one file exists."""
-        with open(self.service.index_path, 'w') as f:
-            f.write("dummy index")
-        self.assertFalse(self.service.index_exists())
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "https://cluster.weaviate.cloud")
+    @patch("app.services.vector_store.WEAVIATE_API_KEY", "test-key")
+    def test_initialization_cloud(self, mock_weaviate):
+        """Cloud URL → connect_to_wcs."""
+        mock_client = MagicMock()
+        mock_weaviate.connect_to_wcs.return_value = mock_client
 
-    def test_build_index(self):
-        """Test building the index from documents."""
-        # Create a dummy documents directory
-        docs_dir = os.path.join(self.test_dir, "documents")
-        os.makedirs(docs_dir, exist_ok=True)
-        
-        # Create a dummy MCL markdown file
-        mcl_file = os.path.join(docs_dir, "mcl_guide.md")
-        with open(mcl_file, "w", encoding="utf-8") as f:
-            f.write("# MCL Guide\n\nThis is a test document for the MCL knowledge base.\nIt contains some sample text to be chunked and indexed.")
-            
-        # Create a dummy non-MCL file (should be ignored)
-        spotplan_file = os.path.join(docs_dir, "spotplan_guide.md")
-        with open(spotplan_file, "w", encoding="utf-8") as f:
-            f.write("# Spotplan Guide\n\nThis should be ignored.")
-            
-        # Build the index
-        result = self.service.build_index(docs_dir)
-        
-        # Check results
-        if result.get("error") and "Missing dependencies" in result["error"]:
-            print("Skipping build_index test due to missing dependencies")
-            return
+        service = VectorStoreService()
 
-        self.assertTrue(result["success"])
-        self.assertEqual(result["processed_files"], 1) # Only MCL file
-        self.assertTrue(self.service.index_exists())
-        
-        # Verify metadata content
-        with open(self.service.metadata_path, 'r', encoding='utf-8') as f:
-            import json
-            metadata = json.load(f)
-            self.assertTrue(len(metadata) > 0)
-            self.assertEqual(metadata[0]["document_name"], "mcl_guide.md")
+        mock_weaviate.connect_to_wcs.assert_called_once()
+        assert service.client is mock_client
 
-    def test_load_index(self):
-        """Test loading the index from disk."""
-        # First build an index
-        docs_dir = os.path.join(self.test_dir, "documents")
-        os.makedirs(docs_dir, exist_ok=True)
-        mcl_file = os.path.join(docs_dir, "mcl_guide.md")
-        with open(mcl_file, "w", encoding="utf-8") as f:
-            f.write("# MCL Guide\n\nTest content for loading.")
-            
-        build_result = self.service.build_index(docs_dir)
-        if build_result.get("error") and "Missing dependencies" in build_result["error"]:
-            print("Skipping load_index test due to missing dependencies")
-            return
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
+    def test_client_is_none_when_connection_fails(self, mock_weaviate):
+        """Connection failure → client remains None; no exception raised."""
+        mock_weaviate.connect_to_local.side_effect = Exception("refused")
 
-        # Create a new service instance to simulate a fresh start
-        new_service = VectorStoreService(self.test_dir)
-        
-        # Load the index
-        success = new_service.load_index()
-        
-        self.assertTrue(success)
-        self.assertIsNotNone(new_service.index)
-        self.assertEqual(len(new_service.chunks), 1)
-        self.assertEqual(new_service.chunks[0]["document_name"], "mcl_guide.md")
+        service = VectorStoreService()
 
-    def test_load_index_missing(self):
-        """Test loading when index files are missing."""
-        success = self.service.load_index()
-        self.assertFalse(success)
+        assert service.client is None
 
-    def test_search(self):
-        """Test semantic search."""
-        # Build index with known content
-        docs_dir = os.path.join(self.test_dir, "documents")
-        os.makedirs(docs_dir, exist_ok=True)
-        
-        # Create two distinct documents
-        doc1 = os.path.join(docs_dir, "mcl_login.md")
-        with open(doc1, "w", encoding="utf-8") as f:
-            f.write("# Login Guide\n\nTo login, enter your username and password on the main screen.")
-            
-        doc2 = os.path.join(docs_dir, "mcl_tasks.md")
-        with open(doc2, "w", encoding="utf-8") as f:
-            f.write("# Task Guide\n\nTo create a task, click the plus button in the bottom right corner.")
-            
-        build_result = self.service.build_index(docs_dir)
-        if build_result.get("error") and "Missing dependencies" in build_result["error"]:
-            print("Skipping search test due to missing dependencies")
-            return
-            
-        # Search for login info
-        results = self.service.search("how do I sign in?", limit=1)
-        
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["document_name"], "mcl_login.md")
-        self.assertTrue("similarity_score" in results[0])
-        
-        # Search for task info
-        results = self.service.search("creating new tasks", limit=1)
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["document_name"], "mcl_tasks.md")
 
-    def test_search_without_index(self):
-        """Test search returns empty list when index is not loaded."""
-        results = self.service.search("test")
-        self.assertEqual(results, [])
+class TestVectorStoreAddDocuments:
 
-if __name__ == '__main__':
-    unittest.main()
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
+    def test_add_documents_batches_correctly(self, mock_weaviate):
+        mock_client = MagicMock()
+        mock_weaviate.connect_to_local.return_value = mock_client
+        mock_collection = MagicMock()
+        mock_client.collections.get.return_value = mock_collection
+
+        mock_batch = MagicMock()
+        mock_collection.batch.dynamic.return_value.__enter__.return_value = mock_batch
+        mock_collection.batch.failed_objects = []
+
+        service = VectorStoreService()
+        chunks = [
+            {"text": "chunk1", "header_path": "H1", "source": "doc1", "chunk_index": 0},
+            {"text": "chunk2", "header_path": "H1", "source": "doc1", "chunk_index": 1},
+        ]
+
+        success = service.add_documents(chunks)
+
+        assert success is True
+        assert mock_batch.add_object.call_count == 2
+
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
+    def test_add_documents_returns_false_when_client_none(self, mock_weaviate):
+        mock_weaviate.connect_to_local.side_effect = Exception("refused")
+
+        service = VectorStoreService()
+        result = service.add_documents([{"text": "x"}])
+
+        assert result is False
+
+
+class TestVectorStoreHybridSearch:
+
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
+    def test_hybrid_search_returns_results(self, mock_weaviate):
+        mock_client = MagicMock()
+        mock_weaviate.connect_to_local.return_value = mock_client
+        mock_collection = MagicMock()
+        mock_client.collections.get.return_value = mock_collection
+
+        mock_obj = MagicMock()
+        mock_obj.properties = {
+            "text": "result text",
+            "header_path": "H1",
+            "source": "doc.md",
+        }
+        mock_obj.metadata.score = 0.9
+        mock_obj.uuid = "abc-123"
+
+        mock_collection.query.hybrid.return_value = MagicMock(objects=[mock_obj])
+
+        service = VectorStoreService()
+        results = service.hybrid_search("create a task")
+
+        assert len(results) == 1
+        assert results[0]["text"] == "result text"
+        assert results[0]["score"] == 0.9
+
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
+    def test_hybrid_search_returns_empty_when_client_none(self, mock_weaviate):
+        mock_weaviate.connect_to_local.side_effect = Exception("refused")
+
+        service = VectorStoreService()
+        results = service.hybrid_search("test")
+
+        assert results == []

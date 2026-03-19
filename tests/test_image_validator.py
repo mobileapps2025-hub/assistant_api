@@ -1,14 +1,22 @@
 import unittest
 from unittest.mock import MagicMock, patch, mock_open
 import json
+import os
 from app.services.image_validator import ImageValidatorService
 from app.services.vision_service import VisionService
 
 class TestImageValidatorService(unittest.TestCase):
 
     def setUp(self):
+        # Ensure clean slate
+        if os.path.exists("test_cache.json"):
+            os.remove("test_cache.json")
         self.mock_vision_service = MagicMock(spec=VisionService)
         self.validator = ImageValidatorService(self.mock_vision_service, cache_file="test_cache.json")
+
+    def tearDown(self):
+        if os.path.exists("test_cache.json"):
+            os.remove("test_cache.json")
 
     def test_validate_image_cache_hit(self):
         """Test that cached results are returned without calling the API."""

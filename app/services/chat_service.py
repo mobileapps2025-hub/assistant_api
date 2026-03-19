@@ -1,11 +1,20 @@
 import logging
+import time
+import cohere
 from typing import List, Dict, Any, Optional
 from app.services.vector_store import VectorStoreService
 from app.services.vision_service import VisionService
 from app.services.image_validator import ImageValidatorService
+from app.services.language_service import LanguageService
 from app.core.context import ContextAnalysis
-from app.core.config import client, ENABLE_MCL_IMAGE_VALIDATION
+from app.core.config import client, ENABLE_MCL_IMAGE_VALIDATION, COHERE_API_KEY
 from app.core.logging import get_logger
+from app.graph.nodes import AgentNodes
+from app.graph.workflow import create_workflow
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from app.core.database import CuratedQA
+from app.core.config import AsyncSessionLocal
+from sqlalchemy import select
 
 logger = get_logger(__name__)
 
@@ -14,11 +23,28 @@ class ChatService:
         self,
         vector_store_service: VectorStoreService,
         vision_service: VisionService,
-        image_validator_service: ImageValidatorService
+        image_validator_service: ImageValidatorService,
+        language_service: LanguageService # Injected
     ):
         self.vector_store = vector_store_service
         self.vision_service = vision_service
         self.image_validator = image_validator_service
+        self.language_service = language_service 
+        
+        # Initialize Cohere client if key is available
+        self.cohere_client = None
+        if COHERE_API_KEY:
+            try:
+                self.cohere_client = cohere.Client(COHERE_API_KEY)
+                logger.info("Cohere client initialized for re-ranking.")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Cohere client: {e}")
+        else:
+            logger.warning("COHERE_API_KEY not found. Re-ranking will be disabled.")
+
+        # Initialize Graph
+        self.nodes = AgentNodes(self.vector_store, self.language_service, self.cohere_client)
+        self.workflow = create_workflow(self.nodes)
 
     async def process_chat_request(
         self,
@@ -87,19 +113,13 @@ class ChatService:
                         "metadata": {"validation_failed": True}
                     }
 
-        # Prepare messages for Vision API (GPT-4o)
-        # We can use the client directly or VisionService. 
-        # VisionService.analyze_image_base64 takes a single image and prompt.
-        # Here we have a conversation history and potentially multiple images.
-        # It's better to use the OpenAI client directly here for full conversation support,
-        # or extend VisionService. For now, I'll use the client directly as in legacy_services.
-        
         try:
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=messages,
                 max_tokens=1500,
-                temperature=0.7
+                temperature=0.7,
+                timeout=30
             )
             return {
                 "response": response.choices[0].message.content,
@@ -115,150 +135,134 @@ class ChatService:
                 "error": str(e)
             }
 
+    async def _get_curated_knowledge(self, query: str) -> List[Dict[str, Any]]:
+        """
+        Fetch curated Q&A pairs to use as fallback context.
+        Performs simple keyword filtering to avoid polluting context with irrelevant facts.
+        """
+        if not AsyncSessionLocal:
+            return []
+            
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(CuratedQA).where(CuratedQA.active == True))
+                rows = result.scalars().all()
+                
+                docs = []
+                # Simple keyword extraction (lowercase, split by space)
+                # We use a set for O(1) lookups
+                query_words = set(query.lower().split())
+                
+                # Expanded stop words list to prevent false positives
+                stop_words = {
+                    "the", "is", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", 
+                    "what", "how", "why", "when", "where", "who", "which",
+                    "i", "you", "he", "she", "it", "we", "they", "my", "your", "his", "her", "its", "our", "their",
+                    "do", "does", "did", "can", "could", "will", "would", "should", "have", "has", "had", "be", "am", "are", "was", "were"
+                }
+                keywords = query_words - stop_words
+                
+                for row in rows:
+                    # Tokenize the curated question to ensure we match whole words, not substrings
+                    question_words = set(row.question.lower().split())
+                    
+                    is_relevant = False
+                    if not keywords:
+                        # If query has no keywords (e.g. "Hello"), don't inject anything
+                        is_relevant = False
+                    elif not keywords.isdisjoint(question_words):
+                        # Check for intersection between query keywords and question words
+                        is_relevant = True
+                    
+                    if is_relevant:
+                        docs.append({
+                            "text": f"Question: {row.question}\nAnswer: {row.answer}",
+                            "source": "Learned Knowledge",
+                            "header_path": "Curated QA",
+                            "chunk_index": 0,
+                            "score": 1.0 # High confidence
+                        })
+                return docs
+        except Exception as e:
+            logger.error(f"Failed to fetch curated knowledge: {e}")
+            return []
+
     async def _handle_text_request(
         self,
         messages: List[Dict[str, Any]],
         latest_user_message: Dict[str, Any],
         situational_context: Optional[ContextAnalysis]
     ) -> Dict[str, Any]:
-        
+        start_time = time.monotonic()
+
         user_query = latest_user_message.get("content", "")
         if isinstance(user_query, list):
             # Extract text from list content
             user_query = " ".join([item["text"] for item in user_query if item.get("type") == "text"])
+
+        logger.info(f"Processing text request via Graph: {user_query[:50]}...")
+        
+        # Convert messages to LangChain format
+        lc_messages = []
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content")
+            if isinstance(content, list):
+                 content = " ".join([item["text"] for item in content if item.get("type") == "text"])
             
-        logger.info(f"Processing text request: {user_query[:50]}...")
-        
-        # Detect language
-        detected_lang = self._detect_language(user_query)
-        
-        # RAG Search
-        relevant_chunks = self._find_relevant_chunks(user_query, detected_lang)
-        
-        # Build Context
-        context_text = self._build_context_text(relevant_chunks)
-        
-        # Generate Response
-        system_prompt = self._build_system_prompt(detected_lang, situational_context, context_text)
-        
-        # Prepare messages (replace system prompt or prepend)
-        # We construct a new list of messages
-        final_messages = [{"role": "system", "content": system_prompt}] + messages
+            if role == "user":
+                lc_messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                lc_messages.append(AIMessage(content=content))
+            elif role == "system":
+                lc_messages.append(SystemMessage(content=content))
+
+        # Fetch Curated Knowledge (Fallback/Augmentation)
+        # Filtered by query keywords to prevent context pollution
+        curated_docs = await self._get_curated_knowledge(user_query)
+
+        # Invoke Graph
+        inputs = {
+            "messages": lc_messages,
+            "query": user_query,
+            "documents": curated_docs, # Pre-load documents with curated knowledge
+            "retry_count": 0
+        }
         
         try:
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=final_messages,
-                temperature=0.2,
-                max_tokens=2000
+            result = await self.workflow.ainvoke(inputs)
+
+            duration_ms = int((time.monotonic() - start_time) * 1000)
+            graph_path = _infer_graph_path(result)
+            logger.info(
+                f"[CHAT_SUMMARY] query='{user_query[:60]}' "
+                f"curated_docs={len(curated_docs)} "
+                f"graph_path={graph_path} "
+                f"duration_ms={duration_ms}"
             )
-            
-            content = response.choices[0].message.content
-            
-            # Append sources
-            if relevant_chunks:
-                sources_header = {
-                    'de': "\n\n📚 **Quellen:**\n",
-                    'en': "\n\n📚 **Sources:**\n"
-                }.get(detected_lang, "\n\n📚 **Sources:**\n")
-                
-                unique_sources = sorted(list(set([f"{c['document_name']} (Chunk {c['chunk_index']+1})" for c in relevant_chunks])))
-                content += sources_header + "\n".join([f"• {s}" for s in unique_sources])
 
             return {
-                "response": content,
+                "response": result.get("answer", "No response generated."),
                 "success": True,
                 "has_vision": False
             }
-            
         except Exception as e:
-            logger.error(f"Error generating text response: {e}")
+            duration_ms = int((time.monotonic() - start_time) * 1000)
+            logger.error(f"Error in graph execution after {duration_ms}ms: {e}")
             return {
-                "response": "I encountered an error generating the response.",
+                "response": "I encountered an error processing your request.",
                 "success": False,
                 "has_vision": False,
                 "error": str(e)
             }
 
-    def _detect_language(self, text: str) -> str:
-        # Simple heuristic + fallback to 'en'
-        if not text: return 'en'
-        text_lower = text.lower()
-        if any(char in text_lower for char in ['ä', 'ö', 'ü', 'ß']): return 'de'
-        if any(word in text_lower for word in ['ich', 'kannst', 'mir', 'checkliste']): return 'de'
-        return 'en'
 
-    def _find_relevant_chunks(self, query: str, lang: str) -> List[Dict[str, Any]]:
-        # 1. Translate if needed
-        search_query = query
-        if lang != 'en':
-            # Simple translation mock or use GPT (omitted for brevity, assuming English docs mostly or simple match)
-            # Ideally call a translation helper.
-            pass 
-
-        # 2. Semantic Search via VectorStoreService
-        # This uses the vector store's search capability
-        semantic_results = self.vector_store.search(search_query, limit=10)
-        
-        # 3. Keyword Search (Hybrid) - Optional but good
-        # Access chunks directly from vector_store
-        keyword_results = []
-        if self.vector_store.chunks:
-            query_terms = search_query.lower().split()
-            for chunk in self.vector_store.chunks:
-                score = 0
-                content_lower = chunk['content'].lower()
-                for term in query_terms:
-                    if term in content_lower:
-                        score += 1
-                if score > 0:
-                    c = chunk.copy()
-                    c['keyword_score'] = score
-                    keyword_results.append(c)
-            keyword_results.sort(key=lambda x: x['keyword_score'], reverse=True)
-            keyword_results = keyword_results[:10]
-
-        # Combine results (Simple deduplication)
-        seen = set()
-        final_results = []
-        
-        for r in semantic_results:
-            if r['chunk_id'] not in seen:
-                final_results.append(r)
-                seen.add(r['chunk_id'])
-        
-        for r in keyword_results:
-            if r['chunk_id'] not in seen:
-                final_results.append(r)
-                seen.add(r['chunk_id'])
-                
-        return final_results[:10]
-
-    def _build_context_text(self, chunks: List[Dict[str, Any]]) -> str:
-        if not chunks: return ""
-        parts = []
-        for c in chunks:
-            parts.append(f"[From {c['document_name']}]:\n{c['content']}")
-        return "\n\n---\n\n".join(parts)
-
-    def _build_system_prompt(self, lang: str, context: Optional[ContextAnalysis], context_text: str) -> str:
-        # Simplified prompt construction
-        role = "You are 'MCL Assistant', an expert AI assistant for the MCL (Mobile Checklist) application."
-        
-        if lang == 'de':
-            return f"""{role}
-⚠️ CRITICAL: Respond in GERMAN (Deutsch).
-
-Context:
-{context_text}
-
-Answer the user's question based on the context provided.
-"""
-        else:
-            return f"""{role}
-
-Context:
-{context_text}
-
-Answer the user's question based on the context provided.
-"""
+def _infer_graph_path(result: dict) -> str:
+    """Derive which graph branch was taken from the final state."""
+    retry_count = result.get("retry_count", 0)
+    grade = result.get("grade", "")
+    if grade == "irrelevant" and retry_count == 0:
+        return "retrieve→grade→clarify"
+    if retry_count >= 1:
+        return "retrieve→grade→rewrite→retrieve→generate"
+    return "retrieve→grade→generate"

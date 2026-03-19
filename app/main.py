@@ -1,28 +1,45 @@
 import uvicorn
+import uuid
 from contextlib import asynccontextmanager
 import tempfile
 import os
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import exc
 
 from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse
-from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH
+from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH, CORS_ORIGINS, AsyncSessionLocal
 from app.core.database import Feedback, Base
 from app.core.dependencies import get_vector_store_service, get_chat_service
 from app.services.chat_service import ChatService
 from app.services.vector_store import VectorStoreService
+from app.services.ingestion_service import IngestionService
 from app.core.context import analyze_situational_context
-from app.routers import vision
-from app.core.logging import setup_logging, get_logger
+from app.routers import vision, admin
+from app.core.logging import setup_logging, get_logger, request_id_var
 
 # Setup logging
 setup_logging()
 logger = get_logger(__name__)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Attaches a short UUID to every request for end-to-end tracing."""
+
+    async def dispatch(self, request: Request, call_next):
+        req_id = uuid.uuid4().hex[:8]
+        token = request_id_var.set(req_id)
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = req_id
+            return response
+        finally:
+            request_id_var.reset(token)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -41,21 +58,24 @@ async def lifespan(app: FastAPI):
         
         # Initialize MCL knowledge base
         logger.info("Initializing MCL knowledge base...")
+        # Just initialize the service holder - specific connection happens lazily
         vector_store = get_vector_store_service()
         
-        if vector_store.index_exists():
-            if vector_store.load_index():
-                logger.info(f"MCL knowledge base loaded successfully. Total chunks: {len(vector_store.chunks)}")
+        if vector_store.client:
+            logger.info("Verifying Weaviate schema...")
+            vector_store.ensure_schema()
+            
+            logger.info("Checking for documents to ingest...")
+            stats = vector_store.get_stats()
+            if stats.get("count", 0) == 0:
+                logger.info("Vector store is empty. Triggering initial ingestion...")
+                ingestion_service = IngestionService(vector_store)
+                # In docs folder
+                ingestion_service.ingest_all("app/documents")
             else:
-                logger.error("Failed to load MCL knowledge base index.")
-        else:
-            logger.info("Index not found. Building index from documents...")
-            # Assuming documents are in app/documents
-            result = vector_store.build_index("app/documents")
-            if result["success"]:
-                logger.info(f"Index built successfully. Total chunks: {result['total_chunks']}")
-            else:
-                logger.error(f"Failed to build index: {result.get('error')}")
+                logger.info(f"Vector store already contains {stats['count']} documents. Skipping ingestion.")
+        
+        logger.info("MCL knowledge base service initialized.")
 
         logger.info("MCL Assistant startup completed.")
         yield
@@ -75,15 +95,17 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(vision.router)
+app.include_router(admin.router)
 
 # --- API Endpoints ---
 
@@ -111,47 +133,29 @@ async def root():
 
 @app.get("/health")
 async def health_check(vector_store: VectorStoreService = Depends(get_vector_store_service)):
-    """Health check endpoint."""
-    is_loaded = vector_store.index is not None
-    chunks = vector_store.chunks
-    
+    """Health check endpoint — reports real infrastructure status."""
+    stats = vector_store.get_stats()
+    weaviate_status = stats.get("status", "unknown")
+    weaviate_healthy = weaviate_status == "connected"
+    db_healthy = AsyncSessionLocal is not None
+
+    overall = "healthy" if (weaviate_healthy and db_healthy) else "degraded"
+
     return {
-        "status": "healthy",
-        "knowledge_base_loaded": is_loaded,
-        "total_document_chunks": len(chunks),
-        "documents_processed": len(set(chunk['document_name'] for chunk in chunks)) if chunks else 0
+        "status": overall,
+        "weaviate": weaviate_status,
+        "document_count": stats.get("count", 0),
+        "database": "connected" if db_healthy else "unavailable",
     }
 
 @app.get("/api/chunks")
 async def get_chunks_info(vector_store: VectorStoreService = Depends(get_vector_store_service)):
     """Get information about available MCL document chunks."""
-    chunks = vector_store.chunks
-    if not chunks:
-        return {"message": "No MCL document chunks available", "chunks": []}
-    
-    # Group chunks by document
-    documents_info = {}
-    for chunk in chunks:
-        doc_name = chunk["document_name"]
-        if doc_name not in documents_info:
-            documents_info[doc_name] = {
-                "document_name": doc_name,
-                "document_type": chunk["document_type"],
-                "total_chunks": 0,
-                "chunks": []
-            }
-        documents_info[doc_name]["total_chunks"] += 1
-        documents_info[doc_name]["chunks"].append({
-            "chunk_id": chunk["chunk_id"],
-            "chunk_index": chunk["chunk_index"],
-            "content_preview": chunk["content"][:200] + "..." if len(chunk["content"]) > 200 else chunk["content"],
-            "content_hash": chunk["content_hash"]
-        })
+    stats = vector_store.get_stats()
     
     return {
-        "total_chunks": len(chunks),
-        "total_documents": len(documents_info),
-        "documents": list(documents_info.values())
+        "message": "Detailed chunk listing is available via search endpoint",
+        "stats": stats
     }
 
 @app.post("/api/search")
@@ -244,8 +248,7 @@ async def chat(
             return ChatResponse(
                 response=result["response"],
                 response_id=response_id,
-                sources=[], # Sources are embedded in response text now
-                app_type="mcl"
+                sources=[]
             )
         else:
             error_msg = result.get("error", "Unknown error occurred")

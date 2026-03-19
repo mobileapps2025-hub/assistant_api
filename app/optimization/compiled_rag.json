@@ -1,0 +1,65 @@
+{
+  "generate.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "context": "To reset your password, go to Settings > Account > Security and click 'Reset Password'.",
+        "question": "How do I reset my password?",
+        "reasoning": "The context provides a clear step-by-step process for resetting a password, which involves navigating through the app's settings to the security section.",
+        "answer": "To reset your password, go to Settings > Account > Security and click 'Reset Password'."
+      },
+      {
+        "augmented": true,
+        "context": "The MCL (Mobile Checklist) app is a tool for store managers to complete daily operational checks.",
+        "question": "What is the MCL app?",
+        "reasoning": "The context provides a brief description of the MCL app, indicating that it is a tool designed for store managers to perform daily operational checks. This suggests that the app is likely used for ensuring that store operations are running smoothly and that all necessary tasks are completed on a daily basis.",
+        "answer": "The MCL (Mobile Checklist) app is a tool for store managers to complete daily operational checks."
+      },
+      {
+        "augmented": true,
+        "context": "Yes, the app supports offline mode. Data will sync when connection is restored.",
+        "question": "Can I use the app offline?",
+        "reasoning": "The context states that the app supports offline mode, which means users can continue to use the app without an internet connection. Once the connection is restored, any data generated or modified while offline will sync automatically.",
+        "answer": "Yes, you can use the app offline. Data will sync when the connection is restored."
+      },
+      {
+        "augmented": true,
+        "context": "The secret codename for the next release is MCL got Crazy",
+        "question": "What is the secret codename for the next release?",
+        "reasoning": "The context provides the specific information about the secret codename for the next release, which is directly mentioned as \"MCL got Crazy.\"",
+        "answer": "The secret codename for the next release is \"MCL got Crazy.\""
+      }
+    ],
+    "signature": {
+      "instructions": "Answer the user's question based on the retrieved context.",
+      "fields": [
+        {
+          "prefix": "Context:",
+          "description": "Relevant facts and documents retrieved from the knowledge base."
+        },
+        {
+          "prefix": "Question:",
+          "description": "The user's question."
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Answer:",
+          "description": "A helpful, accurate, and concise answer to the question."
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.13",
+      "dspy": "2.6.27",
+      "cloudpickle": "3.1"
+    }
+  }
+}
