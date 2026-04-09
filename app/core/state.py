@@ -15,3 +15,8 @@ class AgentState(TypedDict):
     grade: Optional[str]
     retry_count: int
     contextualized_query: Optional[str]
+    # Grading confidence metadata (set by grade_documents)
+    relevant_count: Optional[int]
+    total_graded: Optional[int]
+    # Per-retry search strategy override (set by rewrite_query)
+    search_alpha_override: Optional[float]

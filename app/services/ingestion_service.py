@@ -15,35 +15,62 @@ class IngestionService:
     def load_pdf_document(self, file_path: str) -> List[Dict[str, Any]]:
         """
         Load a PDF file and split it into chunks.
+        Per-page metadata is extracted so that chunks carry a meaningful header_path
+        instead of the generic "PDF Content" label, improving retrieval context.
         """
         try:
             reader = pypdf.PdfReader(file_path)
-            text = ""
-            for page in reader.pages:
-                text += page.extract_text() + "\n"
-            
-            # Split text into chunks
+            filename = os.path.basename(file_path)
+
+            # Extract per-page text while tracking page number
+            page_texts: List[tuple] = []  # (page_num, text)
+            for page_num, page in enumerate(reader.pages, start=1):
+                page_text = page.extract_text() or ""
+                if page_text.strip():
+                    page_texts.append((page_num, page_text))
+
             text_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=1000,
                 chunk_overlap=200,
                 length_function=len,
             )
-            docs = text_splitter.create_documents([text])
-            
+
             chunks = []
-            filename = os.path.basename(file_path)
-            
-            for i, doc in enumerate(docs):
-                chunk = {
-                    "text": doc.page_content,
-                    "header_path": "PDF Content", # PDFs don't have structured headers like MD
-                    "source": filename,
-                    "chunk_index": i
-                }
-                chunks.append(chunk)
-                
+            chunk_index = 0
+
+            for page_num, page_text in page_texts:
+                docs = text_splitter.create_documents([page_text])
+                for doc in docs:
+                    content = doc.page_content.strip()
+                    if not content:
+                        continue
+
+                    # Detect section header from the first meaningful line of the chunk.
+                    # A header is: ALL CAPS line, a line starting with Q: or ending in ?,
+                    # or a short line (≤80 chars) that looks like a title.
+                    first_line = content.split("\n")[0].strip()
+                    if (
+                        first_line.isupper()
+                        or first_line.startswith("Q:")
+                        or first_line.endswith("?")
+                        or (len(first_line) <= 80 and not first_line.endswith("."))
+                    ):
+                        section_header = first_line[:60]
+                    else:
+                        section_header = f"Page {page_num}"
+
+                    header_path = f"Page {page_num} > {section_header}"
+
+                    chunks.append({
+                        "text": content,
+                        "header_path": header_path,
+                        "source": filename,
+                        "chunk_index": chunk_index,
+                    })
+                    chunk_index += 1
+
             return chunks
-            
+
         except Exception as e:
             logger.error(f"Error processing PDF file {file_path}: {e}")
             return []
