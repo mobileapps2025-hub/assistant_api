@@ -23,7 +23,7 @@ def create_workflow(nodes: AgentNodes):
 
         if grade == "relevant":
             return "generate_answer"
-        elif retry_count >= 1: # Stricter: Only allow 1 rewrite attempt
+        elif retry_count >= 3:  # Three distinct strategies exhausted → give up
             return "clarify_ambiguity"
         else:
             return "rewrite_query"

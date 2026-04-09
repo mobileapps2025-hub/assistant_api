@@ -31,8 +31,9 @@ COHERE_API_KEY = os.getenv("COHERE_API_KEY", "")
 # --- RAG search tuning ---
 SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "60"))
 SEARCH_ALPHA = float(os.getenv("SEARCH_ALPHA", "0.5"))
-RERANK_TOP_N = int(os.getenv("RERANK_TOP_N", "10"))
-RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "0.3"))
+RERANK_TOP_N = int(os.getenv("RERANK_TOP_N", "15"))          # was 10; more candidates survive for grading
+RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "0.15"))    # was 0.3; eliminates the score-cliff
+RERANK_HIGH_CONFIDENCE = float(os.getenv("RERANK_HIGH_CONFIDENCE", "0.5"))  # tier boundary: high vs medium
 MIN_SEARCH_SCORE = float(os.getenv("MIN_SEARCH_SCORE", "0.0"))  # 0 = no filter; tune after testing
 MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "24000"))  # ~6000 tokens
 

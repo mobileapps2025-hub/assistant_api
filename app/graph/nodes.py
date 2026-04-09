@@ -1,8 +1,10 @@
+import json
 import logging
+import re
 from typing import Dict, Any, List, Optional
 from app.core.state import AgentState
 from app.services.vector_store import VectorStoreService
-from app.core.config import client, RERANK_TOP_N, RERANK_THRESHOLD, MAX_CONTEXT_CHARS, SEARCH_LIMIT
+from app.core.config import client, RERANK_TOP_N, RERANK_THRESHOLD, RERANK_HIGH_CONFIDENCE, MAX_CONTEXT_CHARS, SEARCH_LIMIT
 from app.core.logging import get_logger
 from app.services.language_service import LanguageService
 from langchain_core.messages import HumanMessage, AIMessage
@@ -118,24 +120,26 @@ Latest user question: {query}"""
     async def retrieve_documents(self, state: AgentState) -> Dict[str, Any]:
         query = state.get("contextualized_query") or state["query"]
         retry_count = state.get("retry_count", 0)
+        # Use alpha override set by rewrite_query for this retry, then clear it
+        search_alpha = state.get("search_alpha_override") or 0.5
         logger.info(
             f"[TRACE] retrieve_documents: "
             f"language_in_state='{state.get('language')}' | "
             f"retry_count={retry_count} | "
+            f"search_alpha={search_alpha} | "
             f"query='{query[:60]}'"
         )
         # On retry after rewrite, start fresh — don't prepend old irrelevant docs
-        # (they would end up at positions [:3] and cause the grader to mark as irrelevant again)
         existing_docs = [] if retry_count > 0 else state.get("documents", [])
 
-        logger.info(f"Retrieving documents for query: '{query}' (original: '{state['query']}')" if query != state["query"] else f"Retrieving documents for query: '{query}'")
-        
+        logger.info(f"Retrieving documents for query: '{query}'" + (f" (original: '{state['query']}')" if query != state["query"] else ""))
+
         try:
-            # 1. Hybrid Search
-            initial_results = self.vector_store.hybrid_search(query, limit=SEARCH_LIMIT, alpha=0.5)
-            logger.info(f"Hybrid search found {len(initial_results)} documents.")
-            
-            # 2. Re-ranking
+            # 1. Hybrid search — use per-retry alpha override
+            initial_results = self.vector_store.hybrid_search(query, limit=SEARCH_LIMIT, alpha=search_alpha)
+            logger.info(f"Hybrid search found {len(initial_results)} documents (alpha={search_alpha}).")
+
+            # 2. Re-ranking with soft confidence tiers (eliminates score cliff)
             final_results = initial_results
             if self.cohere_client and initial_results:
                 documents = [r.get("text", "") for r in initial_results]
@@ -148,33 +152,40 @@ Latest user question: {query}"""
                     )
                     reranked = []
                     for hit in response.results:
-                        if hit.relevance_score > RERANK_THRESHOLD:
-                            original = initial_results[hit.index]
-                            original["rerank_score"] = hit.relevance_score
-                            reranked.append(original)
+                        score = hit.relevance_score
+                        if score < RERANK_THRESHOLD:
+                            continue  # truly irrelevant — drop
+                        original = initial_results[hit.index].copy()
+                        original["rerank_score"] = score
+                        # Soft tier: high (≥0.5) or medium (0.15–0.5) — both pass grading
+                        original["confidence_tier"] = "high" if score >= RERANK_HIGH_CONFIDENCE else "medium"
+                        reranked.append(original)
                     final_results = reranked
-                    logger.info(f"Re-ranking kept {len(final_results)} documents (score > {RERANK_THRESHOLD}).")
+                    logger.info(
+                        f"Re-ranking kept {len(final_results)} documents "
+                        f"(threshold={RERANK_THRESHOLD}, high_confidence={RERANK_HIGH_CONFIDENCE})."
+                    )
                 except Exception as e:
                     logger.error(f"Re-ranking failed: {e}")
                     final_results = initial_results[:RERANK_TOP_N]
             else:
                 final_results = initial_results[:RERANK_TOP_N]
-                logger.info(f"Re-ranking skipped or disabled. Using top {len(final_results)} results.")
-            
-            # Merge with existing docs (Curated Knowledge should take precedence or be included)
-            # We prepend existing docs so they appear first in context
+                logger.info(f"Re-ranking skipped. Using top {len(final_results)} results.")
+
             merged_results = existing_docs + final_results
-            logger.info(f"Total documents passed to generation: {len(merged_results)} (Curated: {len(existing_docs)}, Retrieved: {len(final_results)})")
-                
-            return {"documents": merged_results}
+            logger.info(
+                f"Total documents for grading: {len(merged_results)} "
+                f"(curated={len(existing_docs)}, retrieved={len(final_results)})"
+            )
+            return {"documents": merged_results, "search_alpha_override": None}
         except Exception as e:
             logger.error(f"Retrieval failed: {e}")
-            # Even if retrieval fails, return existing docs (curated knowledge)
             return {"documents": existing_docs, "error": str(e)}
 
     async def grade_documents(self, state: AgentState) -> Dict[str, Any]:
         """
-        Determines whether the retrieved documents are relevant to the question.
+        Grade EACH retrieved document individually in a single LLM call via JSON output.
+        Eliminates bulk-grading non-determinism: one weak doc can no longer flip the whole set.
         """
         query = state["query"]
         documents = state.get("documents", [])
@@ -186,42 +197,37 @@ Latest user question: {query}"""
 
         if not documents:
             logger.info("[TRACE] grade_documents: no documents → irrelevant")
-            return {"grade": "irrelevant"}
+            return {"grade": "irrelevant", "relevant_count": 0, "total_graded": 0}
 
-        # Concatenate document content for grading
-        context_text = "\n".join([d.get("text", "") for d in documents[:5]]) # Check top 5
+        # Grade up to 8 docs; beyond that use the first 8 (already ranked by relevance)
+        docs_to_grade = documents[:8]
 
-        system_prompt = """You are a grader assessing whether a retrieved document is relevant to a user question about the MCL mobile checklist app.
-Give a binary score: 'yes' if the document contains information that could help answer the question (including out-of-scope guidance, redirects, or statements that a feature is not supported), 'no' if it does not.
+        # Build numbered doc list for the prompt (proper JSON escaping)
+        doc_list_lines = []
+        for i, doc in enumerate(docs_to_grade):
+            snippet = doc.get("text", "")[:400].replace("\n", " ")
+            escaped = json.dumps(snippet)  # handles ", \, control chars
+            doc_list_lines.append(f'  {{"doc_index": {i}, "text": {escaped}}}')
+        doc_list_json = "[\n" + ",\n".join(doc_list_lines) + "\n]"
 
-Examples:
-Document: "To create a new checklist, tap the + button in the top-right corner of the MCL mobile app..."
-Question: "How do I add a checklist?"
-Score: yes
+        system_prompt = """You are a grader for an MCL mobile-checklist-app support system.
+For each document, decide if it could help answer the user question.
+Mark relevant=true if the document contains ANYTHING useful:
+  - Direct answers to the question
+  - Statements that a feature is not supported
+  - Redirects to the correct place (e.g. "do this in the Dashboard")
+  - Related troubleshooting steps
 
-Document: "The Dashboard shows all active tasks assigned to users in your organisation..."
-Question: "What is the price of MCL?"
-Score: no
+Mark relevant=false ONLY if the document has zero overlap with the question topic.
 
-Document: "Sync issues can occur when the device has no internet connection. Check connectivity and tap the sync icon."
-Question: "My data is not updating, what should I do?"
-Score: yes
+Return ONLY a JSON object with this exact shape (no markdown, no prose):
+{"grades": [{"doc_index": 0, "relevant": true}, {"doc_index": 1, "relevant": false}, ...]}"""
 
-Document: "Role-based permissions define what each user can see and edit in the Dashboard."
-Question: "How do I delete my account?"
-Score: no
-
-Document: "Direct integration with Power BI, SAP, or other third-party platforms is not documented. MCL supports exporting checklists to Excel from the Dashboard."
-Question: "Can I export data to Power BI?"
-Score: yes
-
-Document: "Password reset is not documented. Contact your MCL Administrator or support@x2-solutions.de."
-Question: "How do I reset my password?"
-Score: yes
-
-Respond with only 'yes' or 'no'."""
-
-        user_prompt = f"Document:\n{context_text}\n\nQuestion: {query}\nScore:"
+        user_prompt = (
+            f"Question: {query}\n\n"
+            f"Documents:\n{doc_list_json}\n\n"
+            "Grade each document and return the JSON:"
+        )
 
         try:
             response = client.chat.completions.create(
@@ -230,27 +236,64 @@ Respond with only 'yes' or 'no'."""
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
+                response_format={"type": "json_object"},
                 temperature=0,
                 timeout=30
             )
-            grade = response.choices[0].message.content.strip().lower()
-            if "yes" in grade:
-                return {"grade": "relevant"}
-            else:
-                return {"grade": "irrelevant"}
+            raw = response.choices[0].message.content.strip()
+            grades_data = json.loads(raw)
+            grades = grades_data.get("grades", [])
+
+            # Filter: keep only docs graded relevant=true (truthy check handles bool & string)
+            relevant_indices = {g["doc_index"] for g in grades if g.get("relevant") in (True, "true", "yes")}
+            relevant_docs = [docs_to_grade[i] for i in sorted(relevant_indices)]
+
+            # Append any docs beyond the graded window unchanged
+            extra_docs = documents[8:]
+
+            total_graded = len(docs_to_grade)
+            relevant_count = len(relevant_docs)
+            logger.info(
+                f"grade_documents: {relevant_count}/{total_graded} docs passed "
+                f"(+{len(extra_docs)} ungraded overflow)"
+            )
+
+            if relevant_count == 0 and not extra_docs:
+                return {
+                    "grade": "irrelevant",
+                    "documents": [],
+                    "relevant_count": 0,
+                    "total_graded": total_graded,
+                }
+
+            return {
+                "grade": "relevant",
+                "documents": relevant_docs + extra_docs,
+                "relevant_count": relevant_count,
+                "total_graded": total_graded,
+            }
+
         except Exception as e:
-            logger.error(f"Grading failed: {e}")
-            return {"grade": "irrelevant"}  # Fail safe: route to clarify rather than hallucinate
+            logger.error(f"Grading failed: {e}. Falling back to all docs as relevant.")
+            # On JSON parse error, pass all docs through to avoid false negatives
+            return {
+                "grade": "relevant",
+                "documents": documents,
+                "relevant_count": len(documents),
+                "total_graded": len(documents),
+            }
 
     async def rewrite_query(self, state: AgentState) -> Dict[str, Any]:
         """
         Transform the query to produce a better question.
+        Three distinct strategies based on retry_count so each attempt
+        explores a different retrieval dimension.
         """
         query = state["query"]
         retry_count = state.get("retry_count", 0)
         messages = state.get("messages", [])
 
-        # Build short conversation history to resolve pronouns and follow-up references
+        # Build short conversation history
         history_text = ""
         prior_messages = messages[:-1] if messages else []
         recent = prior_messages[-4:] if len(prior_messages) > 4 else prior_messages
@@ -264,29 +307,64 @@ Respond with only 'yes' or 'no'."""
             if history_lines:
                 history_text = "Recent conversation:\n" + "\n".join(history_lines) + "\n\n"
 
-        system_prompt = """You are MarieClaire, an expert AI assistant for the MCL mobile app and dashboard.
-        Your task is to rewrite user questions to be optimized for vectorstore retrieval within the MCL knowledge base.
+        # ── Strategy selection ──────────────────────────────────────────────
+        # retry_count==0 → Strategy 1: MCL terminology mapping (same as before)
+        # retry_count==1 → Strategy 2: Broad synonym expansion (semantic-heavy α=0.8)
+        # retry_count==2 → Strategy 3: Query decomposition into sub-questions (keyword-heavy α=0.2)
 
-        Focus on standard MCL terminology (Tasks, Checklists, Inspections, Sync, Filters).
-        If the question contains pronouns (it, them, that, this) or is a follow-up referencing prior context,
-        use the conversation history to expand it into a self-contained question.
-        Do NOT hallucinate features.
-        Do NOT assume specific mappings for unknown terms like "event" unless semantically obvious in the MCL context.
+        if retry_count == 0:
+            # Strategy 1: MCL terminology alignment
+            system_prompt = """You are MarieClaire, an expert AI assistant for the MCL mobile app and dashboard.
+Your task is to rewrite the user question to be optimized for vectorstore retrieval within the MCL knowledge base.
 
-        Key MCL domain knowledge for rewrites:
-        - Checklists are CREATED in the MCL Dashboard (Checklist Wizard), NOT in the mobile app.
-          If a user asks "how to create a checklist in the app", rewrite to "how to create a checklist in the MCL Dashboard".
-        - The mobile app is used to RUN/START/COMPLETE checklists, not to create them.
-        - Department order can only be changed in the mobile app (drag-and-drop), not the Dashboard.
-        - Jumping between departments is iOS-only; not available on Android.
-        - 'Audit' is an informal term. In MCL: a one-time/ad-hoc audit = Special Inspection; a recurring audit = Routine Inspection.
-          If a user mentions 'audit' without specifying, rewrite to include both Special Inspection and Routine Inspection.
-        - Finishing/completing a checklist in the MCL mobile app = tapping "Finish Report" (German: "Bericht abschließen").
-          If a user asks how to finish/end/complete a checklist ("Wie beende ich eine Checkliste?"), rewrite to include "Finish Report" and "report types".
-        - ALWAYS rewrite non-English questions into English for better retrieval.
-        """
+Focus on standard MCL terminology (Tasks, Checklists, Inspections, Sync, Filters).
+If the question contains pronouns (it, them, that, this) or is a follow-up, use conversation history to make it self-contained.
+Do NOT hallucinate features.
 
-        user_prompt = f"{history_text}Initial question: {query}. Formulate an improved, self-contained question."
+Key MCL domain knowledge for rewrites:
+- Checklists are CREATED in the MCL Dashboard (Checklist Wizard), NOT in the mobile app.
+- The mobile app is used to RUN/START/COMPLETE checklists, not to create them.
+- Department order can only be changed in the mobile app (drag-and-drop), not the Dashboard.
+- Jumping between departments is iOS-only; not available on Android.
+- 'Audit' in MCL: one-time/ad-hoc audit = Special Inspection; recurring audit = Routine Inspection.
+- Finishing/completing a checklist = tapping "Finish Report" (German: "Bericht abschließen").
+- ALWAYS rewrite non-English questions into English for better retrieval.
+
+Output ONLY the rewritten question, no explanation."""
+            alpha_override = None  # keep default 0.5
+
+        elif retry_count == 1:
+            # Strategy 2: Broad synonym expansion — semantic search will find near-matches
+            system_prompt = """You are a search query expander for a vector database about the MCL app.
+The previous retrieval attempt failed. Expand the user question by listing synonyms and related concepts.
+
+Rules:
+- Include alternative terms separated by OR (e.g., "Dashboard OR web interface OR admin panel OR management view")
+- For MCL concepts: Dashboard = web admin, Task = work item = activity, Checklist = inspection form = audit form
+- Add context words that co-occur with the concept in documentation
+- Keep the result as a single expanded search string
+- Do NOT add questions or explanation, output ONLY the expanded query
+
+Example input: "What is the Dashboard?"
+Example output: "Dashboard OR web admin panel OR management interface MCL features overview navigation sections"""
+            alpha_override = 0.8  # tilt heavily toward semantic matching
+
+        else:
+            # Strategy 3: Decompose into sub-questions, keyword-heavy to catch exact terms
+            system_prompt = """You are a query decomposition assistant for an MCL documentation search.
+The previous retrieval attempts failed. Break the question into 2-3 shorter sub-questions that each target one specific concept.
+
+Rules:
+- Produce at most 3 sub-questions separated by " | "
+- Each sub-question should contain specific MCL keywords (Dashboard, Task, Checklist, Sync, Filter, etc.)
+- Focus on noun phrases — avoid filler words
+- Output ONLY the sub-questions joined by " | ", no explanation
+
+Example input: "Why am I not seeing my checklists in the app after my supervisor made changes?"
+Example output: "checklist not visible mobile app | checklist sync not updating | supervisor changes not reflected app"""
+            alpha_override = 0.2  # tilt heavily toward keyword/BM25 matching
+
+        user_prompt = f"{history_text}Question: {query}\nRewritten:"
 
         try:
             response = client.chat.completions.create(
@@ -299,36 +377,78 @@ Respond with only 'yes' or 'no'."""
                 timeout=30
             )
             better_question = response.choices[0].message.content.strip()
-            logger.info(f"Query rewritten: '{query}' → '{better_question}'")
-            return {"query": better_question, "retry_count": retry_count + 1}
+            logger.info(
+                f"Query rewrite strategy {retry_count + 1}: "
+                f"'{query[:60]}' → '{better_question[:60]}'"
+                + (f" | alpha_override={alpha_override}" if alpha_override else "")
+            )
+            result: Dict[str, Any] = {
+                "query": better_question,
+                "contextualized_query": better_question,
+                "retry_count": retry_count + 1,
+            }
+            if alpha_override is not None:
+                result["search_alpha_override"] = alpha_override
+            return result
         except Exception as e:
-            logger.error(f"Query rewrite failed: {e}")
-            return {"retry_count": retry_count + 1} # Return original query but increment count
+            logger.error(f"Query rewrite failed (strategy {retry_count + 1}): {e}")
+            return {"retry_count": retry_count + 1}
 
     async def clarify_ambiguity(self, state: AgentState) -> Dict[str, Any]:
         """
-        Ask the user for clarification when retrieval fails.
+        Reached only after 3 distinct retrieval strategies are exhausted.
+        Instead of a dead-end, show what WAS found and suggest related MCL topics.
         """
         query = state["query"]
         lang = state.get("language", "en")
+        documents = state.get("documents", [])
         logger.info(
             f"[TRACE] clarify_ambiguity: "
             f"language='{lang}' | "
-            f"retry_count={state.get('retry_count', 0)}"
+            f"retry_count={state.get('retry_count', 0)} | "
+            f"available_docs={len(documents)}"
         )
-        
-        system_prompt = """You are MarieClaire, the MCL Support Specialist.
-        The user has asked a question that is not found in the MCL documentation or is unrelated to the MCL app.
-        
-        Your goal is to politely state that you cannot find the information and ask for clarification, strictly following the Source-Based Truth guideline.
-        
-        Guideline:
-        "I cannot find information regarding that specific topic in the current MCL guides. I can help you only with MCL related information. If this is related to the app, could you please clarify what are you asking for?"
-        
-        Adapt the language to {lang} if necessary, but keep the meaning identical.
-        """
-        
-        user_prompt = f"User Question: {query}. Generate the clarification response."
+
+        # Collect any topic hints from whatever docs were retrieved
+        found_topics: List[str] = []
+        for doc in documents[:5]:
+            header = doc.get("header_path", "")
+            source = doc.get("document_name", doc.get("source", ""))
+            if header and header != "Root" and header not in found_topics:
+                found_topics.append(header)
+            elif source and source not in found_topics:
+                found_topics.append(source)
+        found_topics = found_topics[:3]
+
+        related_hint = ""
+        if found_topics:
+            related_hint = (
+                f"\nRelated topics found in documentation: {', '.join(found_topics)}."
+            )
+
+        system_prompt = f"""You are MarieClaire, the MCL Support Specialist.
+The user asked a question that could not be answered after exhaustive search of the MCL documentation.
+
+Respond in **{lang.upper()}** language.
+
+Your response MUST:
+1. Acknowledge you could not find the specific information.
+2. Mention any related topics that were found (if provided below).
+3. Offer 3-4 concrete MCL topics you CAN answer, for example:
+   - Dashboard overview and navigation
+   - Creating and managing checklists (Checklist Wizard)
+   - Tasks: creation, completion on mobile and tablet
+   - Routine Inspections vs Special Inspections
+   - Sync issues and troubleshooting
+   - Roles and permissions
+   - Filters and search in the mobile app
+4. Ask if any of those might be what they are looking for, OR ask them to rephrase.
+
+Do NOT say "I don't know" without offering alternatives.
+Do NOT invent features or answers not backed by documentation.
+{related_hint}"""
+
+        user_prompt = f"User question: {query}\nGenerate a helpful clarification response in {lang.upper()}:"
 
         try:
             response = client.chat.completions.create(
@@ -344,7 +464,13 @@ Respond with only 'yes' or 'no'."""
             return {"answer": clarification}
         except Exception as e:
             logger.error(f"Clarification generation failed: {e}")
-            return {"answer": "I cannot find information regarding that specific topic in the current MCL guides. I can help you only with MCL related information."}
+            return {
+                "answer": (
+                    "I cannot find information regarding that specific topic in the current MCL guides. "
+                    "I can help you with Dashboard navigation, Checklists, Tasks, Inspections, Sync, "
+                    "Roles and Permissions, or Filters. Could you clarify what you are looking for?"
+                )
+            }
 
     async def generate_answer(self, state: AgentState) -> Dict[str, Any]:
         lang = state.get("language", "en")
@@ -359,10 +485,9 @@ Respond with only 'yes' or 'no'."""
             f"query='{query[:60]}'"
         )
 
-        # Trim documents to context budget before building the prompt
         documents = self._trim_to_budget(documents)
 
-        # Build context text
+        # Build context text with inline source tags for citation enforcement
         context_text = ""
         if documents:
             for c in documents:
@@ -371,12 +496,24 @@ Respond with only 'yes' or 'no'."""
                 text = c.get('text', '')
                 context_text += f"\n[Source: {source} | Section: {header_path}]: {text}\n"
 
-        # STRICT GROUNDING CHECK
+        # Helpful "no context" fallback — name the topic + 5 MCL pillars
         if not context_text:
-            logger.warning(f"No context available for query: '{query}'. Returning fallback response.")
-            return {"answer": "I cannot find information regarding that specific topic in the current MCL guides. I can help you only with MCL related information."}
+            topic_hint = query[:60] if query else "that topic"
+            logger.warning(f"No context for query '{topic_hint}'. Returning informative fallback.")
+            return {
+                "answer": (
+                    f"I could not find documentation specifically about \"{topic_hint}\" in the current MCL guides.\n\n"
+                    "I CAN help you with these MCL topics:\n"
+                    "• **Dashboard** — overview, navigation, and management features\n"
+                    "• **Checklists** — creating and editing via the Checklist Wizard\n"
+                    "• **Tasks** — creating, completing on mobile (phone/tablet), and tracking\n"
+                    "• **Inspections** — Routine Inspections vs Special Inspections\n"
+                    "• **Sync & Troubleshooting** — connectivity, filters, and permissions\n\n"
+                    "Is any of these related to what you were looking for? Feel free to ask again."
+                )
+            }
 
-        # Build conversation history from last 3 turns (6 messages), excluding current query
+        # Build conversation history
         history_text = ""
         prior_messages = messages[:-1] if messages else []
         recent = prior_messages[-6:] if len(prior_messages) > 6 else prior_messages
@@ -393,45 +530,55 @@ Respond with only 'yes' or 'no'."""
         system_prompt = f"""# Role & Persona
 You are MarieClaire, the MCL Support Specialist, an expert AI assistant dedicated to helping users navigate the MCL ecosystem. Your knowledge base covers the **MCL Mobile App (iOS/Android, Phone/Tablet)**, the **MCL Dashboard**, and the **Checklist Wizard**.
 
-Your goal is to provide clear, step-by-step instructions to troubleshoot issues, guide users through features, and explain role-based permissions.
+# ⚠️ ABSOLUTE RULE — SOURCE-BASED TRUTH
+Every factual claim you make MUST be directly supported by the provided Context Information.
+- DO NOT invent features, settings, or steps that are not mentioned in the context.
+- DO NOT extrapolate or assume behaviour beyond what is written.
+- DO NOT say "you can also…" unless the context explicitly states it.
+- After EVERY factual claim or step, add an inline citation: [Source: filename]
+  Example: "Tap the **+** button to create a task [Source: checklist_wizard.md]."
+- If you cannot find support for a claim in the context, omit that claim entirely.
+
+When context is empty or does not cover the question, reply:
+"I cannot find information about [specific topic] in the current MCL guides.
+I can help you with: Dashboard navigation, Checklists, Tasks, Inspections, Sync troubleshooting, Roles & Permissions, or Filters. Could you clarify or rephrase?"
 
 # CRITICAL INSTRUCTION: LANGUAGE
 The user is speaking in **{lang.upper()}**. You **MUST** answer in **{lang.upper()}**.
-Translating technical terms:
-- Use the standard MCL terminology if it exists in {lang.upper()}.
-- If specific terms like "Dashboard" or "Checklist" are commonly used in English even in {lang.upper()} business context, keep them or provide the {lang.upper()} equivalent in parentheses.
+Technical terms like "Dashboard" or "Checklist" may stay in English if they are the canonical MCL term.
 
 # Core Guidelines
 
-1.  **Source-Based Truth:** Answer **only** using the provided context. If a user asks a question not covered by the documentation (e.g., pricing, API integration not mentioned), politely state (in {lang.upper()}): *"I cannot find information regarding that specific topic in the current MCL guides. I can help you only with MCL related information. If this is related to the app, could you please clarify what are you asking for?"*
-2.  **Platform Disambiguation:**
-    * Many features (e.g., "Creating a Task," "Filtering") exist in both the **Mobile App** and the **Dashboard**.
-    * **Always** determine which platform the user is asking about. If it is ambiguous, ask for clarification.
-    * **IMPORTANT:** If the user has already stated their device or platform in the conversation history (e.g., "I'm on a tablet", "I'm using iOS", "I'm in the Dashboard"), answer **exclusively** for that device/platform. Do NOT list instructions for other platforms unless explicitly asked. Tablet users cannot use the swipe method — only the Note method applies.
-3.  **Device Specifics (Crucial):**
-    * **Mobile vs. Tablet:** Watch for UI differences. On tablets, tasks are completed via the Note method in Tasks Overview — the swipe method is NOT available.
-    * **iOS vs. Android:** Note specific functional differences.
-4.  **Formatting:**
-    * Use **Bold** for UI elements.
-    * Use Bullet points for lists and numbered lists for sequential steps.
-    * Use > Blockquotes for important warnings.
+1. **Platform Disambiguation:**
+   - Many features exist in both the **Mobile App** and the **Dashboard**.
+   - Always determine which platform the user is asking about.
+   - If the user already stated their device/platform in conversation history, answer exclusively for that platform.
+   - Tablet users: Tasks are completed via the Note method in Tasks Overview — the swipe method is NOT available.
+
+2. **Device Specifics:**
+   - Mobile vs. Tablet: watch for UI differences.
+   - iOS vs. Android: note functional differences.
+
+3. **Formatting:**
+   - **Bold** for UI elements.
+   - Bullet points for lists; numbered lists for sequential steps.
+   - > Blockquotes for important warnings.
 
 # Handling Specific Scenarios
 
 ## 1. Troubleshooting & "Missing" Items
-Check "Common Culprits": Sync Status, Filters, Permissions, Connectivity.
+Check: Sync Status → Filters → Permissions → Connectivity.
 
 ## 2. Terminology Handling
-* **N.Z. / N.A.:** Treat "N.Z." (German context) and "N.A." (English context) as synonymous ("Not Applicable").
-* **Audit:** If the user says "audit" without specifying, clarify: a one-time/ad-hoc audit = **Special Inspection**; a recurring/scheduled audit = **Routine Inspection**. Ask which type they need before answering.
+- **N.Z. / N.A.:** Synonymous ("Not Applicable").
+- **Audit:** Clarify — one-time = **Special Inspection**; recurring = **Routine Inspection**.
 
 ## 3. Creating & Editing Content
-* **Checklists:** Differentiate between "Routine" and "Special" inspections.
-* **Tasks:** Differentiate between creating a task *inside* a checklist vs. the *Task Menu*.
+- **Checklists:** Routine vs. Special inspections.
+- **Tasks:** Inside a checklist vs. the Task Menu.
 
 # Tone
-* Professional, helpful, and concise.
-* Empathetic to technical frustrations.
+Professional, helpful, and concise. Empathetic to technical frustrations.
 """
 
         user_prompt = f"""Context Information:
@@ -439,7 +586,7 @@ Check "Common Culprits": Sync Status, Filters, Permissions, Connectivity.
 {history_text}
 User Question: {query}
 
-Answer as MarieClaire:"""
+Answer as MarieClaire (cite sources inline with [Source: filename]):"""
 
         try:
             response = client.chat.completions.create(
@@ -452,19 +599,84 @@ Answer as MarieClaire:"""
                 timeout=30
             )
             content = response.choices[0].message.content.strip()
-            
-            # Append sources
+
+            # Post-generation grounding validation
+            content = self._validate_grounding(content, documents)
+
+            # Append sources footer
             if documents:
                 sources_header = {
                     'de': "\n\n📚 **Quellen:**\n",
                     'en': "\n\n📚 **Sources:**\n"
                 }.get(lang, "\n\n📚 **Sources:**\n")
-                
-                unique_sources = sorted(list(set([f"{c.get('document_name', 'Doc')} (Chunk {c.get('chunk_index', 0)+1})" for c in documents])))
+                unique_sources = sorted(list(set([
+                    f"{c.get('document_name', 'Doc')} (Chunk {c.get('chunk_index', 0) + 1})"
+                    for c in documents
+                ])))
                 content += sources_header + "\n".join([f"• {s}" for s in unique_sources])
-                
+
             return {"answer": content}
-            
+
         except Exception as e:
             logger.error(f"Generation failed: {e}")
             return {"answer": "Error generating response.", "error": str(e)}
+
+    def _validate_grounding(self, answer: str, documents: List[Dict[str, Any]]) -> str:
+        """
+        Post-generation grounding check:
+        1. Verifies that [Source: X] citations in the answer match actual retrieved documents.
+        2. Strips sentences containing fabricated citations (source not in doc list).
+        3. If the answer has NO citations at all, prepends a grounding caveat.
+        """
+        if not documents:
+            return answer
+
+        # Build set of known source filenames (case-insensitive)
+        known_sources = {
+            doc.get("source", "").lower().strip()
+            for doc in documents
+            if doc.get("source")
+        }
+
+        # Extract all [Source: X] citations
+        citation_pattern = re.compile(r'\[Source:\s*([^\]]+)\]')
+        found_citations = citation_pattern.findall(answer)
+
+        if not found_citations:
+            # No inline citations at all — prepend grounding note
+            logger.info("_validate_grounding: no inline citations found; prepending grounding note.")
+            return "Based on the available MCL documentation:\n\n" + answer
+
+        # Check each cited source against known documents
+        fabricated = [
+            c for c in found_citations
+            if c.strip().lower() not in known_sources
+        ]
+
+        if not fabricated:
+            return answer  # All citations valid
+
+        logger.warning(
+            f"_validate_grounding: fabricated citations detected: {fabricated}. "
+            "Stripping affected sentences."
+        )
+
+        # Split into sentences, remove any containing a fabricated citation
+        fabricated_lower = {f.strip().lower() for f in fabricated}
+        sentences = re.split(r'(?<=[.!?])\s+', answer)
+        clean_sentences = []
+        for sentence in sentences:
+            sentence_citations = citation_pattern.findall(sentence)
+            if any(c.strip().lower() in fabricated_lower for c in sentence_citations):
+                logger.debug(f"_validate_grounding: dropped sentence: {sentence[:80]}")
+                continue
+            clean_sentences.append(sentence)
+
+        cleaned = " ".join(clean_sentences).strip()
+        if not cleaned:
+            # Everything was stripped — return safe fallback
+            return (
+                "I found some related documentation, but could not confirm specific details. "
+                "Please consult your MCL administrator or contact support@x2-solutions.de."
+            )
+        return cleaned
