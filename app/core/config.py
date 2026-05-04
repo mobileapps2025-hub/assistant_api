@@ -26,14 +26,30 @@ VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "mcl_vector_store")
 
 def _default_weaviate_url() -> str:
     """Use embedded Weaviate by default on Azure App Service."""
-    return "embedded" if os.getenv("WEBSITE_SITE_NAME") else "http://localhost:8080"
+    return "embedded" if _is_azure_app_service() else "http://localhost:8080"
 
 
-WEAVIATE_URL = (
-    os.getenv("WEAVIATE_URL")
-    or os.getenv("APPSETTING_WEAVIATE_URL")
-    or _default_weaviate_url()
-)
+def _is_azure_app_service() -> bool:
+    return bool(os.getenv("WEBSITE_SITE_NAME"))
+
+
+def _is_local_weaviate_url(url: str) -> bool:
+    normalized = url.strip().lower()
+    return normalized.startswith(("http://localhost", "http://127.0.0.1"))
+
+
+def _resolve_weaviate_url() -> str:
+    configured_url = os.getenv("WEAVIATE_URL") or os.getenv("APPSETTING_WEAVIATE_URL")
+    if configured_url and _is_azure_app_service() and _is_local_weaviate_url(configured_url):
+        _logger.warning(
+            "Ignoring local WEAVIATE_URL on Azure App Service and using embedded Weaviate. "
+            "Set WEAVIATE_URL to a reachable external Weaviate endpoint to override."
+        )
+        return "embedded"
+    return configured_url or _default_weaviate_url()
+
+
+WEAVIATE_URL = _resolve_weaviate_url()
 WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY") or os.getenv("APPSETTING_WEAVIATE_API_KEY", "")
 
 # --- Reranking ---
