@@ -39,16 +39,15 @@ class VectorStoreService:
                 # Binary is cached at /home/.cache/weaviate-embedded (persistent on Azure App Service).
                 # Data is stored at /home/weaviate_data (also persistent on Azure).
                 # First startup downloads the binary once (~100 MB); subsequent starts reuse it.
-                # Using default embedded ports (6666 HTTP, 50050 gRPC) to avoid conflicts.
                 from weaviate.embedded import EmbeddedOptions
                 logger.info("[WEAVIATE] Starting embedded mode — binary: /home/.cache/weaviate-embedded, data: /home/weaviate_data")
                 self.client = weaviate.WeaviateClient(
                     embedded_options=EmbeddedOptions(
-                        port=6666,
-                        grpc_port=50050,
+                        port=8079,
+                        grpc_port=50060,
                         persistence_data_path="/home/weaviate_data",
                         binary_path="/home/.cache/weaviate-embedded",
-                        environment_variables={
+                        additional_env_vars={
                             "ENABLE_MODULES": "text2vec-openai,generative-openai",
                             "DEFAULT_VECTORIZER_MODULE": "none",
                             "AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED": "true",
