@@ -24,6 +24,8 @@ class VectorStoreService:
             self.client = None
             return
 
+        logger.info(f"[WEAVIATE] Initializing — WEAVIATE_URL='{WEAVIATE_URL}'")
+
         try:
             # Always pass OpenAI key if available, needed for the text2vec-openai module
             headers = {}
@@ -32,18 +34,20 @@ class VectorStoreService:
 
             auth_config = weaviate.auth.AuthApiKey(api_key=WEAVIATE_API_KEY) if WEAVIATE_API_KEY else None
 
-            if WEAVIATE_URL == "embedded":
-                # Embedded mode: the Python client downloads and manages the Weaviate binary.
-                # The binary is cached at ~/.cache/weaviate-embedded (persistent on Azure /home).
-                # Data is stored at /home/weaviate_data (persistent on Azure App Service).
-                # First startup downloads the binary (~60 MB, one-time only).
+            if WEAVIATE_URL.strip().lower() == "embedded":
+                # Embedded mode: the weaviate-client downloads and manages the Weaviate binary.
+                # Binary is cached at /home/.cache/weaviate-embedded (persistent on Azure App Service).
+                # Data is stored at /home/weaviate_data (also persistent on Azure).
+                # First startup downloads the binary once (~100 MB); subsequent starts reuse it.
+                # Using default embedded ports (6666 HTTP, 50050 gRPC) to avoid conflicts.
                 from weaviate.embedded import EmbeddedOptions
-                logger.info("Starting Weaviate in embedded mode (binary is cached after first download)...")
+                logger.info("[WEAVIATE] Starting embedded mode — binary: /home/.cache/weaviate-embedded, data: /home/weaviate_data")
                 self.client = weaviate.WeaviateClient(
                     embedded_options=EmbeddedOptions(
-                        port=8080,
-                        grpc_port=50051,
+                        port=6666,
+                        grpc_port=50050,
                         persistence_data_path="/home/weaviate_data",
+                        binary_path="/home/.cache/weaviate-embedded",
                         environment_variables={
                             "ENABLE_MODULES": "text2vec-openai,generative-openai",
                             "DEFAULT_VECTORIZER_MODULE": "none",
@@ -55,7 +59,7 @@ class VectorStoreService:
                     additional_headers=headers,
                 )
                 self.client.connect()
-                logger.info("Weaviate embedded started and connected.")
+                logger.info("[WEAVIATE] Embedded Weaviate started and connected successfully.")
 
             elif "weaviate.cloud" in WEAVIATE_URL:
                 self.client = weaviate.connect_to_wcs(
@@ -63,7 +67,7 @@ class VectorStoreService:
                     auth_credentials=auth_config,
                     headers=headers,
                 )
-                logger.info(f"Connected to Weaviate Cloud at {WEAVIATE_URL}")
+                logger.info(f"[WEAVIATE] Connected to Weaviate Cloud at {WEAVIATE_URL}")
 
             else:
                 # Local server (e.g. Docker Compose for development)
@@ -76,10 +80,10 @@ class VectorStoreService:
                     port=port_only,
                     headers=headers,
                 )
-                logger.info(f"Connected to Weaviate at {WEAVIATE_URL}")
+                logger.info(f"[WEAVIATE] Connected to local Weaviate at {WEAVIATE_URL}")
 
         except Exception as e:
-            logger.error(f"Failed to connect to Weaviate: {e}")
+            logger.error(f"[WEAVIATE] Failed to connect: {e}", exc_info=True)
             self.client = None
 
     def ensure_schema(self):
