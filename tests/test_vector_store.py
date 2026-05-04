@@ -50,6 +50,11 @@ class TestVectorStoreServiceInit:
         )
         mock_client.connect.assert_called_once()
         assert service.client is mock_client
+        env_vars = mock_embedded_options.call_args.kwargs["additional_env_vars"]
+        assert env_vars["CLUSTER_ADVERTISE_ADDR"] == "127.0.0.1"
+        assert env_vars["CLUSTER_GOSSIP_BIND_PORT"] == "7100"
+        assert env_vars["CLUSTER_DATA_BIND_PORT"] == "7101"
+        assert env_vars["RAFT_BOOTSTRAP_EXPECT"] == "1"
 
     @patch("app.services.vector_store.weaviate")
     @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
