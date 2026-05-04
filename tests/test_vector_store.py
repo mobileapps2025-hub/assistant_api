@@ -31,6 +31,26 @@ class TestVectorStoreServiceInit:
         mock_weaviate.connect_to_wcs.assert_called_once()
         assert service.client is mock_client
 
+    @patch("app.services.vector_store.EmbeddedOptions")
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "embedded")
+    def test_initialization_embedded(self, mock_weaviate, mock_embedded_options):
+        """Embedded URL → managed Weaviate client is connected and stored."""
+        mock_client = MagicMock()
+        mock_weaviate.WeaviateClient.return_value = mock_client
+        mock_embedded_options.return_value = "embedded-options"
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": ""}):
+            service = VectorStoreService()
+
+        mock_embedded_options.assert_called_once()
+        mock_weaviate.WeaviateClient.assert_called_once_with(
+            embedded_options="embedded-options",
+            additional_headers={},
+        )
+        mock_client.connect.assert_called_once()
+        assert service.client is mock_client
+
     @patch("app.services.vector_store.weaviate")
     @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
     def test_client_is_none_when_connection_fails(self, mock_weaviate):

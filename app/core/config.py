@@ -22,8 +22,19 @@ MCL_VALIDATION_CONFIDENCE_THRESHOLD = float(os.getenv("MCL_VALIDATION_CONFIDENCE
 
 # --- Vector store ---
 VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "mcl_vector_store")
-WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
-WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY", "")
+
+
+def _default_weaviate_url() -> str:
+    """Use embedded Weaviate by default on Azure App Service."""
+    return "embedded" if os.getenv("WEBSITE_SITE_NAME") else "http://localhost:8080"
+
+
+WEAVIATE_URL = (
+    os.getenv("WEAVIATE_URL")
+    or os.getenv("APPSETTING_WEAVIATE_URL")
+    or _default_weaviate_url()
+)
+WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY") or os.getenv("APPSETTING_WEAVIATE_API_KEY", "")
 
 # --- Reranking ---
 COHERE_API_KEY = os.getenv("COHERE_API_KEY", "")

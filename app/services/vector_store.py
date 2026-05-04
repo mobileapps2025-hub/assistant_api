@@ -1,6 +1,7 @@
 import weaviate
 from weaviate.classes.config import Configure, Property, DataType, VectorDistances
 from weaviate.classes.query import MetadataQuery, HybridFusion, Filter
+from weaviate.embedded import EmbeddedOptions
 from typing import List, Dict, Any, Optional
 import os
 from app.core.config import WEAVIATE_URL, WEAVIATE_API_KEY, client as openai_client, SEARCH_LIMIT, SEARCH_ALPHA, MIN_SEARCH_SCORE
@@ -39,14 +40,15 @@ class VectorStoreService:
                 # Binary is cached at /home/.cache/weaviate-embedded (persistent on Azure App Service).
                 # Data is stored at /home/weaviate_data (also persistent on Azure).
                 # First startup downloads the binary once (~100 MB); subsequent starts reuse it.
-                from weaviate.embedded import EmbeddedOptions
-                logger.info("[WEAVIATE] Starting embedded mode — binary: /home/.cache/weaviate-embedded, data: /home/weaviate_data")
+                data_path = os.getenv("WEAVIATE_EMBEDDED_DATA_PATH", "/home/weaviate_data")
+                binary_path = os.getenv("WEAVIATE_EMBEDDED_BINARY_PATH", "/home/.cache/weaviate-embedded")
+                logger.info(f"[WEAVIATE] Starting embedded mode — binary: {binary_path}, data: {data_path}")
                 self.client = weaviate.WeaviateClient(
                     embedded_options=EmbeddedOptions(
                         port=8079,
                         grpc_port=50060,
-                        persistence_data_path="/home/weaviate_data",
-                        binary_path="/home/.cache/weaviate-embedded",
+                        persistence_data_path=data_path,
+                        binary_path=binary_path,
                         additional_env_vars={
                             "ENABLE_MODULES": "text2vec-openai,generative-openai",
                             "DEFAULT_VECTORIZER_MODULE": "none",

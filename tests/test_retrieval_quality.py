@@ -86,11 +86,12 @@ async def test_retrieve_uses_alpha_override_from_state():
 
     with patch.object(nodes.vector_store, "hybrid_search", return_value=[]) as mock_search:
         await nodes.retrieve_documents(state)
-        mock_search.assert_called_once()
-        call_kwargs = mock_search.call_args.kwargs
-        assert call_kwargs.get("alpha") == 0.8, (
-            f"Alpha override was not passed to hybrid_search. Got: {call_kwargs}"
-        )
+        assert mock_search.call_count == 2
+        for call in mock_search.call_args_list:
+            call_kwargs = call.kwargs
+            assert call_kwargs.get("alpha") == 0.8, (
+                f"Alpha override was not passed to hybrid_search. Got: {call_kwargs}"
+            )
 
 
 @pytest.mark.asyncio
