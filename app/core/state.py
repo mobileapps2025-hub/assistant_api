@@ -10,6 +10,7 @@ class AgentState(TypedDict):
     query: str
     language: str
     documents: List[Dict[str, Any]]
+    visual_aids: List[Dict[str, Any]]
     answer: Optional[str]
     error: Optional[str]
     grade: Optional[str]

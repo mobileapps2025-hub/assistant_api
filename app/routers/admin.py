@@ -47,7 +47,7 @@ async def trigger_ingestion(
     documents_path = "app/documents"
     logger.info(f"[ADMIN] Ingestion triggered for path: {documents_path}")
 
-    result = ingestion_service.ingest_all(documents_path)
+    result = ingestion_service.ingest_all(documents_path, reset_collection=True)
 
     if not result["success"] and result["processed_files"] == 0 and result["failed_files"] > 0:
         raise HTTPException(
