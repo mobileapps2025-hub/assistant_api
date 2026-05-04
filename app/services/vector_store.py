@@ -1,6 +1,6 @@
 import weaviate
 from weaviate.classes.config import Configure, Property, DataType, VectorDistances
-from weaviate.classes.query import MetadataQuery, HybridFusion
+from weaviate.classes.query import MetadataQuery, HybridFusion, Filter
 from typing import List, Dict, Any, Optional
 import os
 from app.core.config import WEAVIATE_URL, WEAVIATE_API_KEY, client as openai_client, SEARCH_LIMIT, SEARCH_ALPHA, MIN_SEARCH_SCORE
@@ -13,7 +13,7 @@ class VectorStoreService:
     Service for managing the Weaviate vector store.
     """
     
-    COLLECTION_NAME = "MCL_Document"
+    COLLECTION_NAME = "MCL_Document_v2"
 
     def __init__(self):
         """
@@ -25,42 +25,61 @@ class VectorStoreService:
             return
 
         try:
-            # Connect to Weaviate Cloud or Local
+            # Always pass OpenAI key if available, needed for the text2vec-openai module
             headers = {}
-            # Always pass OpenAI key if available, as it's needed for the text2vec-openai module
             if os.getenv("OPENAI_API_KEY"):
                 headers["X-OpenAI-Api-Key"] = os.getenv("OPENAI_API_KEY")
-            
+
             auth_config = weaviate.auth.AuthApiKey(api_key=WEAVIATE_API_KEY) if WEAVIATE_API_KEY else None
 
-            # Determine connection type based on URL
-            if "weaviate.cloud" in WEAVIATE_URL:
-                 self.client = weaviate.connect_to_wcs(
+            if WEAVIATE_URL == "embedded":
+                # Embedded mode: the Python client downloads and manages the Weaviate binary.
+                # The binary is cached at ~/.cache/weaviate-embedded (persistent on Azure /home).
+                # Data is stored at /home/weaviate_data (persistent on Azure App Service).
+                # First startup downloads the binary (~60 MB, one-time only).
+                from weaviate.embedded import EmbeddedOptions
+                logger.info("Starting Weaviate in embedded mode (binary is cached after first download)...")
+                self.client = weaviate.WeaviateClient(
+                    embedded_options=EmbeddedOptions(
+                        port=8080,
+                        grpc_port=50051,
+                        persistence_data_path="/home/weaviate_data",
+                        environment_variables={
+                            "ENABLE_MODULES": "text2vec-openai,generative-openai",
+                            "DEFAULT_VECTORIZER_MODULE": "none",
+                            "AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED": "true",
+                            "QUERY_DEFAULTS_LIMIT": "25",
+                            "CLUSTER_HOSTNAME": "node1",
+                        },
+                    ),
+                    additional_headers=headers,
+                )
+                self.client.connect()
+                logger.info("Weaviate embedded started and connected.")
+
+            elif "weaviate.cloud" in WEAVIATE_URL:
+                self.client = weaviate.connect_to_wcs(
                     cluster_url=WEAVIATE_URL,
                     auth_credentials=auth_config,
-                    headers=headers
+                    headers=headers,
                 )
+                logger.info(f"Connected to Weaviate Cloud at {WEAVIATE_URL}")
+
             else:
-                # Local connection
-                # The weaviate client v4 handles http/https/port better if we are explicit about ports/schema
+                # Local server (e.g. Docker Compose for development)
                 import urllib.parse
                 parsed = urllib.parse.urlparse(WEAVIATE_URL)
                 host_only = parsed.hostname or "localhost"
                 port_only = parsed.port or 8080
-                
                 self.client = weaviate.connect_to_local(
                     host=host_only,
                     port=port_only,
-                    headers=headers
+                    headers=headers,
                 )
-            
-            logger.info(f"Connected to Weaviate at {WEAVIATE_URL}")
-            # Do NOT call ensure_schema() in constructor as it might block/fail if Weaviate is not ready yet
-            # self.ensure_schema()
-            
+                logger.info(f"Connected to Weaviate at {WEAVIATE_URL}")
+
         except Exception as e:
             logger.error(f"Failed to connect to Weaviate: {e}")
-            logger.info("Tip: If you are not running Weaviate locally (e.g. Docker), consider using a free Weaviate Cloud Sandbox (https://console.weaviate.cloud).")
             self.client = None
 
     def ensure_schema(self):
@@ -82,6 +101,7 @@ class VectorStoreService:
                         Property(name="header_path", data_type=DataType.TEXT),
                         Property(name="source", data_type=DataType.TEXT),
                         Property(name="chunk_index", data_type=DataType.INT),
+                        Property(name="doc_type", data_type=DataType.TEXT),
                     ]
                 )
                 logger.info(f"Collection {self.COLLECTION_NAME} created.")
@@ -136,7 +156,8 @@ class VectorStoreService:
                             "text": chunk.get("text", ""),
                             "header_path": chunk.get("header_path", ""),
                             "source": chunk.get("source", ""),
-                            "chunk_index": chunk.get("chunk_index", 0)
+                            "chunk_index": chunk.get("chunk_index", 0),
+                            "doc_type": chunk.get("doc_type", "faq"),
                         }
                         # Weaviate handles vectorization automatically via text2vec-openai
                     )
@@ -154,7 +175,7 @@ class VectorStoreService:
             logger.error(f"Error adding documents: {e}")
             return False
 
-    def hybrid_search(self, query: str, alpha: float = SEARCH_ALPHA, limit: int = SEARCH_LIMIT) -> List[Dict[str, Any]]:
+    def hybrid_search(self, query: str, alpha: float = SEARCH_ALPHA, limit: int = SEARCH_LIMIT, doc_types: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Perform hybrid search (Vector + Keyword).
         
@@ -162,6 +183,7 @@ class VectorStoreService:
             query: Search query.
             alpha: Weight for vector search (0 = pure keyword, 1 = pure vector).
             limit: Number of results.
+            doc_types: Optional list of doc_type values to filter by. When None, searches all types.
         """
         if not self.client:
             logger.warning("Weaviate client is not initialized. Skipping search.")
@@ -170,13 +192,15 @@ class VectorStoreService:
         collection = self.client.collections.get(self.COLLECTION_NAME)
         
         try:
-            logger.info(f"Executing hybrid search in Weaviate. Query: '{query}', Alpha: {alpha}, Limit: {limit}")
+            filters = Filter.by_property("doc_type").contains_any(doc_types) if doc_types else None
+            logger.info(f"Executing hybrid search in Weaviate. Query: '{query}', Alpha: {alpha}, Limit: {limit}, doc_types={doc_types}")
             response = collection.query.hybrid(
                 query=query,
                 alpha=alpha,
                 limit=limit,
                 fusion_type=HybridFusion.RELATIVE_SCORE,
-                return_metadata=MetadataQuery(score=True)
+                return_metadata=MetadataQuery(score=True),
+                filters=filters,
             )
             
             results = []
@@ -188,11 +212,12 @@ class VectorStoreService:
                     "text": obj.properties.get("text"),
                     "header_path": obj.properties.get("header_path"),
                     "source": obj.properties.get("source"),
+                    "doc_type": obj.properties.get("doc_type"),
                     "score": score,
                     "uuid": str(obj.uuid)
                 })
 
-            logger.info(f"Weaviate returned {len(results)} results (min_score={MIN_SEARCH_SCORE}).")
+            logger.info(f"Weaviate returned {len(results)} results (min_score={MIN_SEARCH_SCORE}, doc_types={doc_types}).")
             if results:
                 logger.debug(f"Top result score: {results[0]['score']}")
 

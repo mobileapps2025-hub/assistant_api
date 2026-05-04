@@ -39,6 +39,50 @@ class AgentNodes:
             logger.info(f"Context trimmed: {len(documents)} → {len(trimmed)} chunks ({total} chars)")
         return trimmed
 
+    def _grade_context_items(self, query: str, items: List[Dict[str, Any]], label: str) -> tuple[List[Dict[str, Any]], int]:
+        """Return context items that are relevant to the query."""
+        if not items:
+            return [], 0
+
+        items_to_grade = items[:8]
+        doc_list_lines = []
+        for i, item in enumerate(items_to_grade):
+            snippet = item.get("text", "")[:400].replace("\n", " ")
+            escaped = json.dumps(snippet)
+            doc_list_lines.append(f'  {{"doc_index": {i}, "text": {escaped}}}')
+        doc_list_json = "[\n" + ",\n".join(doc_list_lines) + "\n]"
+
+        system_prompt = f"""You are a grader for an MCL mobile-checklist-app support system.
+For each {label}, decide if it could help answer the user question.
+Mark relevant=true if it contains anything useful for the question.
+Mark relevant=false ONLY if it has zero overlap with the question topic.
+
+Return ONLY a JSON object with this exact shape (no markdown, no prose):
+{{"grades": [{{"doc_index": 0, "relevant": true}}, {{"doc_index": 1, "relevant": false}}, ...]}}"""
+
+        user_prompt = (
+            f"Question: {query}\n\n"
+            f"{label.title()} items:\n{doc_list_json}\n\n"
+            "Grade each item and return the JSON:"
+        )
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+            timeout=30
+        )
+        raw = response.choices[0].message.content.strip()
+        grades_data = json.loads(raw)
+        grades = grades_data.get("grades", [])
+        relevant_indices = {g["doc_index"] for g in grades if g.get("relevant") in (True, "true", "yes")}
+        relevant_items = [items_to_grade[i] for i in sorted(relevant_indices)]
+        return relevant_items, len(items_to_grade)
+
     def detect_language(self, state: AgentState) -> Dict[str, Any]:
         query = state["query"]
         lang_before = state.get("language", "<not set>")
@@ -134,12 +178,24 @@ Latest user question: {query}"""
 
         logger.info(f"Retrieving documents for query: '{query}'" + (f" (original: '{state['query']}')" if query != state["query"] else ""))
 
-        try:
-            # 1. Hybrid search — use per-retry alpha override
-            initial_results = self.vector_store.hybrid_search(query, limit=SEARCH_LIMIT, alpha=search_alpha)
-            logger.info(f"Hybrid search found {len(initial_results)} documents (alpha={search_alpha}).")
+        TEXT_DOC_TYPES = ["faq", "platform_note", "assistant_identity"]
 
-            # 2. Re-ranking with soft confidence tiers (eliminates score cliff)
+        try:
+            # 1. Text-track hybrid search — excludes visual_guide chunks
+            initial_results = self.vector_store.hybrid_search(
+                query, limit=SEARCH_LIMIT, alpha=search_alpha,
+                doc_types=TEXT_DOC_TYPES,
+            )
+            logger.info(f"Text-track hybrid search: {len(initial_results)} results (alpha={search_alpha}).")
+
+            # 2. Visual-track hybrid search — visual_guide chunks only, small k
+            visual_results = self.vector_store.hybrid_search(
+                query, limit=3, alpha=search_alpha,
+                doc_types=["visual_guide"],
+            )
+            logger.info(f"Visual-track hybrid search: {len(visual_results)} results.")
+
+            # 3. Re-ranking applies to text track only
             final_results = initial_results
             if self.cohere_client and initial_results:
                 documents = [r.get("text", "") for r in initial_results]
@@ -177,10 +233,10 @@ Latest user question: {query}"""
                 f"Total documents for grading: {len(merged_results)} "
                 f"(curated={len(existing_docs)}, retrieved={len(final_results)})"
             )
-            return {"documents": merged_results, "search_alpha_override": None}
+            return {"documents": merged_results, "visual_aids": visual_results, "search_alpha_override": None}
         except Exception as e:
             logger.error(f"Retrieval failed: {e}")
-            return {"documents": existing_docs, "error": str(e)}
+            return {"documents": existing_docs, "visual_aids": [], "error": str(e)}
 
     async def grade_documents(self, state: AgentState) -> Dict[str, Any]:
         """
@@ -189,13 +245,30 @@ Latest user question: {query}"""
         """
         query = state["query"]
         documents = state.get("documents", [])
+        visual_aids = state.get("visual_aids", [])
         logger.info(
             f"[TRACE] grade_documents: "
             f"language_in_state='{state.get('language')}' | "
-            f"docs_count={len(documents)}"
+            f"docs_count={len(documents)} | visual_aids_count={len(visual_aids)}"
         )
 
         if not documents:
+            if visual_aids:
+                try:
+                    relevant_visual_aids, total_visual_graded = self._grade_context_items(query, visual_aids, "visual aid")
+                    logger.info(
+                        f"grade_documents: {len(relevant_visual_aids)}/{total_visual_graded} visual aids passed with no text docs"
+                    )
+                    if relevant_visual_aids:
+                        return {
+                            "grade": "relevant",
+                            "documents": [],
+                            "visual_aids": relevant_visual_aids,
+                            "relevant_count": 0,
+                            "total_graded": total_visual_graded,
+                        }
+                except Exception as e:
+                    logger.error(f"Visual-aid grading failed without text docs: {e}")
             logger.info("[TRACE] grade_documents: no documents → irrelevant")
             return {"grade": "irrelevant", "relevant_count": 0, "total_graded": 0}
 
@@ -259,6 +332,22 @@ Return ONLY a JSON object with this exact shape (no markdown, no prose):
             )
 
             if relevant_count == 0 and not extra_docs:
+                if visual_aids:
+                    try:
+                        relevant_visual_aids, total_visual_graded = self._grade_context_items(query, visual_aids, "visual aid")
+                        logger.info(
+                            f"grade_documents: {len(relevant_visual_aids)}/{total_visual_graded} visual aids passed after text docs failed"
+                        )
+                        if relevant_visual_aids:
+                            return {
+                                "grade": "relevant",
+                                "documents": [],
+                                "visual_aids": relevant_visual_aids,
+                                "relevant_count": 0,
+                                "total_graded": total_graded + total_visual_graded,
+                            }
+                    except Exception as e:
+                        logger.error(f"Visual-aid grading failed after text docs failed: {e}")
                 return {
                     "grade": "irrelevant",
                     "documents": [],
@@ -475,19 +564,21 @@ Do NOT invent features or answers not backed by documentation.
     async def generate_answer(self, state: AgentState) -> Dict[str, Any]:
         lang = state.get("language", "en")
         documents = state.get("documents", [])
+        visual_aids = state.get("visual_aids", [])
         query = state.get("query", "")
         messages = state.get("messages", [])
         logger.info(
             f"[TRACE] generate_answer: "
             f"language='{lang}' | "
             f"docs={len(documents)} | "
+            f"visual_aids={len(visual_aids)} | "
             f"retry_count={state.get('retry_count', 0)} | "
             f"query='{query[:60]}'"
         )
 
         documents = self._trim_to_budget(documents)
 
-        # Build context text with inline source tags for citation enforcement
+        # Build TEXTUAL CONTEXT block
         context_text = ""
         if documents:
             for c in documents:
@@ -496,8 +587,18 @@ Do NOT invent features or answers not backed by documentation.
                 text = c.get('text', '')
                 context_text += f"\n[Source: {source} | Section: {header_path}]: {text}\n"
 
-        # Helpful "no context" fallback — name the topic + 5 MCL pillars
-        if not context_text:
+        # Build AVAILABLE VISUAL AIDS block (omitted entirely if empty)
+        visual_context = ""
+        if visual_aids:
+            for va in visual_aids:
+                source = va.get('source', 'Unknown')
+                header_path = va.get('header_path', 'Root')
+                text = va.get('text', '')
+                visual_context += f"\n[Caption: {header_path} | File: {source}]\n{text}\n"
+
+        # Helpful "no context" fallback — name the topic + 5 MCL pillars.
+        # Visual-guide chunks include prose plus images and are enough context by themselves.
+        if not context_text and not visual_context:
             topic_hint = query[:60] if query else "that topic"
             logger.warning(f"No context for query '{topic_hint}'. Returning informative fallback.")
             return {
@@ -579,10 +680,29 @@ Check: Sync Status → Filters → Permissions → Connectivity.
 
 # Tone
 Professional, helpful, and concise. Empathetic to technical frustrations.
+
+# ⚠️ ABSOLUTE RULE — VISUAL AIDS
+Ground your answer text in the # TEXTUAL CONTEXT section. Separately, the # AVAILABLE VISUAL AIDS section contains screenshots that visually illustrate MCL screens.
+
+**You MUST include an image when a visual aid is relevant to the user's question:**
+- If ANY entry in AVAILABLE VISUAL AIDS is on-topic for the user's question (e.g. they ask "where is X" / "what does Y look like" / "how do I navigate Z"), you MUST embed that entry's `![alt](images/...)` markdown link verbatim in your answer.
+- Copy the image markdown EXACTLY as it appears in AVAILABLE VISUAL AIDS — do not modify the URL, alt text, or punctuation.
+- Place the image link on its own line, immediately AFTER the sentence it illustrates.
+- Do NOT invent image links. Do NOT include images not present in AVAILABLE VISUAL AIDS.
+- Only omit a visual aid if it is clearly off-topic for the user's question.
+
+When AVAILABLE VISUAL AIDS contains a relevant entry and you fail to include its image link, your answer is incomplete.
 """
 
-        user_prompt = f"""Context Information:
-{context_text}
+        user_prompt = f"""# TEXTUAL CONTEXT
+{context_text}"""
+
+        if visual_context:
+            user_prompt += f"""
+# AVAILABLE VISUAL AIDS
+{visual_context}"""
+
+        user_prompt += f"""
 {history_text}
 User Question: {query}
 
@@ -600,8 +720,8 @@ Answer as MarieClaire (cite sources inline with [Source: filename]):"""
             )
             content = response.choices[0].message.content.strip()
 
-            # Post-generation grounding validation
-            content = self._validate_grounding(content, documents)
+            # Post-generation grounding validation (visual_aids count as known sources too)
+            content = self._validate_grounding(content, documents, visual_aids)
 
             # Append sources footer
             if documents:
@@ -621,22 +741,35 @@ Answer as MarieClaire (cite sources inline with [Source: filename]):"""
             logger.error(f"Generation failed: {e}")
             return {"answer": "Error generating response.", "error": str(e)}
 
-    def _validate_grounding(self, answer: str, documents: List[Dict[str, Any]]) -> str:
+    def _validate_grounding(
+        self,
+        answer: str,
+        documents: List[Dict[str, Any]],
+        visual_aids: Optional[List[Dict[str, Any]]] = None,
+    ) -> str:
         """
         Post-generation grounding check:
         1. Verifies that [Source: X] citations in the answer match actual retrieved documents.
         2. Strips sentences containing fabricated citations (source not in doc list).
         3. If the answer has NO citations at all, prepends a grounding caveat.
+
+        Visual-aid sources (from the visual track) are also counted as valid known
+        sources so that legitimate references to e.g. main-navigation-menu.md are
+        not mistakenly flagged as fabricated.
         """
-        if not documents:
+        if not documents and not visual_aids:
             return answer
 
-        # Build set of known source filenames (case-insensitive)
+        # Build set of known source filenames (case-insensitive) from BOTH tracks
         known_sources = {
             doc.get("source", "").lower().strip()
-            for doc in documents
+            for doc in (documents or [])
             if doc.get("source")
         }
+        for va in (visual_aids or []):
+            src = va.get("source", "").lower().strip()
+            if src:
+                known_sources.add(src)
 
         # Extract all [Source: X] citations
         citation_pattern = re.compile(r'\[Source:\s*([^\]]+)\]')
