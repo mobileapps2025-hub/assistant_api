@@ -61,6 +61,47 @@ class TestVectorStoreServiceInit:
 
         assert service.client is None
 
+    @patch("app.services.vector_store.EmbeddedOptions")
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
+    def test_azure_localhost_url_uses_embedded(self, mock_weaviate, mock_embedded_options):
+        """Azure runtime should never try localhost Weaviate."""
+        mock_client = MagicMock()
+        mock_weaviate.WeaviateClient.return_value = mock_client
+        mock_embedded_options.return_value = "embedded-options"
+
+        with patch.dict("os.environ", {"WEBSITE_INSTANCE_ID": "abc", "OPENAI_API_KEY": ""}):
+            service = VectorStoreService()
+
+        mock_weaviate.connect_to_local.assert_not_called()
+        mock_weaviate.WeaviateClient.assert_called_once_with(
+            embedded_options="embedded-options",
+            additional_headers={},
+        )
+        assert service.weaviate_url == "embedded"
+        assert service.client is mock_client
+
+    @patch("app.services.vector_store.EmbeddedOptions")
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "http://weaviate.internal:8080")
+    def test_azure_connection_failure_falls_back_to_embedded(self, mock_weaviate, mock_embedded_options):
+        """Azure connection failures should retry with embedded before giving up."""
+        mock_client = MagicMock()
+        mock_weaviate.connect_to_local.side_effect = Exception("refused")
+        mock_weaviate.WeaviateClient.return_value = mock_client
+        mock_embedded_options.return_value = "embedded-options"
+
+        with patch.dict("os.environ", {"WEBSITE_INSTANCE_ID": "abc", "OPENAI_API_KEY": ""}):
+            service = VectorStoreService()
+
+        mock_weaviate.connect_to_local.assert_called_once()
+        mock_weaviate.WeaviateClient.assert_called_once_with(
+            embedded_options="embedded-options",
+            additional_headers={},
+        )
+        assert service.weaviate_url == "embedded"
+        assert service.client is mock_client
+
 
 class TestVectorStoreAddDocuments:
 
@@ -135,3 +176,21 @@ class TestVectorStoreHybridSearch:
         results = service.hybrid_search("test")
 
         assert results == []
+
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
+    def test_hybrid_search_retries_when_client_none(self, mock_weaviate):
+        first_client = MagicMock()
+        second_client = MagicMock()
+        mock_weaviate.connect_to_local.side_effect = [first_client, second_client]
+        mock_collection = MagicMock()
+        second_client.collections.get.return_value = mock_collection
+        mock_collection.query.hybrid.return_value = MagicMock(objects=[])
+
+        service = VectorStoreService()
+        service.client = None
+        results = service.hybrid_search("test")
+
+        assert results == []
+        assert mock_weaviate.connect_to_local.call_count == 2
+        second_client.collections.get.assert_called_once_with(service.COLLECTION_NAME)

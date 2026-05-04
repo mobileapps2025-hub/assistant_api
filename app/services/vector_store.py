@@ -4,6 +4,7 @@ from weaviate.classes.query import MetadataQuery, HybridFusion, Filter
 from weaviate.embedded import EmbeddedOptions
 from typing import List, Dict, Any, Optional
 import os
+import urllib.parse
 from app.core.config import WEAVIATE_URL, WEAVIATE_API_KEY, client as openai_client, SEARCH_LIMIT, SEARCH_ALPHA, MIN_SEARCH_SCORE
 from app.core.logging import get_logger
 
@@ -20,78 +21,127 @@ class VectorStoreService:
         """
         Initialize the VectorStoreService with Weaviate connection.
         """
+        self.client = None
+        self.weaviate_url = self._normalize_weaviate_url(WEAVIATE_URL)
+
         if not WEAVIATE_URL:
             logger.warning("WEAVIATE_URL not set. Vector store will not function.")
-            self.client = None
             return
 
-        logger.info(f"[WEAVIATE] Initializing — WEAVIATE_URL='{WEAVIATE_URL}'")
+        if self.weaviate_url != WEAVIATE_URL:
+            logger.warning(
+                f"[WEAVIATE] Using effective WEAVIATE_URL='{self.weaviate_url}' "
+                f"instead of configured WEAVIATE_URL='{WEAVIATE_URL}'"
+            )
 
+        logger.info(f"[WEAVIATE] Initializing — WEAVIATE_URL='{self.weaviate_url}'")
+        self._connect()
+
+    def _build_headers(self) -> Dict[str, str]:
+        """Build headers required by Weaviate vectorizer modules."""
+        headers = {}
+        if os.getenv("OPENAI_API_KEY"):
+            headers["X-OpenAI-Api-Key"] = os.getenv("OPENAI_API_KEY")
+        return headers
+
+    def _is_azure_runtime(self) -> bool:
+        return any(
+            os.getenv(name)
+            for name in (
+                "WEBSITE_SITE_NAME",
+                "WEBSITE_INSTANCE_ID",
+                "WEBSITE_HOSTNAME",
+                "APPSETTING_WEBSITE_SITE_NAME",
+            )
+        )
+
+    def _is_local_url(self, url: str) -> bool:
+        normalized = url.strip().lower()
+        return normalized.startswith(("http://localhost", "http://127.0.0.1"))
+
+    def _normalize_weaviate_url(self, url: str) -> str:
+        if self._is_azure_runtime() and self._is_local_url(url):
+            return "embedded"
+        return url
+
+    def _connect_embedded(self, headers: Dict[str, str]):
+        # Embedded mode: the weaviate-client downloads and manages the Weaviate binary.
+        # Binary is cached at /home/.cache/weaviate-embedded (persistent on Azure App Service).
+        # Data is stored at /home/weaviate_data (also persistent on Azure).
+        # First startup downloads the binary once (~100 MB); subsequent starts reuse it.
+        data_path = os.getenv("WEAVIATE_EMBEDDED_DATA_PATH", "/home/weaviate_data")
+        binary_path = os.getenv("WEAVIATE_EMBEDDED_BINARY_PATH", "/home/.cache/weaviate-embedded")
+        logger.info(f"[WEAVIATE] Starting embedded mode — binary: {binary_path}, data: {data_path}")
+        self.client = weaviate.WeaviateClient(
+            embedded_options=EmbeddedOptions(
+                port=8079,
+                grpc_port=50060,
+                persistence_data_path=data_path,
+                binary_path=binary_path,
+                additional_env_vars={
+                    "ENABLE_MODULES": "text2vec-openai,generative-openai",
+                    "DEFAULT_VECTORIZER_MODULE": "none",
+                    "AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED": "true",
+                    "QUERY_DEFAULTS_LIMIT": "25",
+                    "CLUSTER_HOSTNAME": "node1",
+                },
+            ),
+            additional_headers=headers,
+        )
+        self.client.connect()
+        logger.info("[WEAVIATE] Embedded Weaviate started and connected successfully.")
+
+    def _connect_cloud(self, headers: Dict[str, str], auth_config):
+        self.client = weaviate.connect_to_wcs(
+            cluster_url=self.weaviate_url,
+            auth_credentials=auth_config,
+            headers=headers,
+        )
+        logger.info(f"[WEAVIATE] Connected to Weaviate Cloud at {self.weaviate_url}")
+
+    def _connect_local(self, headers: Dict[str, str]):
+        parsed = urllib.parse.urlparse(self.weaviate_url)
+        host_only = parsed.hostname or "localhost"
+        port_only = parsed.port or 8080
+        self.client = weaviate.connect_to_local(
+            host=host_only,
+            port=port_only,
+            headers=headers,
+        )
+        logger.info(f"[WEAVIATE] Connected to local Weaviate at {self.weaviate_url}")
+
+    def _connect(self):
         try:
-            # Always pass OpenAI key if available, needed for the text2vec-openai module
-            headers = {}
-            if os.getenv("OPENAI_API_KEY"):
-                headers["X-OpenAI-Api-Key"] = os.getenv("OPENAI_API_KEY")
-
+            headers = self._build_headers()
             auth_config = weaviate.auth.AuthApiKey(api_key=WEAVIATE_API_KEY) if WEAVIATE_API_KEY else None
 
-            if WEAVIATE_URL.strip().lower() == "embedded":
-                # Embedded mode: the weaviate-client downloads and manages the Weaviate binary.
-                # Binary is cached at /home/.cache/weaviate-embedded (persistent on Azure App Service).
-                # Data is stored at /home/weaviate_data (also persistent on Azure).
-                # First startup downloads the binary once (~100 MB); subsequent starts reuse it.
-                data_path = os.getenv("WEAVIATE_EMBEDDED_DATA_PATH", "/home/weaviate_data")
-                binary_path = os.getenv("WEAVIATE_EMBEDDED_BINARY_PATH", "/home/.cache/weaviate-embedded")
-                logger.info(f"[WEAVIATE] Starting embedded mode — binary: {binary_path}, data: {data_path}")
-                self.client = weaviate.WeaviateClient(
-                    embedded_options=EmbeddedOptions(
-                        port=8079,
-                        grpc_port=50060,
-                        persistence_data_path=data_path,
-                        binary_path=binary_path,
-                        additional_env_vars={
-                            "ENABLE_MODULES": "text2vec-openai,generative-openai",
-                            "DEFAULT_VECTORIZER_MODULE": "none",
-                            "AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED": "true",
-                            "QUERY_DEFAULTS_LIMIT": "25",
-                            "CLUSTER_HOSTNAME": "node1",
-                        },
-                    ),
-                    additional_headers=headers,
-                )
-                self.client.connect()
-                logger.info("[WEAVIATE] Embedded Weaviate started and connected successfully.")
-
-            elif "weaviate.cloud" in WEAVIATE_URL:
-                self.client = weaviate.connect_to_wcs(
-                    cluster_url=WEAVIATE_URL,
-                    auth_credentials=auth_config,
-                    headers=headers,
-                )
-                logger.info(f"[WEAVIATE] Connected to Weaviate Cloud at {WEAVIATE_URL}")
-
+            if self.weaviate_url.strip().lower() == "embedded":
+                self._connect_embedded(headers)
+            elif "weaviate.cloud" in self.weaviate_url:
+                self._connect_cloud(headers, auth_config)
             else:
-                # Local server (e.g. Docker Compose for development)
-                import urllib.parse
-                parsed = urllib.parse.urlparse(WEAVIATE_URL)
-                host_only = parsed.hostname or "localhost"
-                port_only = parsed.port or 8080
-                self.client = weaviate.connect_to_local(
-                    host=host_only,
-                    port=port_only,
-                    headers=headers,
-                )
-                logger.info(f"[WEAVIATE] Connected to local Weaviate at {WEAVIATE_URL}")
+                self._connect_local(headers)
 
         except Exception as e:
             logger.error(f"[WEAVIATE] Failed to connect: {e}", exc_info=True)
             self.client = None
+            if self._is_azure_runtime() and self.weaviate_url.strip().lower() != "embedded":
+                logger.warning("[WEAVIATE] Retrying with embedded Weaviate after Azure connection failure.")
+                self.weaviate_url = "embedded"
+                self._connect()
+
+    def _ensure_client(self) -> bool:
+        if self.client:
+            return True
+        logger.warning("[WEAVIATE] Client is not initialized. Attempting reconnect before continuing.")
+        self._connect()
+        return self.client is not None
 
     def ensure_schema(self):
         """
         Ensure the collection schema exists.
         """
-        if not self.client:
+        if not self._ensure_client():
             return
 
         try:
@@ -119,7 +169,7 @@ class VectorStoreService:
         """
         Get statistics about the vector store.
         """
-        if not self.client:
+        if not self._ensure_client():
             return {"status": "disconnected", "count": 0}
 
         try:
@@ -147,7 +197,7 @@ class VectorStoreService:
         Args:
             chunks: List of dictionaries containing 'text', 'header_path', 'source', etc.
         """
-        if not self.client:
+        if not self._ensure_client():
             logger.error("Weaviate client not initialized.")
             return False
 
@@ -190,7 +240,7 @@ class VectorStoreService:
             limit: Number of results.
             doc_types: Optional list of doc_type values to filter by. When None, searches all types.
         """
-        if not self.client:
+        if not self._ensure_client():
             logger.warning("Weaviate client is not initialized. Skipping search.")
             return []
 

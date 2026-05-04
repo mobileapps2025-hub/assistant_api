@@ -30,7 +30,15 @@ def _default_weaviate_url() -> str:
 
 
 def _is_azure_app_service() -> bool:
-    return bool(os.getenv("WEBSITE_SITE_NAME"))
+    return any(
+        os.getenv(name)
+        for name in (
+            "WEBSITE_SITE_NAME",
+            "WEBSITE_INSTANCE_ID",
+            "WEBSITE_HOSTNAME",
+            "APPSETTING_WEBSITE_SITE_NAME",
+        )
+    )
 
 
 def _is_local_weaviate_url(url: str) -> bool:
