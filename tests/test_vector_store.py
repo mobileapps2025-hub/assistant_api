@@ -41,7 +41,8 @@ class TestVectorStoreServiceInit:
         mock_embedded_options.return_value = "embedded-options"
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": ""}):
-            service = VectorStoreService()
+            with patch.object(VectorStoreService, "_patch_hosts_for_embedded"):
+                service = VectorStoreService()
 
         mock_embedded_options.assert_called_once()
         mock_weaviate.WeaviateClient.assert_called_once_with(
@@ -52,9 +53,14 @@ class TestVectorStoreServiceInit:
         assert service.client is mock_client
         env_vars = mock_embedded_options.call_args.kwargs["additional_env_vars"]
         assert env_vars["CLUSTER_ADVERTISE_ADDR"] == "127.0.0.1"
-        assert env_vars["CLUSTER_GOSSIP_BIND_PORT"] == "7100"
-        assert env_vars["CLUSTER_DATA_BIND_PORT"] == "7101"
         assert env_vars["RAFT_BOOTSTRAP_EXPECT"] == "1"
+        # CLUSTER_HOSTNAME, CLUSTER_GOSSIP_BIND_PORT, CLUSTER_DATA_BIND_PORT must NOT be
+        # overridden here — the weaviate-client library sets them consistently with RAFT_JOIN
+        # (which we cannot override without knowing the random raft_port).  Overriding
+        # CLUSTER_HOSTNAME alone was the root cause of the Raft bootstrap loop on Azure.
+        assert "CLUSTER_HOSTNAME" not in env_vars
+        assert "CLUSTER_GOSSIP_BIND_PORT" not in env_vars
+        assert "CLUSTER_DATA_BIND_PORT" not in env_vars
 
     @patch("app.services.vector_store.weaviate")
     @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
@@ -76,7 +82,8 @@ class TestVectorStoreServiceInit:
         mock_embedded_options.return_value = "embedded-options"
 
         with patch.dict("os.environ", {"WEBSITE_INSTANCE_ID": "abc", "OPENAI_API_KEY": ""}):
-            service = VectorStoreService()
+            with patch.object(VectorStoreService, "_patch_hosts_for_embedded"):
+                service = VectorStoreService()
 
         mock_weaviate.connect_to_local.assert_not_called()
         mock_weaviate.WeaviateClient.assert_called_once_with(
@@ -97,7 +104,8 @@ class TestVectorStoreServiceInit:
         mock_embedded_options.return_value = "embedded-options"
 
         with patch.dict("os.environ", {"WEBSITE_INSTANCE_ID": "abc", "OPENAI_API_KEY": ""}):
-            service = VectorStoreService()
+            with patch.object(VectorStoreService, "_patch_hosts_for_embedded"):
+                service = VectorStoreService()
 
         mock_weaviate.connect_to_local.assert_called_once()
         mock_weaviate.WeaviateClient.assert_called_once_with(
@@ -106,6 +114,64 @@ class TestVectorStoreServiceInit:
         )
         assert service.weaviate_url == "embedded"
         assert service.client is mock_client
+
+    @patch("app.services.vector_store.EmbeddedOptions")
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "embedded")
+    def test_embedded_already_listening_falls_back_to_connect_to_local(self, mock_weaviate, mock_embedded_options):
+        """When embedded ports are already in use, fall back to connect_to_local()."""
+        from weaviate.exceptions import WeaviateStartUpError
+        local_client = MagicMock()
+        mock_weaviate.WeaviateClient.return_value = MagicMock(
+            connect=MagicMock(side_effect=WeaviateStartUpError(
+                "Embedded DB did not start because processes are already listening on ports http:8079 and grpc:50060"
+            ))
+        )
+        mock_weaviate.connect_to_local.return_value = local_client
+        mock_embedded_options.return_value = "embedded-options"
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": ""}):
+            with patch.object(VectorStoreService, "_patch_hosts_for_embedded"):
+                service = VectorStoreService()
+
+        mock_weaviate.connect_to_local.assert_called_once_with(
+            port=8079, grpc_port=50060, headers={}
+        )
+        assert service.client is local_client
+
+    @patch("app.services.vector_store.WEAVIATE_URL", "embedded")
+    def test_patch_hosts_writes_entry_when_absent(self):
+        """_patch_hosts_for_embedded appends the loopback entry when missing."""
+        service = VectorStoreService.__new__(VectorStoreService)
+        import io
+        fake_file_content = "127.0.0.1 localhost\n"
+        written = []
+
+        def fake_open(path, mode="r", **kw):
+            if mode == "r":
+                return io.StringIO(fake_file_content)
+            buf = io.StringIO()
+            buf.close = lambda: written.append(buf.getvalue())
+            return buf
+
+        with patch("builtins.open", side_effect=fake_open):
+            service._patch_hosts_for_embedded(port=8079)
+
+        assert any("Embedded_at_8079" in w for w in written)
+
+    @patch("app.services.vector_store.WEAVIATE_URL", "embedded")
+    def test_patch_hosts_skips_when_already_present(self):
+        """_patch_hosts_for_embedded is a no-op when entry already exists."""
+        service = VectorStoreService.__new__(VectorStoreService)
+        import io
+        fake_file_content = "127.0.0.1 localhost\n127.0.0.1 Embedded_at_8079\n"
+
+        mock_open = MagicMock(return_value=io.StringIO(fake_file_content))
+        with patch("builtins.open", mock_open):
+            service._patch_hosts_for_embedded(port=8079)
+
+        # open() called once (for reading), never for appending
+        assert mock_open.call_count == 1
 
 
 class TestVectorStoreAddDocuments:
