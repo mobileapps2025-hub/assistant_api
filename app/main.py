@@ -7,6 +7,7 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -106,6 +107,9 @@ app.add_middleware(
 
 app.include_router(vision.router)
 app.include_router(admin.router)
+
+# Serve visual guide images as static files
+app.mount("/images", StaticFiles(directory="static/images"), name="images")
 
 # --- API Endpoints ---
 

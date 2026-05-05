@@ -1,5 +1,7 @@
 import logging
 import time
+import os
+import re
 import cohere
 from typing import List, Dict, Any, Optional
 from app.services.vector_store import VectorStoreService
@@ -269,7 +271,7 @@ class ChatService:
             )
 
             return {
-                "response": result.get("answer", "No response generated."),
+                "response": _rewrite_image_urls(result.get("answer", "No response generated.")),
                 "success": True,
                 "has_vision": False
             }
@@ -293,3 +295,15 @@ def _infer_graph_path(result: dict) -> str:
     if retry_count >= 1:
         return "retrieve→grade→rewrite→retrieve→generate"
     return "retrieve→grade→generate"
+
+
+def _rewrite_image_urls(text: str) -> str:
+    """Rewrite relative image URLs to absolute backend URLs so they load correctly."""
+    import re
+    base_url = os.getenv(
+        "API_PUBLIC_URL",
+        os.getenv("WEBSITE_HOSTNAME", "assistantapi-ctgmb3aad8gvcybg.westeurope-01.azurewebsites.net")
+    )
+    if not base_url.startswith("http"):
+        base_url = f"https://{base_url}"
+    return re.sub(r"\]\(images/", f"]({base_url}/images/", text)
