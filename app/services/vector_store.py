@@ -64,36 +64,88 @@ class VectorStoreService:
             return "embedded"
         return url
 
+    def _patch_hosts_for_embedded(self, port: int = 8079) -> None:
+        """
+        Add '127.0.0.1 Embedded_at_{port}' to /etc/hosts so that Weaviate's
+        Raft bootstrap can resolve the embedded-node hostname.
+
+        The weaviate-client library names the embedded node 'Embedded_at_{port}'
+        and sets RAFT_JOIN=Embedded_at_{port}:{raft_port}.  On Azure App Service
+        (no DNS for that name) Raft loops forever on "unable to resolve any node
+        address to join".  Adding the loopback entry fixes it.
+        """
+        hostname = f"Embedded_at_{port}"
+        entry = f"127.0.0.1 {hostname}\n"
+        try:
+            with open("/etc/hosts", "r") as f:
+                if hostname in f.read():
+                    logger.debug(f"[WEAVIATE] /etc/hosts already contains {hostname}")
+                    return
+            with open("/etc/hosts", "a") as f:
+                f.write(entry)
+            logger.info(f"[WEAVIATE] Patched /etc/hosts: {entry.strip()}")
+        except Exception as e:
+            logger.warning(f"[WEAVIATE] Could not patch /etc/hosts: {e}")
+
     def _connect_embedded(self, headers: Dict[str, str]):
         # Embedded mode: the weaviate-client downloads and manages the Weaviate binary.
         # Binary is cached at /home/.cache/weaviate-embedded (persistent on Azure App Service).
         # Data is stored at /home/weaviate_data (also persistent on Azure).
         # First startup downloads the binary once (~100 MB); subsequent starts reuse it.
+        embedded_port = 8079
+        embedded_grpc_port = 50060
         data_path = os.getenv("WEAVIATE_EMBEDDED_DATA_PATH", "/home/weaviate_data")
         binary_path = os.getenv("WEAVIATE_EMBEDDED_BINARY_PATH", "/home/.cache/weaviate-embedded")
+
+        # Patch /etc/hosts BEFORE starting the binary.
+        # The weaviate-client library sets CLUSTER_HOSTNAME=Embedded_at_{port} and
+        # RAFT_JOIN=Embedded_at_{port}:{raft_port} by default (via setdefault).
+        # Do NOT override CLUSTER_HOSTNAME or the gossip/data/raft ports here —
+        # that would break the consistency between CLUSTER_HOSTNAME and RAFT_JOIN.
+        # Instead we keep the library defaults and make the hostname resolvable.
+        self._patch_hosts_for_embedded(port=embedded_port)
+
         logger.info(f"[WEAVIATE] Starting embedded mode — binary: {binary_path}, data: {data_path}")
-        self.client = weaviate.WeaviateClient(
-            embedded_options=EmbeddedOptions(
-                port=8079,
-                grpc_port=50060,
-                persistence_data_path=data_path,
-                binary_path=binary_path,
-                additional_env_vars={
-                    "ENABLE_MODULES": "text2vec-openai,generative-openai",
-                    "DEFAULT_VECTORIZER_MODULE": "none",
-                    "AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED": "true",
-                    "QUERY_DEFAULTS_LIMIT": "25",
-                    "CLUSTER_HOSTNAME": "node1",
-                    "CLUSTER_ADVERTISE_ADDR": os.getenv("WEAVIATE_CLUSTER_ADVERTISE_ADDR", "127.0.0.1"),
-                    "CLUSTER_GOSSIP_BIND_PORT": os.getenv("WEAVIATE_CLUSTER_GOSSIP_BIND_PORT", "7100"),
-                    "CLUSTER_DATA_BIND_PORT": os.getenv("WEAVIATE_CLUSTER_DATA_BIND_PORT", "7101"),
-                    "RAFT_BOOTSTRAP_EXPECT": "1",
-                },
-            ),
-            additional_headers=headers,
-        )
-        self.client.connect()
-        logger.info("[WEAVIATE] Embedded Weaviate started and connected successfully.")
+        try:
+            self.client = weaviate.WeaviateClient(
+                embedded_options=EmbeddedOptions(
+                    port=embedded_port,
+                    grpc_port=embedded_grpc_port,
+                    persistence_data_path=data_path,
+                    binary_path=binary_path,
+                    additional_env_vars={
+                        "ENABLE_MODULES": "text2vec-openai,generative-openai",
+                        "DEFAULT_VECTORIZER_MODULE": "none",
+                        "AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED": "true",
+                        "QUERY_DEFAULTS_LIMIT": "25",
+                        # Keep CLUSTER_ADVERTISE_ADDR explicit so Azure (no private IP) uses loopback.
+                        # Do NOT set CLUSTER_HOSTNAME, CLUSTER_GOSSIP_BIND_PORT, CLUSTER_DATA_BIND_PORT —
+                        # those are set consistently by the library and must not be split from RAFT_JOIN.
+                        "CLUSTER_ADVERTISE_ADDR": os.getenv("WEAVIATE_CLUSTER_ADVERTISE_ADDR", "127.0.0.1"),
+                        "RAFT_BOOTSTRAP_EXPECT": "1",
+                    },
+                ),
+                additional_headers=headers,
+            )
+            self.client.connect()
+            logger.info("[WEAVIATE] Embedded Weaviate started and connected successfully.")
+        except Exception as e:
+            if "already listening on ports" in str(e):
+                # A previous Gunicorn worker already launched embedded Weaviate and it
+                # is still running (orphaned process on port 8079/50060).
+                # Connect directly instead of trying to start a second instance.
+                logger.warning(
+                    f"[WEAVIATE] Embedded Weaviate already running on ports "
+                    f"{embedded_port}/{embedded_grpc_port}. Falling back to connect_to_local()."
+                )
+                self.client = weaviate.connect_to_local(
+                    port=embedded_port,
+                    grpc_port=embedded_grpc_port,
+                    headers=headers,
+                )
+                logger.info("[WEAVIATE] Connected to already-running embedded Weaviate via connect_to_local().")
+            else:
+                raise
 
     def _connect_cloud(self, headers: Dict[str, str], auth_config):
         self.client = weaviate.connect_to_wcs(
