@@ -104,6 +104,7 @@ def create_file(openai_client, file_path):
     return created_file.id
 
 def start_knowledge_base():
+    print("Spotplan Agent v2.0 - Initializing Knowledge Base...")
     print("Starting knowledge base initialization...")
     try:
         file_path = "spotplan_guide.md" 

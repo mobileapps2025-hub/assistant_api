@@ -44,6 +44,7 @@ VECTOR_STORE_ID = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global VECTOR_STORE_ID
+    print("Spotplan Agent v2.0 - Function Calling Enabled")
     print("Application startup sequence initiated...")
     try:
         VECTOR_STORE_ID = start_knowledge_base()
