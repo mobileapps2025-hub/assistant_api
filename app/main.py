@@ -1,5 +1,6 @@
 import uvicorn
 import uuid
+import httpx
 from contextlib import asynccontextmanager
 import tempfile
 import os
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import exc
 
-from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse
+from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, LoginRequest, LoginResponse, MarketInfo, UserMarketsResponse, AuthContext
 from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH, CORS_ORIGINS, AsyncSessionLocal
 from app.core.database import Feedback, Base
 from app.core.dependencies import get_vector_store_service, get_chat_service
@@ -23,6 +24,7 @@ from app.services.ingestion_service import IngestionService
 from app.core.context import analyze_situational_context
 from app.routers import vision, admin
 from app.core.logging import setup_logging, get_logger, request_id_var
+from app.clients.mcl_service_client import MCLServiceClient
 
 # Setup logging
 setup_logging()
@@ -246,7 +248,8 @@ async def chat(
         result = await chat_service.process_chat_request(
             messages_for_ai,
             situational_context=context_analysis,
-            session_id=body.session_id
+            session_id=body.session_id,
+            auth_context=body.auth_context
         )
         
         if result["success"]:
@@ -267,6 +270,58 @@ async def chat(
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 # --- Feedback Endpoint ---
+
+@app.post("/api/auth/login", response_model=LoginResponse)
+async def login(body: LoginRequest):
+    """Proxy login to MCL Services and return token + user info."""
+    try:
+        client = MCLServiceClient()
+        result = await client.login(body.userName, body.password)
+        logger.info(f"[AUTH] User '{body.user_name}' logged in successfully")
+        return LoginResponse(
+            access_token=result["access_token"],
+            user_id=result["user_id"],
+            company_id=result["company_id"],
+            company_name=result.get("company_name", ""),
+            full_name=result.get("full_name", ""),
+            email=result.get("email", ""),
+        )
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[AUTH] Login failed: {e.response.status_code}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    except Exception as e:
+        logger.error(f"[AUTH] Login error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/auth/user-markets", response_model=UserMarketsResponse)
+async def get_user_markets(body: AuthContext):
+    """Get markets assigned to the authenticated user."""
+    if not body.access_token or not body.company_id or not body.user_id:
+        raise HTTPException(status_code=400, detail="Missing auth context fields")
+    try:
+        client = MCLServiceClient()
+        markets_data = await client.get_user_markets(
+            body.access_token, body.company_id, body.user_id
+        )
+        markets = [
+            MarketInfo(
+                id=m.get("id", ""),
+                name=m.get("name", ""),
+                soll_bestand=m.get("sollBestand"),
+                kasseneinsaetze=m.get("kasseneinsaetze"),
+                summe_kasseneinsatze=m.get("summeKasseneinsatze"),
+            )
+            for m in markets_data
+        ]
+        return UserMarketsResponse(markets=markets, total=len(markets))
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[MARKETS] Failed: {e.response.status_code}")
+        raise HTTPException(status_code=502, detail="Failed to fetch markets from MCL")
+    except Exception as e:
+        logger.error(f"[MARKETS] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/feedback", response_model=FeedbackResponse)
 async def submit_feedback(

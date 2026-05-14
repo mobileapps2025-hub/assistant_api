@@ -2,6 +2,7 @@ import logging
 import time
 import os
 import re
+import json
 import cohere
 from typing import List, Dict, Any, Optional
 from app.services.vector_store import VectorStoreService
@@ -17,6 +18,9 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.core.database import CuratedQA
 from app.core.config import AsyncSessionLocal
 from sqlalchemy import select
+from app.models import AuthContext
+from app.tools import MCL_USER_TOOLS
+from app.clients.mcl_service_client import MCLServiceClient
 
 logger = get_logger(__name__)
 
@@ -52,7 +56,8 @@ class ChatService:
         self,
         messages: List[Dict[str, Any]],
         situational_context: Optional[ContextAnalysis] = None,
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        auth_context: Optional[AuthContext] = None
     ) -> Dict[str, Any]:
         """
         Process a chat request, handling both text and vision.
@@ -89,7 +94,15 @@ class ChatService:
                 situational_context
             )
         
-        # 3. Handle Text (RAG)
+        # 3. Try function-calling for authenticated user-specific queries
+        if auth_context and auth_context.access_token:
+            fc_result = await self._handle_function_calling(
+                messages, latest_user_message, auth_context
+            )
+            if fc_result is not None:
+                return fc_result
+        
+        # 4. Handle Text (RAG)
         return await self._handle_text_request(
             messages,
             latest_user_message,
@@ -139,7 +152,102 @@ class ChatService:
                 "error": str(e)
             }
 
-    async def _get_curated_knowledge(self, query: str) -> List[Dict[str, Any]]:
+    async def _handle_function_calling(
+        self,
+        messages: List[Dict[str, Any]],
+        latest_user_message: Dict[str, Any],
+        auth_context: AuthContext
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Try GPT function-calling for authenticated user-specific queries.
+        Returns None if no tool was called (fall through to RAG).
+        """
+        user_query = latest_user_message.get("content", "")
+        if isinstance(user_query, list):
+            user_query = " ".join([item["text"] for item in user_query if item.get("type") == "text"])
+
+        system_prompt = """You are MarieClaire, the MCL Support Specialist.
+You have access to tools that can look up user-specific information from the MCL system.
+Use these tools when the user asks about their own data (e.g., markets, assignments).
+If the user is asking a general MCL question that doesn't require personal data,
+do NOT call any tools — let the knowledge base handle it.
+Always respond in the same language as the user."""
+
+        api_messages = [
+            {"role": "system", "content": system_prompt},
+        ]
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content")
+            if isinstance(content, list):
+                content = " ".join([item.get("text", "") for item in content if item.get("type") == "text"])
+            api_messages.append({"role": role, "content": content or ""})
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=api_messages,
+                tools=MCL_USER_TOOLS,
+                tool_choice="auto",
+                temperature=0,
+                timeout=30
+            )
+
+            choice = response.choices[0]
+            if not choice.message.tool_calls:
+                logger.info("[FC] No tool calls — falling through to RAG")
+                return None
+
+            tool_call = choice.message.tool_calls[0]
+            function_name = tool_call.function.name
+            logger.info(f"[FC] Tool called: {function_name}")
+
+            if function_name == "get_user_markets":
+                mcl = MCLServiceClient()
+                markets = await mcl.get_user_markets(
+                    auth_context.access_token,
+                    auth_context.company_id,
+                    auth_context.user_id
+                )
+                tool_result = json.dumps(markets, ensure_ascii=False)
+
+                api_messages.append({
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": tool_call.id,
+                            "type": "function",
+                            "function": {
+                                "name": function_name,
+                                "arguments": tool_call.function.arguments
+                            }
+                        }
+                    ]
+                })
+                api_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": tool_result
+                })
+
+                final_response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=api_messages,
+                    temperature=0,
+                    timeout=30
+                )
+                return {
+                    "response": final_response.choices[0].message.content,
+                    "success": True,
+                    "has_vision": False
+                }
+
+            return None
+
+        except Exception as e:
+            logger.error(f"[FC] Function calling error: {e}")
+            return None
         """
         Fetch curated Q&A pairs to use as fallback context.
         Performs simple keyword filtering to avoid polluting context with irrelevant facts.

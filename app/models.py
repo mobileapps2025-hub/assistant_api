@@ -40,9 +40,48 @@ class Message(BaseModel):
         }
 
 
+class AuthContext(BaseModel):
+    access_token: Optional[str] = None
+    user_id: Optional[str] = None
+    company_id: Optional[str] = None
+    company_name: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    userName: str = Field(alias="userName")
+    password: str
+
+    model_config = {"populate_by_name": True}
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    user_id: str
+    company_id: str
+    company_name: str
+    full_name: str
+    email: str
+
+
+class MarketInfo(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    soll_bestand: Optional[float] = None
+    kasseneinsaetze: Optional[float] = None
+    summe_kasseneinsatze: Optional[float] = None
+
+
+class UserMarketsResponse(BaseModel):
+    markets: List[MarketInfo]
+    total: int
+
+
 class ChatRequest(BaseModel):
     messages: List[Message]
     session_id: Optional[str] = None
+    auth_context: Optional[AuthContext] = None
 
 
 class FeedbackRequest(BaseModel):
