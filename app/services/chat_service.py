@@ -21,6 +21,7 @@ from sqlalchemy import select
 from app.models import AuthContext
 from app.tools import MCL_USER_TOOLS
 from app.clients.mcl_service_client import MCLServiceClient
+from app.services.memory_service import MemoryService
 
 logger = get_logger(__name__)
 
@@ -102,7 +103,12 @@ class ChatService:
             if fc_result is not None:
                 return fc_result
         
-        # 4. Handle Text (RAG)
+        # 4. Classify intent: chat (small talk) vs MCL query (needs RAG)
+        intent = await self._classify_intent(latest_user_message)
+        if intent == "CHAT":
+            return await self._handle_chat(messages)
+
+        # 5. Handle Text (RAG)
         return await self._handle_text_request(
             messages,
             latest_user_message,
@@ -248,6 +254,8 @@ Always respond in the same language as the user."""
         except Exception as e:
             logger.error(f"[FC] Function calling error: {e}")
             return None
+
+    async def _get_curated_knowledge(self, query: str) -> List[Dict[str, Any]]:
         """
         Fetch curated Q&A pairs to use as fallback context.
         Performs simple keyword filtering to avoid polluting context with irrelevant facts.
@@ -298,6 +306,98 @@ Always respond in the same language as the user."""
         except Exception as e:
             logger.error(f"Failed to fetch curated knowledge: {e}")
             return []
+
+    async def _classify_intent(self, latest_user_message: Dict[str, Any]) -> str:
+        user_query = latest_user_message.get("content", "")
+        if isinstance(user_query, list):
+            user_query = " ".join([item["text"] for item in user_query if item.get("type") == "text"])
+        user_query = user_query.strip()
+        if not user_query:
+            return "CHAT"
+
+        # Fast-path heuristics for very short messages
+        short = user_query.lower().rstrip("!?.")
+        if short in ("hi", "hello", "hey", "ok", "okay", "thanks", "thank you", "bye", "yes", "no", "test", "testing", "good", "nice", "cool", "great", "lol", "haha"):
+            return "CHAT"
+        if len(user_query) < 4 and short not in ("mcl", "app", "ios", "bug", "faq"):
+            return "CHAT"
+
+        system_prompt = """Classify this message. Reply with exactly one word.
+
+CHAT — the user is just talking: greeting, thanks, small talk, testing the bot, casual conversation, "how are you", "what can you do", or just playing around. Also CHAT if the user is asking about YOU (the bot) or making conversation.
+
+MCL_QUERY — the user wants factual MCL help: how to use a feature, troubleshooting, platform differences, dashboard questions, checklists, tasks, inspections, sync issues.
+
+Output ONLY one word: CHAT or MCL_QUERY"""
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_query}
+                ],
+                max_tokens=10,
+                temperature=0,
+                timeout=10
+            )
+            result = response.choices[0].message.content.strip().upper()
+            logger.info(f"[CLASSIFY] '{user_query[:60]}' → {result}")
+            return "CHAT" if "CHAT" in result else "MCL_QUERY"
+        except Exception as e:
+            logger.warning(f"[CLASSIFY] Failed, defaulting to MCL_QUERY: {e}")
+            return "MCL_QUERY"
+
+    async def _handle_chat(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+        system_prompt = """You are MarieClaire, the MCL Support Specialist. You help users with the MCL (Mobile Checklist) application for retail operations.
+
+You are having a casual conversation right now. Be warm, friendly, and concise.
+
+Your personality:
+- Professional but approachable — like a helpful colleague
+- Concise — 1 to 3 short sentences unless the user asks for more
+- Use plain language, no markdown walls
+- If the user is testing you, play along warmly
+- If they ask what you can do, briefly mention MCL help: Dashboard, Checklists, Tasks, Inspections, Sync troubleshooting
+- If they share personal info, show interest but don't overreact
+- Stay on brand as MarieClaire from MCL
+
+MEMORY: You have a persistent memory system. When the user shares personal info (name, preferences, projects), it IS saved for future conversations — tell them "I'll remember that!" or "Got it, saved!". When the user closes the chat or starts a new one, important details are automatically preserved. If they ask "what do you remember", tell them you can recall previous conversations. NEVER say you can't remember or save things.
+
+NEVER fabricate MCL features or steps when just chatting. If they want MCL help, offer to switch modes."""
+
+        api_messages = [{"role": "system", "content": system_prompt}]
+
+        # Inject memory context if available
+        try:
+            memory_service = MemoryService()
+            context = memory_service.recall_context()
+            if context:
+                api_messages.insert(0, {"role": "system", "content": context})
+        except Exception:
+            pass
+
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if isinstance(content, list):
+                content = " ".join([item.get("text", "") for item in content if item.get("type") == "text"])
+            api_messages.append({"role": role, "content": content})
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=api_messages,
+                max_tokens=300,
+                temperature=0.7,
+                timeout=15
+            )
+            content = response.choices[0].message.content.strip()
+            logger.info(f"[CHAT] Response: {content[:80]}...")
+            return {"response": content, "success": True, "has_vision": False}
+        except Exception as e:
+            logger.error(f"[CHAT] Error: {e}")
+            return {"response": "I'm here! How can I help you with MCL?", "success": True, "has_vision": False}
 
     async def _handle_text_request(
         self,

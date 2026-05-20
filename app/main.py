@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import exc
 
-from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, LoginRequest, LoginResponse, MarketInfo, UserMarketsResponse, AuthContext
+from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, LoginRequest, LoginResponse, MarketInfo, UserMarketsResponse, AuthContext, MemorySaveRequest, MemoryInfo, MemoryListResponse, MemorySaveResponse, MemoryUpdateRequest, MemoryRecallResponse, MemoryStoreRequest
 from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH, CORS_ORIGINS, AsyncSessionLocal
 from app.core.database import Feedback, Base
 from app.core.dependencies import get_vector_store_service, get_chat_service
@@ -25,6 +25,7 @@ from app.core.context import analyze_situational_context
 from app.routers import vision, admin
 from app.core.logging import setup_logging, get_logger, request_id_var
 from app.clients.mcl_service_client import MCLServiceClient
+from app.services.memory_service import MemoryService
 
 # Setup logging
 setup_logging()
@@ -321,6 +322,99 @@ async def get_user_markets(body: AuthContext):
     except Exception as e:
         logger.error(f"[MARKETS] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/memory/store", response_model=dict)
+async def store_messages(body: MemoryStoreRequest):
+    """Store raw messages for a session (no GPT extraction — fast)."""
+    try:
+        service = MemoryService()
+        service.store_messages(body.session_id, body.messages)
+        return {"stored": True, "session_id": body.session_id, "count": len(body.messages)}
+    except Exception as e:
+        logger.error(f"[MEMORY] Store error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/memory/save", response_model=MemorySaveResponse)
+async def save_memories(body: MemorySaveRequest):
+    """Extract and save important memories from a conversation. If session_id is provided, reads from store."""
+    try:
+        service = MemoryService()
+        messages = body.messages
+        if (not messages or len(messages) == 0) and body.session_id:
+            messages = service.get_stored_messages(body.session_id)
+        if not messages:
+            raise HTTPException(status_code=400, detail="No messages to process")
+        result = await service.process_and_save(messages)
+        if body.session_id:
+            service.clear_stored_messages(body.session_id)
+        return MemorySaveResponse(
+            saved=[MemoryInfo(**m) for m in result["saved"]],
+            updated=[MemoryInfo(**m) for m in result["updated"]],
+            deleted=result["deleted"],
+        )
+    except Exception as e:
+        logger.error(f"[MEMORY] Save error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/memory/list", response_model=MemoryListResponse)
+async def list_memories():
+    """List all saved memories."""
+    try:
+        service = MemoryService()
+        memories = service.list_memories()
+        return MemoryListResponse(memories=[MemoryInfo(**m) for m in memories])
+    except Exception as e:
+        logger.error(f"[MEMORY] List error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/memory/{memory_id}", response_model=MemoryInfo)
+async def get_memory(memory_id: str):
+    """Get a single memory by ID."""
+    service = MemoryService()
+    mem = service.get_memory(memory_id)
+    if not mem:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return MemoryInfo(**mem)
+
+
+@app.put("/api/memory/{memory_id}", response_model=MemoryInfo)
+async def update_memory(memory_id: str, body: MemoryUpdateRequest):
+    """Update the content of a memory (user edit)."""
+    service = MemoryService()
+    result = service.update_memory_content(memory_id, body.content)
+    if not result:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return MemoryInfo(**result)
+
+
+@app.delete("/api/memory/{memory_id}")
+async def delete_memory(memory_id: str):
+    """Delete a memory file."""
+    service = MemoryService()
+    if service.delete_memory(memory_id):
+        return {"deleted": True}
+    raise HTTPException(status_code=404, detail="Memory not found")
+
+
+@app.post("/api/memory/recall", response_model=MemoryRecallResponse)
+async def recall_memories():
+    """Recall all memories as formatted context for system prompt injection."""
+    try:
+        service = MemoryService()
+        context = service.recall_context()
+        memories = service.list_memories()
+        return MemoryRecallResponse(
+            context=context,
+            memories=[MemoryInfo(**m) for m in memories],
+        )
+    except Exception as e:
+        logger.error(f"[MEMORY] Recall error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.post("/api/feedback", response_model=FeedbackResponse)

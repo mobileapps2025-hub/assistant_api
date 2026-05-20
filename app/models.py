@@ -152,3 +152,43 @@ class ChatResponse(BaseModel):
 def generate_response_id() -> str:
     """Generate a unique response ID for tracking."""
     return f"resp_{uuid.uuid4().hex[:8]}"
+
+
+class MemorySaveRequest(BaseModel):
+    messages: List[Dict[str, Any]]
+    session_id: Optional[str] = None
+
+
+class MemoryInfo(BaseModel):
+    id: str
+    title: str = ""
+    category: str = ""
+    importance: str = "low"
+    tags: List[str] = []
+    content: str = ""
+    created: str = ""
+    updated: str = ""
+
+
+class MemoryListResponse(BaseModel):
+    memories: List[MemoryInfo]
+
+
+class MemorySaveResponse(BaseModel):
+    saved: List[MemoryInfo] = []
+    updated: List[MemoryInfo] = []
+    deleted: List[str] = []
+
+
+class MemoryUpdateRequest(BaseModel):
+    content: str
+
+
+class MemoryRecallResponse(BaseModel):
+    context: str = ""
+    memories: List[MemoryInfo] = []
+
+
+class MemoryStoreRequest(BaseModel):
+    session_id: str
+    messages: List[Dict[str, Any]]
