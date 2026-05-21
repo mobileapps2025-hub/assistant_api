@@ -17,10 +17,11 @@ from sqlalchemy import exc
 from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, LoginRequest, LoginResponse, MarketInfo, UserMarketsResponse, AuthContext, MemorySaveRequest, MemoryInfo, MemoryListResponse, MemorySaveResponse, MemoryUpdateRequest, MemoryRecallResponse, MemoryStoreRequest
 from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH, CORS_ORIGINS, AsyncSessionLocal
 from app.core.database import Feedback, Base
-from app.core.dependencies import get_vector_store_service, get_chat_service
+from app.core.dependencies import get_vector_store_service, get_chat_service, get_speech_service
 from app.services.chat_service import ChatService
 from app.services.vector_store import VectorStoreService
 from app.services.ingestion_service import IngestionService
+from app.services.speech_service import SpeechService
 from app.core.context import analyze_situational_context
 from app.routers import vision, admin
 from app.core.logging import setup_logging, get_logger, request_id_var
@@ -515,6 +516,36 @@ async def submit_feedback(
             detail=f"Database error: {str(e)}"
         )
 
+
+@app.post("/api/speech-to-text")
+async def speech_to_text(
+    file: UploadFile = File(...),
+    speech_service: SpeechService = Depends(get_speech_service)
+):
+    """
+    Transcribe audio to text using OpenAI Whisper.
+
+    Accepts a multipart form upload with an audio file (webm, wav, mp3, etc.)
+    and returns the transcribed text.
+    """
+    if not file.content_type or not file.content_type.startswith("audio/"):
+        raise HTTPException(
+            status_code=400,
+            detail="File must be an audio file"
+        )
+
+    try:
+        audio_bytes = await file.read()
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="Empty audio file")
+
+        text = await speech_service.transcribe(audio_bytes, filename=file.filename or "audio.webm")
+        return {"text": text}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[SPEECH API] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Speech-to-text failed: {str(e)}")
 
 
 if __name__ == "__main__":

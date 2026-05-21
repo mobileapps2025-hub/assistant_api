@@ -6,6 +6,7 @@ from app.services.image_validator import ImageValidatorService
 from app.services.language_service import LanguageService
 from app.services.chat_service import ChatService
 from app.services.ingestion_service import IngestionService
+from app.services.speech_service import SpeechService
 from app.core.config import VECTOR_STORE_PATH
 
 # Singleton instance for VectorStoreService
@@ -48,3 +49,8 @@ def get_ingestion_service(
     vector_store: VectorStoreService = Depends(get_vector_store_service)
 ) -> IngestionService:
     return IngestionService(vector_store)
+
+
+@lru_cache()
+def get_speech_service() -> SpeechService:
+    return SpeechService()
