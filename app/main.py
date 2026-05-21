@@ -1,5 +1,6 @@
 import uvicorn
 import uuid
+import httpx
 from contextlib import asynccontextmanager
 import tempfile
 import os
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import exc
 
-from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse
+from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, LoginRequest, LoginResponse, MarketInfo, UserMarketsResponse, AuthContext, MemorySaveRequest, MemoryInfo, MemoryListResponse, MemorySaveResponse, MemoryUpdateRequest, MemoryRecallResponse, MemoryStoreRequest
 from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH, CORS_ORIGINS, AsyncSessionLocal
 from app.core.database import Feedback, Base
 from app.core.dependencies import get_vector_store_service, get_chat_service
@@ -23,6 +24,8 @@ from app.services.ingestion_service import IngestionService
 from app.core.context import analyze_situational_context
 from app.routers import vision, admin
 from app.core.logging import setup_logging, get_logger, request_id_var
+from app.clients.mcl_service_client import MCLServiceClient
+from app.services.memory_service import MemoryService
 
 # Setup logging
 setup_logging()
@@ -168,25 +171,31 @@ async def search_chunks(
     vector_store: VectorStoreService = Depends(get_vector_store_service)
 ):
     """Search for relevant MCL chunks based on a query."""
-    query = query_data.get("query", "")
-    max_results = query_data.get("max_results", 5)
+    query = str(query_data.get("query", "")).strip()
+    try:
+        max_results = int(query_data.get("max_results", 5))
+    except (TypeError, ValueError):
+        max_results = 5
+    max_results = max(1, max_results)
     
     if not query:
         return {"error": "Query is required"}
     
-    relevant_chunks = vector_store.search(query, limit=max_results)
+    relevant_chunks = vector_store.hybrid_search(query, limit=max_results)
     
     return {
         "query": query,
         "total_results": len(relevant_chunks),
         "results": [
             {
-                "document_name": chunk["document_name"],
-                "chunk_index": chunk["chunk_index"],
-                "total_chunks": chunk["total_chunks"],
-                "content_preview": chunk["content"][:300] + "..." if len(chunk["content"]) > 300 else chunk["content"],
-                "content_hash": chunk["content_hash"],
-                "similarity_score": chunk.get("similarity_score", 0)
+                "source": chunk.get("source"),
+                "source_title": chunk.get("source_title") or chunk.get("source"),
+                "header_path": chunk.get("header_path"),
+                "doc_type": chunk.get("doc_type"),
+                "chunk_index": chunk.get("chunk_index", 0),
+                "score": chunk.get("score", 0),
+                "uuid": chunk.get("uuid"),
+                "content_preview": (chunk.get("text") or "")[:500],
             }
             for chunk in relevant_chunks
         ]
@@ -246,7 +255,8 @@ async def chat(
         result = await chat_service.process_chat_request(
             messages_for_ai,
             situational_context=context_analysis,
-            session_id=body.session_id
+            session_id=body.session_id,
+            auth_context=body.auth_context
         )
         
         if result["success"]:
@@ -267,6 +277,153 @@ async def chat(
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 # --- Feedback Endpoint ---
+
+@app.post("/api/auth/login", response_model=LoginResponse)
+async def login(body: LoginRequest):
+    """Proxy login to MCL Services and return token + user info."""
+    try:
+        client = MCLServiceClient()
+        result = await client.login(body.userName, body.password)
+        logger.info(f"[AUTH] User '{body.user_name}' logged in successfully")
+        return LoginResponse(
+            access_token=result["access_token"],
+            user_id=result["user_id"],
+            company_id=result["company_id"],
+            company_name=result.get("company_name", ""),
+            full_name=result.get("full_name", ""),
+            email=result.get("email", ""),
+        )
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[AUTH] Login failed: {e.response.status_code}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    except Exception as e:
+        logger.error(f"[AUTH] Login error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/auth/user-markets", response_model=UserMarketsResponse)
+async def get_user_markets(body: AuthContext):
+    """Get markets assigned to the authenticated user."""
+    if not body.access_token or not body.company_id or not body.user_id:
+        raise HTTPException(status_code=400, detail="Missing auth context fields")
+    try:
+        client = MCLServiceClient()
+        markets_data = await client.get_user_markets(
+            body.access_token, body.company_id, body.user_id
+        )
+        markets = [
+            MarketInfo(
+                id=m.get("id", ""),
+                name=m.get("name", ""),
+                soll_bestand=m.get("sollBestand"),
+                kasseneinsaetze=m.get("kasseneinsaetze"),
+                summe_kasseneinsatze=m.get("summeKasseneinsatze"),
+            )
+            for m in markets_data
+        ]
+        return UserMarketsResponse(markets=markets, total=len(markets))
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[MARKETS] Failed: {e.response.status_code}")
+        raise HTTPException(status_code=502, detail="Failed to fetch markets from MCL")
+    except Exception as e:
+        logger.error(f"[MARKETS] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/memory/store", response_model=dict)
+async def store_messages(body: MemoryStoreRequest):
+    """Store raw messages for a session (no GPT extraction — fast)."""
+    try:
+        service = MemoryService()
+        service.store_messages(body.session_id, body.messages)
+        return {"stored": True, "session_id": body.session_id, "count": len(body.messages)}
+    except Exception as e:
+        logger.error(f"[MEMORY] Store error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/memory/save", response_model=MemorySaveResponse)
+async def save_memories(body: MemorySaveRequest):
+    """Extract and save important memories from a conversation. If session_id is provided, reads from store."""
+    try:
+        service = MemoryService()
+        messages = body.messages
+        if (not messages or len(messages) == 0) and body.session_id:
+            messages = service.get_stored_messages(body.session_id)
+        if not messages:
+            return MemorySaveResponse(saved=[], updated=[], deleted=[])
+        result = await service.process_and_save(messages)
+        if body.session_id:
+            service.clear_stored_messages(body.session_id)
+        return MemorySaveResponse(
+            saved=[MemoryInfo(**m) for m in result["saved"]],
+            updated=[MemoryInfo(**m) for m in result["updated"]],
+            deleted=result["deleted"],
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[MEMORY] Save error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/memory/list", response_model=MemoryListResponse)
+async def list_memories():
+    """List all saved memories."""
+    try:
+        service = MemoryService()
+        memories = service.list_memories()
+        return MemoryListResponse(memories=[MemoryInfo(**m) for m in memories])
+    except Exception as e:
+        logger.error(f"[MEMORY] List error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/memory/{memory_id}", response_model=MemoryInfo)
+async def get_memory(memory_id: str):
+    """Get a single memory by ID."""
+    service = MemoryService()
+    mem = service.get_memory(memory_id)
+    if not mem:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return MemoryInfo(**mem)
+
+
+@app.put("/api/memory/{memory_id}", response_model=MemoryInfo)
+async def update_memory(memory_id: str, body: MemoryUpdateRequest):
+    """Update the content of a memory (user edit)."""
+    service = MemoryService()
+    result = service.update_memory_content(memory_id, body.content)
+    if not result:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return MemoryInfo(**result)
+
+
+@app.delete("/api/memory/{memory_id}")
+async def delete_memory(memory_id: str):
+    """Delete a memory file."""
+    service = MemoryService()
+    if service.delete_memory(memory_id):
+        return {"deleted": True}
+    raise HTTPException(status_code=404, detail="Memory not found")
+
+
+@app.post("/api/memory/recall", response_model=MemoryRecallResponse)
+async def recall_memories():
+    """Recall all memories as formatted context for system prompt injection."""
+    try:
+        service = MemoryService()
+        context = service.recall_context()
+        memories = service.list_memories()
+        return MemoryRecallResponse(
+            context=context,
+            memories=[MemoryInfo(**m) for m in memories],
+        )
+    except Exception as e:
+        logger.error(f"[MEMORY] Recall error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @app.post("/api/feedback", response_model=FeedbackResponse)
 async def submit_feedback(

@@ -22,6 +22,7 @@ class VectorStoreService:
         Initialize the VectorStoreService with Weaviate connection.
         """
         self.client = None
+        self._source_title_supported: Optional[bool] = None
         self.weaviate_url = self._normalize_weaviate_url(WEAVIATE_URL)
 
         if not WEAVIATE_URL:
@@ -193,6 +194,40 @@ class VectorStoreService:
         self._connect()
         return self.client is not None
 
+    def _collection_property_names(self, collection) -> Optional[set]:
+        try:
+            config = collection.config.get()
+            properties = getattr(config, "properties", None)
+            if isinstance(properties, dict):
+                return set(properties.keys())
+            if isinstance(properties, (list, tuple, set)):
+                return {
+                    prop.name
+                    for prop in properties
+                    if getattr(prop, "name", None)
+                }
+        except Exception as e:
+            logger.debug(f"[WEAVIATE] Could not inspect collection properties: {e}")
+        return None
+
+    def _ensure_optional_property(self, collection, property_name: str, data_type) -> bool:
+        property_names = self._collection_property_names(collection)
+        if property_names is not None and property_name in property_names:
+            return True
+
+        try:
+            collection.config.add_property(
+                Property(name=property_name, data_type=data_type)
+            )
+            logger.info(f"[WEAVIATE] Added missing property '{property_name}' to {self.COLLECTION_NAME}.")
+            return True
+        except Exception as e:
+            logger.warning(
+                f"[WEAVIATE] Could not add optional property '{property_name}' "
+                f"to existing collection {self.COLLECTION_NAME}: {e}"
+            )
+            return False
+
     def ensure_schema(self):
         """
         Ensure the collection schema exists.
@@ -211,13 +246,21 @@ class VectorStoreService:
                         Property(name="text", data_type=DataType.TEXT),
                         Property(name="header_path", data_type=DataType.TEXT),
                         Property(name="source", data_type=DataType.TEXT),
+                        Property(name="source_title", data_type=DataType.TEXT),
                         Property(name="chunk_index", data_type=DataType.INT),
                         Property(name="doc_type", data_type=DataType.TEXT),
                     ]
                 )
+                self._source_title_supported = True
                 logger.info(f"Collection {self.COLLECTION_NAME} created.")
             else:
                 logger.info(f"Collection {self.COLLECTION_NAME} already exists.")
+                collection = self.client.collections.get(self.COLLECTION_NAME)
+                self._source_title_supported = self._ensure_optional_property(
+                    collection,
+                    "source_title",
+                    DataType.TEXT,
+                )
         except Exception as e:
             logger.error(f"Error ensuring schema: {e}")
 
@@ -262,14 +305,22 @@ class VectorStoreService:
         try:
             with collection.batch.dynamic() as batch:
                 for chunk in chunks:
+                    properties = {
+                        "text": chunk.get("text", ""),
+                        "header_path": chunk.get("header_path", ""),
+                        "source": chunk.get("source", ""),
+                        "chunk_index": chunk.get("chunk_index", 0),
+                        "doc_type": chunk.get("doc_type", "faq"),
+                    }
+                    if self._source_title_supported is not False:
+                        properties["source_title"] = (
+                            chunk.get("source_title")
+                            or chunk.get("source")
+                            or ""
+                        )
+
                     batch.add_object(
-                        properties={
-                            "text": chunk.get("text", ""),
-                            "header_path": chunk.get("header_path", ""),
-                            "source": chunk.get("source", ""),
-                            "chunk_index": chunk.get("chunk_index", 0),
-                            "doc_type": chunk.get("doc_type", "faq"),
-                        }
+                        properties=properties
                         # Weaviate handles vectorization automatically via text2vec-openai
                     )
             
@@ -319,11 +370,15 @@ class VectorStoreService:
                 score = obj.metadata.score or 0.0
                 if score < MIN_SEARCH_SCORE:
                     continue
+                properties = obj.properties or {}
+                source = properties.get("source")
                 results.append({
-                    "text": obj.properties.get("text"),
-                    "header_path": obj.properties.get("header_path"),
-                    "source": obj.properties.get("source"),
-                    "doc_type": obj.properties.get("doc_type"),
+                    "text": properties.get("text"),
+                    "header_path": properties.get("header_path"),
+                    "source": source,
+                    "source_title": properties.get("source_title") or source,
+                    "doc_type": properties.get("doc_type"),
+                    "chunk_index": properties.get("chunk_index", 0),
                     "score": score,
                     "uuid": str(obj.uuid)
                 })

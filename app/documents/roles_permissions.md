@@ -23,7 +23,7 @@ The MCL system has exactly nine roles:
 4. **Store Management** — Access restricted to their own store(s). Can assign tasks only to roles within their own store.
 5. **Department Management** — Identical permissions to Section Management except: can only view and manage their own tasks (not all market tasks).
 6. **Section Management** — Identical permissions to Department Management except: can view all tasks in the market.
-7. **Checklist Management** — Can create, edit, and delete checklists in the Dashboard. Cannot receive tasks. Cannot view Reports or Data Analysis tabs.
+7. **Checklist Management** — Can create, edit, and delete checklists in the Dashboard. Can receive tasks assigned by others. Cannot create tasks from the Dashboard. Cannot view Reports or Data Analysis tabs.
 8. **Auditor** — Can create, edit, and delete checklists. Can see all markets. Cannot receive tasks.
 9. **Team Member** — Standard user role. Can receive tasks and answer checklists.
 
@@ -36,8 +36,9 @@ The MCL system has exactly nine roles:
 - **Can only view checklists:** Executive Management (view-only)
 
 ### Task Reception (who can be assigned tasks)
-- **Can receive tasks:** Company Administration, Regional Management, Store Management, Department Management, Section Management, Team Member
-- **Cannot receive tasks:** Auditor, Executive Management, Checklist Management
+- **Can receive tasks:** Company Administration, Regional Management, Store Management, Department Management, Section Management, Checklist Management, Team Member
+- **Cannot receive tasks:** Auditor, Executive Management
+- **Important distinction:** Checklist Management can receive assigned tasks. Its restriction is Dashboard task creation only; do not treat "cannot create tasks from the Dashboard" as "cannot receive tasks."
 
 ### Task Creation
 - **From the Dashboard:** All roles except Checklist Management

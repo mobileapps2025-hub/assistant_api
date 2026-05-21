@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
-from app.services.chat_service import ChatService, _infer_graph_path
+from app.services.chat_service import ChatService, _infer_graph_path, _rewrite_image_urls
 from app.services.vector_store import VectorStoreService
 from app.services.vision_service import VisionService
 from app.services.image_validator import ImageValidatorService
@@ -42,6 +42,24 @@ class TestInferGraphPath:
     def test_missing_keys_defaults_to_generate(self):
         result = _infer_graph_path({})
         assert result == "retrieve→grade→generate"
+
+
+class TestRewriteImageUrls:
+    def test_local_default_uses_running_backend(self, monkeypatch):
+        monkeypatch.delenv("API_PUBLIC_URL", raising=False)
+        monkeypatch.delenv("WEBSITE_HOSTNAME", raising=False)
+
+        result = _rewrite_image_urls("![Guide](images/example.png)")
+
+        assert result == "![Guide](http://127.0.0.1:8001/images/example.png)"
+
+    def test_website_hostname_uses_https(self, monkeypatch):
+        monkeypatch.delenv("API_PUBLIC_URL", raising=False)
+        monkeypatch.setenv("WEBSITE_HOSTNAME", "assistant.example.com")
+
+        result = _rewrite_image_urls("![Guide](images/example.png)")
+
+        assert result == "![Guide](https://assistant.example.com/images/example.png)"
 
 
 # ---------------------------------------------------------------------------

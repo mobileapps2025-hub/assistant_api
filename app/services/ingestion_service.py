@@ -26,6 +26,25 @@ class IngestionService:
             return "platform_note"
         return "faq"
 
+    def _source_title(self, file_path: str, text: str = "") -> str:
+        """Return a human-readable document title for chunk metadata."""
+        frontmatter_title = ""
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("# "):
+                return stripped[2:].strip()
+            if not frontmatter_title and stripped.lower().startswith("title:"):
+                frontmatter_title = stripped.split(":", 1)[1].strip().strip("'\"")
+
+        if frontmatter_title:
+            return frontmatter_title
+
+        filename = os.path.basename(file_path)
+        stem, _ = os.path.splitext(filename)
+        return stem.replace("_", " ").strip() or filename
+
     def load_pdf_document(self, file_path: str) -> List[Dict[str, Any]]:
         """
         Load a PDF file and split it into chunks.
@@ -35,6 +54,7 @@ class IngestionService:
         try:
             reader = pypdf.PdfReader(file_path)
             filename = os.path.basename(file_path)
+            source_title = self._source_title(file_path)
             doc_type = self._detect_doc_type(file_path)
 
             # Extract per-page text while tracking page number
@@ -80,6 +100,7 @@ class IngestionService:
                         "text": content,
                         "header_path": header_path,
                         "source": filename,
+                        "source_title": source_title,
                         "chunk_index": chunk_index,
                         "doc_type": doc_type,
                     })
@@ -109,6 +130,7 @@ class IngestionService:
 
             doc_type = self._detect_doc_type(file_path)
             filename = os.path.basename(file_path)
+            source_title = self._source_title(file_path, text)
 
             if doc_type == "visual_guide":
                 # Try to extract the H1 (or topic from front-matter) for header_path
@@ -122,6 +144,7 @@ class IngestionService:
                     "text": text,
                     "header_path": header_path,
                     "source": filename,
+                    "source_title": source_title,
                     "chunk_index": 0,
                     "doc_type": doc_type,
                 }]
@@ -170,6 +193,7 @@ class IngestionService:
                         "text": sub_doc.page_content,
                         "header_path": header_path,
                         "source": filename,
+                        "source_title": source_title,
                         "chunk_index": chunk_index,
                         "doc_type": doc_type,
                     })

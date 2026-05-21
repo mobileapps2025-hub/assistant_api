@@ -86,6 +86,14 @@ The dashboard charts use the following color coding:
 
 ---
 
+## Dashboard Task Editing
+
+- A Dashboard task can be edited only by the task creator or a Company Administrator (Company Administration role).
+- A task can be edited only while its status is **Not Started**.
+- Tasks with status **In Progress** or **Completed** cannot be edited.
+
+---
+
 ## Bulk Task Deletion
 
 To delete multiple tasks at once in the Dashboard:
