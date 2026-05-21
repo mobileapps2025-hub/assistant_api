@@ -171,25 +171,31 @@ async def search_chunks(
     vector_store: VectorStoreService = Depends(get_vector_store_service)
 ):
     """Search for relevant MCL chunks based on a query."""
-    query = query_data.get("query", "")
-    max_results = query_data.get("max_results", 5)
+    query = str(query_data.get("query", "")).strip()
+    try:
+        max_results = int(query_data.get("max_results", 5))
+    except (TypeError, ValueError):
+        max_results = 5
+    max_results = max(1, max_results)
     
     if not query:
         return {"error": "Query is required"}
     
-    relevant_chunks = vector_store.search(query, limit=max_results)
+    relevant_chunks = vector_store.hybrid_search(query, limit=max_results)
     
     return {
         "query": query,
         "total_results": len(relevant_chunks),
         "results": [
             {
-                "document_name": chunk["document_name"],
-                "chunk_index": chunk["chunk_index"],
-                "total_chunks": chunk["total_chunks"],
-                "content_preview": chunk["content"][:300] + "..." if len(chunk["content"]) > 300 else chunk["content"],
-                "content_hash": chunk["content_hash"],
-                "similarity_score": chunk.get("similarity_score", 0)
+                "source": chunk.get("source"),
+                "source_title": chunk.get("source_title") or chunk.get("source"),
+                "header_path": chunk.get("header_path"),
+                "doc_type": chunk.get("doc_type"),
+                "chunk_index": chunk.get("chunk_index", 0),
+                "score": chunk.get("score", 0),
+                "uuid": chunk.get("uuid"),
+                "content_preview": (chunk.get("text") or "")[:500],
             }
             for chunk in relevant_chunks
         ]
@@ -345,7 +351,7 @@ async def save_memories(body: MemorySaveRequest):
         if (not messages or len(messages) == 0) and body.session_id:
             messages = service.get_stored_messages(body.session_id)
         if not messages:
-            raise HTTPException(status_code=400, detail="No messages to process")
+            return MemorySaveResponse(saved=[], updated=[], deleted=[])
         result = await service.process_and_save(messages)
         if body.session_id:
             service.clear_stored_messages(body.session_id)
@@ -354,6 +360,8 @@ async def save_memories(body: MemorySaveRequest):
             updated=[MemoryInfo(**m) for m in result["updated"]],
             deleted=result["deleted"],
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[MEMORY] Save error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

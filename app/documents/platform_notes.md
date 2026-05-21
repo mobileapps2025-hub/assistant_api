@@ -22,6 +22,15 @@ This document covers platform-specific behaviour in the MCL Mobile App, distingu
 
 ## Completing Tasks — Mobile vs Tablet
 
+### Checklist question photo limit
+
+- A checklist question in the MCL App can have up to **three photos** attached.
+
+### Task photo/comment requirement indicators
+
+- In the task list, tasks that require a photo or comment show **(Photo/Comment)** after the task name or next to the due date.
+- When completing a task through the Note method, a red border around the photo or comment field means that field is required before completion.
+
 ### On a mobile phone (swipe method)
 1. Go to **Tasks Overview**.
 2. Swipe the task from **right to left**.
@@ -53,6 +62,14 @@ Checklist progress is **saved locally on the device**. It is not synced across d
 
 - **In the MCL App**: The order of departments can be changed by **drag-and-drop** before starting the checklist.
 - **In the Dashboard (Checklist Wizard)**: The department order cannot be changed from the Dashboard.
+
+---
+
+## Offline / Wi-Fi Task Creation
+
+- The MCL App can work without Wi-Fi if it was synced at the start of the day.
+- Creating a task from the **Tasks** menu requires online mode.
+- Offline task creation is supported only from within a checklist. The task is saved after the device reconnects.
 
 ---
 

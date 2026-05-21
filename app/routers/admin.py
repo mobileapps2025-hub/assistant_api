@@ -87,11 +87,14 @@ async def add_curated_qa(
     try:
         from app.core.dependencies import get_vector_store_service
         vs_service = get_vector_store_service()
+        vs_service.ensure_schema()
         chunk = {
             "text": f"Question: {qa_request.question}\nAnswer: {qa_request.answer}",
             "header_path": "Curated Knowledge",
             "source": "User Feedback",
-            "chunk_index": 0
+            "source_title": "Curated Q&A",
+            "chunk_index": 0,
+            "doc_type": "faq",
         }
         success = vs_service.add_documents([chunk])
         if success:

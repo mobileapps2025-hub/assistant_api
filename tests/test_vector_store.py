@@ -178,6 +178,20 @@ class TestVectorStoreAddDocuments:
 
     @patch("app.services.vector_store.weaviate")
     @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
+    def test_ensure_schema_includes_source_title(self, mock_weaviate):
+        mock_client = MagicMock()
+        mock_weaviate.connect_to_local.return_value = mock_client
+        mock_client.collections.exists.return_value = False
+
+        service = VectorStoreService()
+        service.ensure_schema()
+
+        properties = mock_client.collections.create.call_args.kwargs["properties"]
+        property_names = [prop.name for prop in properties]
+        assert "source_title" in property_names
+
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
     def test_add_documents_batches_correctly(self, mock_weaviate):
         mock_client = MagicMock()
         mock_weaviate.connect_to_local.return_value = mock_client
@@ -190,7 +204,7 @@ class TestVectorStoreAddDocuments:
 
         service = VectorStoreService()
         chunks = [
-            {"text": "chunk1", "header_path": "H1", "source": "doc1", "chunk_index": 0},
+            {"text": "chunk1", "header_path": "H1", "source": "doc1", "source_title": "Document One", "chunk_index": 0},
             {"text": "chunk2", "header_path": "H1", "source": "doc1", "chunk_index": 1},
         ]
 
@@ -198,6 +212,11 @@ class TestVectorStoreAddDocuments:
 
         assert success is True
         assert mock_batch.add_object.call_count == 2
+        first_properties = mock_batch.add_object.call_args_list[0].kwargs["properties"]
+        second_properties = mock_batch.add_object.call_args_list[1].kwargs["properties"]
+        assert first_properties["source_title"] == "Document One"
+        assert first_properties["doc_type"] == "faq"
+        assert second_properties["source_title"] == "doc1"
 
     @patch("app.services.vector_store.weaviate")
     @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
@@ -225,6 +244,9 @@ class TestVectorStoreHybridSearch:
             "text": "result text",
             "header_path": "H1",
             "source": "doc.md",
+            "source_title": "Guide",
+            "doc_type": "faq",
+            "chunk_index": 7,
         }
         mock_obj.metadata.score = 0.9
         mock_obj.uuid = "abc-123"
@@ -236,7 +258,36 @@ class TestVectorStoreHybridSearch:
 
         assert len(results) == 1
         assert results[0]["text"] == "result text"
+        assert results[0]["source_title"] == "Guide"
+        assert results[0]["doc_type"] == "faq"
+        assert results[0]["chunk_index"] == 7
         assert results[0]["score"] == 0.9
+
+    @patch("app.services.vector_store.weaviate")
+    @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")
+    def test_hybrid_search_falls_back_when_source_title_missing(self, mock_weaviate):
+        mock_client = MagicMock()
+        mock_weaviate.connect_to_local.return_value = mock_client
+        mock_collection = MagicMock()
+        mock_client.collections.get.return_value = mock_collection
+
+        mock_obj = MagicMock()
+        mock_obj.properties = {
+            "text": "result text",
+            "header_path": "H1",
+            "source": "legacy.md",
+            "chunk_index": 3,
+        }
+        mock_obj.metadata.score = 0.8
+        mock_obj.uuid = "legacy-123"
+
+        mock_collection.query.hybrid.return_value = MagicMock(objects=[mock_obj])
+
+        service = VectorStoreService()
+        results = service.hybrid_search("legacy document")
+
+        assert results[0]["source_title"] == "legacy.md"
+        assert results[0]["chunk_index"] == 3
 
     @patch("app.services.vector_store.weaviate")
     @patch("app.services.vector_store.WEAVIATE_URL", "http://localhost:8080")

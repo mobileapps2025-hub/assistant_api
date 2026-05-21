@@ -508,10 +508,9 @@ def _infer_graph_path(result: dict) -> str:
 def _rewrite_image_urls(text: str) -> str:
     """Rewrite relative image URLs to absolute backend URLs so they load correctly."""
     import re
-    base_url = os.getenv(
-        "API_PUBLIC_URL",
-        os.getenv("WEBSITE_HOSTNAME", "assistantapi-ctgmb3aad8gvcybg.westeurope-01.azurewebsites.net")
-    )
+    base_url = os.getenv("API_PUBLIC_URL") or os.getenv("WEBSITE_HOSTNAME")
+    if not base_url:
+        base_url = "http://127.0.0.1:8001"
     if not base_url.startswith("http"):
         base_url = f"https://{base_url}"
     return re.sub(r"\]\(images/", f"]({base_url}/images/", text)

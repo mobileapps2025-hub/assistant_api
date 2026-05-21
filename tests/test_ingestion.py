@@ -29,6 +29,24 @@ class TestLoadAndSplitDocument:
         assert len(subsection_chunks) == 1
         assert "Subsection A text" in subsection_chunks[0]["text"]
         assert "Section 1" in subsection_chunks[0]["header_path"]
+        assert all(c["source_title"] == "Title" for c in chunks)
+
+    def test_visual_guide_uses_source_title_metadata(self, ingestion_service):
+        service, _ = ingestion_service
+        markdown = (
+            "---\n"
+            "title: Frontmatter Title\n"
+            "doc_type: visual_guide\n"
+            "---\n\n"
+            "# Visual Guide Title\n"
+            "Visual guide content."
+        )
+        with patch("builtins.open", mock_open(read_data=markdown)):
+            chunks = service.load_and_split_document("documents/visual/guide.md")
+
+        assert len(chunks) == 1
+        assert chunks[0]["source_title"] == "Visual Guide Title"
+        assert chunks[0]["doc_type"] == "visual_guide"
 
     def test_returns_empty_list_on_file_error(self, ingestion_service):
         service, _ = ingestion_service

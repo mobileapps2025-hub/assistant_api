@@ -12,6 +12,13 @@ import cohere
 
 logger = get_logger(__name__)
 
+IMAGE_MARKDOWN_RE = re.compile(r'!\[[^\]]*\]\([^)]*images/[^)]*\)')
+VISUAL_CLAIM_RE = re.compile(
+    r'\b(visual guide|visual aid|screenshot|image below|shown below|'
+    r'shown in (?:the )?(?:image|screenshot)|see (?:the )?(?:image|screenshot)|pictured)\b',
+    re.IGNORECASE,
+)
+
 class AgentNodes:
     def __init__(
         self, 
@@ -38,6 +45,114 @@ class AgentNodes:
         if len(trimmed) < len(documents):
             logger.info(f"Context trimmed: {len(documents)} → {len(trimmed)} chunks ({total} chars)")
         return trimmed
+
+    def _source_label(self, item: Dict[str, Any]) -> str:
+        """Prefer human titles, then filenames; never return vague Doc labels."""
+        for key in ("source_title", "source", "document_name"):
+            value = item.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return "Unknown Source"
+
+    def _chunk_number(self, item: Dict[str, Any]) -> int:
+        try:
+            return int(item.get("chunk_index", 0)) + 1
+        except (TypeError, ValueError):
+            return 1
+
+    def _known_source_values(self, item: Dict[str, Any]) -> List[str]:
+        values = []
+        for key in ("source", "source_title", "document_name"):
+            value = item.get(key)
+            if isinstance(value, str) and value.strip():
+                values.append(value.strip().lower())
+        return values
+
+    def _extract_image_markdown(self, text: str) -> List[str]:
+        return [match.group(0) for match in IMAGE_MARKDOWN_RE.finditer(text or "")]
+
+    def _visual_caption(self, visual_aid: Dict[str, Any], query: str) -> str:
+        header_path = (visual_aid.get("header_path") or "").strip()
+        subject = header_path if header_path and header_path != "Root" else self._source_label(visual_aid)
+        topic = (query or "this question").strip().rstrip(".?!")[:90]
+        return f"*Visual aid: {subject} for your question about {topic}.*"
+
+    def _line_looks_like_visual_caption(self, line: str) -> bool:
+        stripped = line.strip().strip("*_").lower()
+        return stripped.startswith(("visual aid:", "caption:", "screenshot:", "image:"))
+
+    def _strip_unavailable_image_markdown(
+        self,
+        answer: str,
+        visual_aids: List[Dict[str, Any]],
+    ) -> str:
+        allowed_images = {
+            image
+            for visual_aid in visual_aids
+            for image in self._extract_image_markdown(visual_aid.get("text", ""))
+        }
+
+        def replace_image(match: re.Match) -> str:
+            image_markdown = match.group(0)
+            return image_markdown if image_markdown in allowed_images else ""
+
+        return IMAGE_MARKDOWN_RE.sub(replace_image, answer)
+
+    def _ensure_visual_captions(
+        self,
+        answer: str,
+        visual_aids: List[Dict[str, Any]],
+        query: str,
+    ) -> str:
+        image_to_caption = {}
+        for visual_aid in visual_aids:
+            for image in self._extract_image_markdown(visual_aid.get("text", "")):
+                image_to_caption[image] = self._visual_caption(visual_aid, query)
+
+        if not image_to_caption:
+            return answer
+
+        lines = []
+        for line in answer.splitlines():
+            image = line.strip()
+            if image in image_to_caption:
+                previous = next((candidate.strip() for candidate in reversed(lines) if candidate.strip()), "")
+                if not self._line_looks_like_visual_caption(previous):
+                    lines.append(image_to_caption[image])
+            lines.append(line)
+        return "\n".join(lines)
+
+    def _remove_visual_claims_without_images(self, answer: str) -> str:
+        if IMAGE_MARKDOWN_RE.search(answer):
+            return answer
+
+        cleaned_lines = []
+        for line in answer.splitlines():
+            if not VISUAL_CLAIM_RE.search(line):
+                cleaned_lines.append(line)
+                continue
+
+            sentences = re.split(r'(?<=[.!?])\s+', line)
+            kept_sentences = [
+                sentence.strip()
+                for sentence in sentences
+                if sentence.strip() and not VISUAL_CLAIM_RE.search(sentence)
+            ]
+            if kept_sentences:
+                cleaned_lines.append(" ".join(kept_sentences))
+
+        return "\n".join(cleaned_lines).strip()
+
+    def _postprocess_visual_aids(
+        self,
+        answer: str,
+        visual_aids: List[Dict[str, Any]],
+        query: str,
+    ) -> str:
+        answer = self._strip_unavailable_image_markdown(answer, visual_aids)
+        answer = self._ensure_visual_captions(answer, visual_aids, query)
+        answer = self._remove_visual_claims_without_images(answer)
+        return re.sub(r'\n{3,}', '\n\n', answer).strip()
 
     def _grade_context_items(self, query: str, items: List[Dict[str, Any]], label: str) -> tuple[List[Dict[str, Any]], int]:
         """Return context items that are relevant to the query."""
@@ -178,7 +293,7 @@ Latest user question: {query}"""
 
         logger.info(f"Retrieving documents for query: '{query}'" + (f" (original: '{state['query']}')" if query != state["query"] else ""))
 
-        TEXT_DOC_TYPES = ["faq", "platform_note", "assistant_identity"]
+        TEXT_DOC_TYPES = ["faq", "platform_note", "assistant_identity", "curated"]
 
         try:
             # 1. Text-track hybrid search — excludes visual_guide chunks
@@ -567,6 +682,11 @@ Do NOT invent features or answers not backed by documentation.
         visual_aids = state.get("visual_aids", [])
         query = state.get("query", "")
         messages = state.get("messages", [])
+        visual_aids_with_images = [
+            visual_aid
+            for visual_aid in visual_aids
+            if self._extract_image_markdown(visual_aid.get("text", ""))
+        ]
         logger.info(
             f"[TRACE] generate_answer: "
             f"language='{lang}' | "
@@ -582,19 +702,23 @@ Do NOT invent features or answers not backed by documentation.
         context_text = ""
         if documents:
             for c in documents:
-                source = c.get('source', 'Unknown')
+                source = c.get("source") or self._source_label(c)
+                source_title = self._source_label(c)
+                title_part = f" | Title: {source_title}" if source_title != source else ""
                 header_path = c.get('header_path', 'Root')
                 text = c.get('text', '')
-                context_text += f"\n[Source: {source} | Section: {header_path}]: {text}\n"
+                context_text += f"\n[Source: {source}{title_part} | Section: {header_path}]: {text}\n"
 
         # Build AVAILABLE VISUAL AIDS block (omitted entirely if empty)
         visual_context = ""
-        if visual_aids:
-            for va in visual_aids:
-                source = va.get('source', 'Unknown')
+        if visual_aids_with_images:
+            for va in visual_aids_with_images:
+                source = va.get("source") or self._source_label(va)
+                source_title = self._source_label(va)
+                title_part = f" | Title: {source_title}" if source_title != source else ""
                 header_path = va.get('header_path', 'Root')
                 text = va.get('text', '')
-                visual_context += f"\n[Caption: {header_path} | File: {source}]\n{text}\n"
+                visual_context += f"\n[Caption: {header_path} | File: {source}{title_part}]\n{text}\n"
 
         # Helpful "no context" fallback — name the topic + 5 MCL pillars.
         # Visual-guide chunks include prose plus images and are enough context by themselves.
@@ -678,18 +802,25 @@ Check: Sync Status → Filters → Permissions → Connectivity.
 - **Checklists:** Routine vs. Special inspections.
 - **Tasks:** Inside a checklist vs. the Task Menu.
 
+## 4. Roles, Permissions, and Task Conflicts
+- Treat role/permission statements as authoritative only when they are supported by the role/permission context you received.
+- Do not confuse **task reception** (a user seeing, opening, or completing an assigned task in the Mobile App) with **Dashboard task creation or assignment**.
+- If the context contains both task reception/completion and Dashboard task creation details, choose the source whose platform and action match the user's question.
+- When the context distinguishes these actions, explain the distinction with citations from the relevant source lines instead of merging them into one workflow.
+
 # Tone
 Professional, helpful, and concise. Empathetic to technical frustrations.
 
 # ⚠️ ABSOLUTE RULE — VISUAL AIDS
-Ground your answer text in the # TEXTUAL CONTEXT section. Separately, the # AVAILABLE VISUAL AIDS section contains screenshots that visually illustrate MCL screens.
+Ground your answer text in the # TEXTUAL CONTEXT section. When present, the # AVAILABLE VISUAL AIDS section contains screenshots that visually illustrate MCL screens.
 
-**You MUST include an image when a visual aid is relevant to the user's question:**
+**Include an image only when a visual aid is relevant to the user's question:**
 - If ANY entry in AVAILABLE VISUAL AIDS is on-topic for the user's question (e.g. they ask "where is X" / "what does Y look like" / "how do I navigate Z"), you MUST embed that entry's `![alt](images/...)` markdown link verbatim in your answer.
 - Copy the image markdown EXACTLY as it appears in AVAILABLE VISUAL AIDS — do not modify the URL, alt text, or punctuation.
-- Place the image link on its own line, immediately AFTER the sentence it illustrates.
+- Place the image link on its own line, immediately AFTER a one-sentence caption that ties the screenshot to the user's question.
 - Do NOT invent image links. Do NOT include images not present in AVAILABLE VISUAL AIDS.
 - Only omit a visual aid if it is clearly off-topic for the user's question.
+- If no `![alt](images/...)` markdown appears in AVAILABLE VISUAL AIDS, do not mention screenshots, visual guides, or visual aids.
 
 When AVAILABLE VISUAL AIDS contains a relevant entry and you fail to include its image link, your answer is incomplete.
 """
@@ -721,7 +852,8 @@ Answer as MarieClaire (cite sources inline with [Source: filename]):"""
             content = response.choices[0].message.content.strip()
 
             # Post-generation grounding validation (visual_aids count as known sources too)
-            content = self._validate_grounding(content, documents, visual_aids)
+            content = self._validate_grounding(content, documents, visual_aids_with_images)
+            content = self._postprocess_visual_aids(content, visual_aids_with_images, query)
 
             # Append sources footer
             if documents:
@@ -730,7 +862,7 @@ Answer as MarieClaire (cite sources inline with [Source: filename]):"""
                     'en': "\n\n📚 **Sources:**\n"
                 }.get(lang, "\n\n📚 **Sources:**\n")
                 unique_sources = sorted(list(set([
-                    f"{c.get('document_name', 'Doc')} (Chunk {c.get('chunk_index', 0) + 1})"
+                    f"{self._source_label(c)} (Chunk {self._chunk_number(c)})"
                     for c in documents
                 ])))
                 content += sources_header + "\n".join([f"• {s}" for s in unique_sources])
@@ -760,16 +892,14 @@ Answer as MarieClaire (cite sources inline with [Source: filename]):"""
         if not documents and not visual_aids:
             return answer
 
-        # Build set of known source filenames (case-insensitive) from BOTH tracks
+        # Build set of known source filenames/titles (case-insensitive) from BOTH tracks
         known_sources = {
-            doc.get("source", "").lower().strip()
+            source_value
             for doc in (documents or [])
-            if doc.get("source")
+            for source_value in self._known_source_values(doc)
         }
         for va in (visual_aids or []):
-            src = va.get("source", "").lower().strip()
-            if src:
-                known_sources.add(src)
+            known_sources.update(self._known_source_values(va))
 
         # Extract all [Source: X] citations
         citation_pattern = re.compile(r'\[Source:\s*([^\]]+)\]')
