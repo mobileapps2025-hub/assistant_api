@@ -3,6 +3,7 @@ import time
 import os
 import re
 import json
+from datetime import datetime, timedelta
 import cohere
 from typing import List, Dict, Any, Optional
 from app.services.vector_store import VectorStoreService
@@ -95,20 +96,37 @@ class ChatService:
                 situational_context
             )
         
-        # 3. Try function-calling for authenticated user-specific queries
-        if auth_context and auth_context.access_token:
-            fc_result = await self._handle_function_calling(
-                messages, latest_user_message, auth_context
-            )
-            if fc_result is not None:
-                return fc_result
-        
-        # 4. Classify intent: chat (small talk) vs MCL query (needs RAG)
+        # 3. Classify intent FIRST: CHAT | PERSONAL | MCL_QUERY.
+        # Routing must not depend on GPT's non-deterministic "auto" tool choice,
+        # otherwise personal questions intermittently fall through to RAG.
         intent = await self._classify_intent(latest_user_message)
+        logger.info(f"[ROUTE] intent={intent} authed={bool(auth_context and auth_context.access_token)}")
+
+        # 4. Personal data → force a tool call (requires a connected session).
+        if intent == "PERSONAL":
+            if auth_context and auth_context.access_token:
+                fc_result = await self._handle_function_calling(
+                    messages, latest_user_message, auth_context
+                )
+                if fc_result is not None:
+                    return fc_result
+                # Tool path produced nothing — fall through to RAG as a last resort.
+            else:
+                return {
+                    "response": (
+                        "To answer questions about your own MCL data (your profile, "
+                        "markets, checklists or tasks) I need your MCL session. "
+                        "Please open the assistant from the MCL app, or connect a token first."
+                    ),
+                    "success": True,
+                    "has_vision": False,
+                }
+
+        # 5. Small talk
         if intent == "CHAT":
             return await self._handle_chat(messages)
 
-        # 5. Handle Text (RAG)
+        # 6. General MCL question → RAG
         return await self._handle_text_request(
             messages,
             latest_user_message,
@@ -165,16 +183,25 @@ class ChatService:
         auth_context: AuthContext
     ) -> Optional[Dict[str, Any]]:
         """
-        Try GPT function-calling for authenticated user-specific queries.
-        Returns None if no tool was called (fall through to RAG).
+        Run GPT function-calling for an authenticated, personal-data query.
+
+        Called only after the intent has been classified as PERSONAL, so a tool
+        call is forced (tool_choice="required") — the model must fetch fresh data
+        instead of answering from conversation history. Returns a graceful
+        message on error; returns None only in the defensive no-tool-call case.
         """
         user_query = latest_user_message.get("content", "")
         if isinstance(user_query, list):
             user_query = " ".join([item["text"] for item in user_query if item.get("type") == "text"])
 
         system_prompt = """You are MarieClaire, the MCL Support Specialist.
-You have access to tools that can look up user-specific information from the MCL system.
-Use these tools when the user asks about their own data (e.g., markets, assignments).
+You have access to tools that can look up user-specific information from the MCL system:
+- the user's profile (name, company, role)
+- the markets assigned to the user
+- the checklists available to the user
+- how many open tasks the user has
+Use these tools when the user asks about their own data (e.g., "who am I", "my company",
+"my markets", "my checklists", "how many open tasks do I have").
 If the user is asking a general MCL question that doesn't require personal data,
 do NOT call any tools — let the knowledge base handle it.
 Always respond in the same language as the user."""
@@ -194,66 +221,102 @@ Always respond in the same language as the user."""
                 model="gpt-4o",
                 messages=api_messages,
                 tools=MCL_USER_TOOLS,
-                tool_choice="auto",
+                tool_choice="required",
                 temperature=0,
                 timeout=30
             )
 
             choice = response.choices[0]
             if not choice.message.tool_calls:
-                logger.info("[FC] No tool calls — falling through to RAG")
+                logger.info("[FC] No tool calls despite required — falling through to RAG")
                 return None
 
             tool_call = choice.message.tool_calls[0]
             function_name = tool_call.function.name
             logger.info(f"[FC] Tool called: {function_name}")
 
-            if function_name == "get_user_markets":
-                mcl = MCLServiceClient()
-                markets = await mcl.get_user_markets(
-                    auth_context.access_token,
-                    auth_context.company_id,
-                    auth_context.user_id
-                )
-                tool_result = json.dumps(markets, ensure_ascii=False)
-
-                api_messages.append({
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [
-                        {
-                            "id": tool_call.id,
-                            "type": "function",
-                            "function": {
-                                "name": function_name,
-                                "arguments": tool_call.function.arguments
-                            }
-                        }
-                    ]
-                })
-                api_messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": tool_result
-                })
-
-                final_response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=api_messages,
-                    temperature=0,
-                    timeout=30
-                )
-                return {
-                    "response": final_response.choices[0].message.content,
-                    "success": True,
-                    "has_vision": False
+            mcl = MCLServiceClient()
+            if function_name == "get_user_info":
+                info = await mcl.get_user_info(auth_context.access_token)
+                data = {
+                    "full_name": info.get("fullName"),
+                    "email": info.get("email"),
+                    "company_id": info.get("companyId"),
+                    "company_name": info.get("companyName"),
+                    "role_id": info.get("roleId"),
+                    "can_create_task": info.get("createTask"),
                 }
+            elif function_name == "get_user_markets":
+                data = await mcl.get_markets_by_username(
+                    auth_context.access_token,
+                    auth_context.email,
+                )
+            elif function_name == "get_user_checklists":
+                # CheckListDate needs a window; use a wide range around today.
+                now = datetime.utcnow()
+                date_from = (now - timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%S")
+                date_to = (now + timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%S")
+                data = await mcl.get_checklists_by_date(
+                    auth_context.access_token,
+                    auth_context.user_id,
+                    date_from,
+                    date_to,
+                )
+            elif function_name == "get_open_task_count":
+                data = await mcl.get_open_task_count(
+                    auth_context.access_token,
+                    auth_context.user_id,
+                )
+            else:
+                logger.warning(f"[FC] Unknown tool '{function_name}' — falling through to RAG")
+                return None
 
-            return None
+            tool_result = json.dumps(data, ensure_ascii=False)
+
+            api_messages.append({
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": tool_call.id,
+                        "type": "function",
+                        "function": {
+                            "name": function_name,
+                            "arguments": tool_call.function.arguments
+                        }
+                    }
+                ]
+            })
+            api_messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": tool_result
+            })
+
+            final_response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=api_messages,
+                temperature=0,
+                timeout=30
+            )
+            return {
+                "response": final_response.choices[0].message.content,
+                "success": True,
+                "has_vision": False
+            }
 
         except Exception as e:
             logger.error(f"[FC] Function calling error: {e}")
-            return None
+            # This is a personal-data query; don't degrade to a RAG
+            # "no information found" — return a clear, on-topic message.
+            return {
+                "response": (
+                    "I couldn't retrieve your information from MCL right now. "
+                    "Please try again in a moment."
+                ),
+                "success": True,
+                "has_vision": False,
+            }
 
     async def _get_curated_knowledge(self, query: str) -> List[Dict[str, Any]]:
         """
@@ -315,20 +378,40 @@ Always respond in the same language as the user."""
         if not user_query:
             return "CHAT"
 
+        lower = user_query.lower()
+
         # Fast-path heuristics for very short messages
-        short = user_query.lower().rstrip("!?.")
+        short = lower.rstrip("!?.")
         if short in ("hi", "hello", "hey", "ok", "okay", "thanks", "thank you", "bye", "yes", "no", "test", "testing", "good", "nice", "cool", "great", "lol", "haha"):
             return "CHAT"
         if len(user_query) < 4 and short not in ("mcl", "app", "ios", "bug", "faq"):
             return "CHAT"
 
-        system_prompt = """Classify this message. Reply with exactly one word.
+        # Fast-path heuristics for clearly personal-data questions (EN/ES/DE).
+        # These are unambiguous "my own data" phrasings — route straight to the
+        # tools without a model round-trip.
+        personal_markers = (
+            "my market", "my checklist", "my task", "my account", "my profile",
+            "my company", "my role", "who am i", "what's my", "what is my",
+            "how many tasks", "how many open", "assigned to me", "do i have",
+            "mis mercados", "mis tareas", "mis listas", "mi empresa", "mi cuenta",
+            "mi perfil", "mi rol", "quien soy", "quién soy", "cuántas tareas",
+            "cuantas tareas", "tengo tareas", "tengo asignad",
+            "meine märkte", "meine aufgaben", "meine checklist", "wer bin ich",
+        )
+        if any(marker in lower for marker in personal_markers):
+            logger.info(f"[CLASSIFY] '{user_query[:60]}' → PERSONAL (heuristic)")
+            return "PERSONAL"
 
-CHAT — the user is just talking: greeting, thanks, small talk, testing the bot, casual conversation, "how are you", "what can you do", or just playing around. Also CHAT if the user is asking about YOU (the bot) or making conversation.
+        system_prompt = """Classify this message into exactly one word.
 
-MCL_QUERY — the user wants factual MCL help: how to use a feature, troubleshooting, platform differences, dashboard questions, checklists, tasks, inspections, sync issues.
+PERSONAL — the user asks about their OWN MCL records: their profile/account, their company or role, the markets assigned to them, their checklists, or how many tasks they have. Typical phrasing: "my ...", "do I have ...", "who am I", "what is assigned to me", "how many tasks do I have".
 
-Output ONLY one word: CHAT or MCL_QUERY"""
+MCL_QUERY — general MCL help NOT tied to the user's own records: how to use a feature, troubleshooting, platform differences, what something is/means, dashboards, definitions, sync issues.
+
+CHAT — the user is just talking: greeting, thanks, small talk, testing the bot, asking about YOU (the bot), casual conversation.
+
+Output ONLY one word: PERSONAL, MCL_QUERY, or CHAT"""
 
         try:
             response = client.chat.completions.create(
@@ -343,7 +426,11 @@ Output ONLY one word: CHAT or MCL_QUERY"""
             )
             result = response.choices[0].message.content.strip().upper()
             logger.info(f"[CLASSIFY] '{user_query[:60]}' → {result}")
-            return "CHAT" if "CHAT" in result else "MCL_QUERY"
+            if "PERSONAL" in result:
+                return "PERSONAL"
+            if "CHAT" in result:
+                return "CHAT"
+            return "MCL_QUERY"
         except Exception as e:
             logger.warning(f"[CLASSIFY] Failed, defaulting to MCL_QUERY: {e}")
             return "MCL_QUERY"

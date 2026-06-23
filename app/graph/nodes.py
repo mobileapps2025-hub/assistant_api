@@ -224,13 +224,16 @@ Return ONLY a JSON object with this exact shape (no markdown, no prose):
             f"messages_count={len(messages)} | "
             f"query='{query[:60]}'"
         )
-        # Fast-path: first turn — query is already self-contained
-        if len(messages) <= 1:
-            logger.info("[TRACE] contextualize_query: first turn fast-path, no LLM call")
+        # Fast-path: first real question is already self-contained. This also
+        # covers the case where the only prior message is the assistant's
+        # welcome greeting (no real user turn to resolve against) — rewriting
+        # then only risks injecting unwanted assumptions.
+        prior_messages = messages[:-1] if messages else []
+        has_prior_user_turn = any(isinstance(m, HumanMessage) for m in prior_messages)
+        if len(messages) <= 1 or not has_prior_user_turn:
+            logger.info("[TRACE] contextualize_query: self-contained question, no LLM call")
             return {"contextualized_query": query}
 
-        # Build last 4 messages (most recent first) for the prompt
-        prior_messages = messages[:-1] if messages else []
         recent = prior_messages[-4:] if len(prior_messages) > 4 else prior_messages
         history_lines = []
         for msg in recent:
@@ -240,7 +243,8 @@ Return ONLY a JSON object with this exact shape (no markdown, no prose):
                 history_lines.append(f"Assistant: {msg.content}")
         last_4_messages = "\n".join(history_lines)
 
-        system_prompt = """You are a query preprocessing assistant for the MCL mobile app knowledge base.
+        system_prompt = """You are a query preprocessing assistant for the MCL knowledge base,
+which covers BOTH the MCL mobile app and the MCL Dashboard (web admin).
 Rewrite the user's latest question into a self-contained search query that can retrieve
 the right documents from a vector database without conversation context.
 
@@ -248,6 +252,9 @@ Rules:
 - Resolve all pronouns ("it", "that", "them", "this") to the actual MCL entity.
 - Expand follow-up questions into full standalone queries.
 - If already self-contained, return it unchanged.
+- Do NOT add platform, device, or surface words (e.g. "mobile app", "Dashboard",
+  "iOS", "Android", "tablet", "web") that the user did not explicitly mention —
+  many actions live on a different surface than the user assumes.
 - Output ONLY the rewritten query, no explanation.
 - Always output in English.
 

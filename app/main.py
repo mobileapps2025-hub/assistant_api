@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import exc
 
-from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, LoginRequest, LoginResponse, MarketInfo, UserMarketsResponse, AuthContext, MemorySaveRequest, MemoryInfo, MemoryListResponse, MemorySaveResponse, MemoryUpdateRequest, MemoryRecallResponse, MemoryStoreRequest
+from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, SessionRequest, SessionResponse, MarketInfo, UserMarketsResponse, AuthContext, MemorySaveRequest, MemoryInfo, MemoryListResponse, MemorySaveResponse, MemoryUpdateRequest, MemoryRecallResponse, MemoryStoreRequest
 from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH, CORS_ORIGINS, AsyncSessionLocal
 from app.core.database import Feedback, Base
 from app.core.dependencies import get_vector_store_service, get_chat_service, get_speech_service
@@ -279,26 +279,33 @@ async def chat(
 
 # --- Feedback Endpoint ---
 
-@app.post("/api/auth/login", response_model=LoginResponse)
-async def login(body: LoginRequest):
-    """Proxy login to MCL Services and return token + user info."""
+@app.post("/api/auth/session", response_model=SessionResponse)
+async def resolve_session(body: SessionRequest):
+    """Establish a session from a token shared by the MCL app.
+
+    The MCL app hands off the user's bearer token (no login here). We call
+    MCL's UserInfo to resolve the identity (user_id, company_id, ...) needed
+    by the user-specific data endpoints, and return it to the frontend to
+    store for the duration of the chat session.
+    """
+    if not body.access_token:
+        raise HTTPException(status_code=400, detail="access_token is required")
     try:
         client = MCLServiceClient()
-        result = await client.login(body.userName, body.password)
-        logger.info(f"[AUTH] User '{body.user_name}' logged in successfully")
-        return LoginResponse(
-            access_token=result["access_token"],
-            user_id=result["user_id"],
-            company_id=result["company_id"],
-            company_name=result.get("company_name", ""),
-            full_name=result.get("full_name", ""),
-            email=result.get("email", ""),
+        info = await client.get_user_info(body.access_token)
+        return SessionResponse(
+            access_token=body.access_token,
+            user_id=info.get("id", ""),
+            company_id=info.get("companyId", ""),
+            company_name=info.get("companyName", ""),
+            full_name=info.get("fullName", ""),
+            email=info.get("email", ""),
         )
     except httpx.HTTPStatusError as e:
-        logger.error(f"[AUTH] Login failed: {e.response.status_code}")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        logger.error(f"[SESSION] UserInfo failed: {e.response.status_code}")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
     except Exception as e:
-        logger.error(f"[AUTH] Login error: {e}")
+        logger.error(f"[SESSION] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
