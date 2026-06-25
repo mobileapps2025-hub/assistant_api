@@ -72,6 +72,19 @@ RERANK_HIGH_CONFIDENCE = float(os.getenv("RERANK_HIGH_CONFIDENCE", "0.5"))  # ti
 MIN_SEARCH_SCORE = float(os.getenv("MIN_SEARCH_SCORE", "0.0"))  # 0 = no filter; tune after testing
 MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "24000"))  # ~6000 tokens
 
+# --- Ragie retrieval (Layer 5) ---
+RAGIE_API_KEY = os.getenv("RAGIE_API_KEY", "")
+RAGIE_PARTITION = os.getenv("RAGIE_PARTITION", "mcl_spike")
+RAGIE_TOP_K = int(os.getenv("RAGIE_TOP_K", "6"))
+
+
+def _resolve_public_url() -> str:
+    base = os.getenv("API_PUBLIC_URL") or os.getenv("WEBSITE_HOSTNAME") or "http://127.0.0.1:8001"
+    return base if base.startswith("http") else f"https://{base}"
+
+
+API_PUBLIC_URL = _resolve_public_url()
+
 # --- CORS ---
 # Comma-separated list of allowed origins, e.g. "https://myapp.azurewebsites.net,http://localhost:5001"
 CORS_ORIGINS = [

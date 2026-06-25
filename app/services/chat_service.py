@@ -10,7 +10,6 @@ from app.services.vector_store import VectorStoreService
 from app.services.vision_service import VisionService
 from app.services.image_validator import ImageValidatorService
 from app.services.language_service import LanguageService
-from app.core.context import ContextAnalysis
 from app.core.config import client, ENABLE_MCL_IMAGE_VALIDATION, COHERE_API_KEY
 from app.core.logging import get_logger
 from app.graph.nodes import AgentNodes
@@ -23,8 +22,61 @@ from app.models import AuthContext
 from app.tools import MCL_USER_TOOLS
 from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
+from app.instructions import get_system_prompt
+from app.routing import classify_route
+from app.retrieval import run as run_retrieval
+from app.enforcement import check_tool_call
 
 logger = get_logger(__name__)
+
+
+def _latest_user_message(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    for message in reversed(messages):
+        if message.get("role") == "user":
+            return message
+    return None
+
+
+def _image_urls(message: Dict[str, Any]) -> List[str]:
+    content = message.get("content")
+    if not isinstance(content, list):
+        return []
+    urls = []
+    for item in content:
+        if item.get("type") == "image_url":
+            url = item.get("image_url", {}).get("url")
+            if url:
+                urls.append(url)
+    return urls
+
+
+def _is_authenticated(auth_context: Optional[AuthContext]) -> bool:
+    return bool(auth_context and auth_context.access_token)
+
+
+def _no_user_message_response() -> Dict[str, Any]:
+    return {"response": "No user message found.", "success": False, "has_vision": False}
+
+
+def _needs_session_response() -> Dict[str, Any]:
+    return {
+        "response": (
+            "To answer questions about your own MCL data (your profile, "
+            "markets, checklists or tasks) I need your MCL session. "
+            "Please open the assistant from the MCL app, or connect a token first."
+        ),
+        "success": True,
+        "has_vision": False,
+    }
+
+
+def _recall_memory(auth_context: Optional[AuthContext]) -> str:
+    user_id = auth_context.user_id if auth_context else None
+    try:
+        return MemoryService(user_id).recall_context()
+    except Exception:
+        return ""
+
 
 class ChatService:
     def __init__(
@@ -57,88 +109,70 @@ class ChatService:
     async def process_chat_request(
         self,
         messages: List[Dict[str, Any]],
-        situational_context: Optional[ContextAnalysis] = None,
         session_id: Optional[str] = None,
         auth_context: Optional[AuthContext] = None
     ) -> Dict[str, Any]:
-        """
-        Process a chat request, handling both text and vision.
-        """
-        # 1. Check for images
-        has_images = False
-        image_urls = []
-        latest_user_message = None
-        
-        for msg in reversed(messages):
-            if msg.get("role") == "user":
-                latest_user_message = msg
-                if isinstance(msg.get("content"), list):
-                    for item in msg["content"]:
-                        if item.get("type") == "image_url":
-                            has_images = True
-                            url = item.get("image_url", {}).get("url")
-                            if url:
-                                image_urls.append(url)
-                break
-        
+        latest_user_message = _latest_user_message(messages)
         if not latest_user_message:
-             return {
-                "response": "No user message found.",
-                "success": False,
-                "has_vision": False
-            }
+            return _no_user_message_response()
 
-        # 2. Handle Vision
-        if has_images:
-            return await self._handle_vision_request(
-                messages, 
-                image_urls, 
-                situational_context
+        image_urls = _image_urls(latest_user_message)
+        if image_urls:
+            return await self._handle_vision_request(messages, image_urls)
+
+        decision = classify_route(messages)
+        logger.info(
+            f"[ROUTE] route={decision.route} authed={_is_authenticated(auth_context)} "
+            f"reason={decision.reason[:80]}"
+        )
+
+        memory_context = _recall_memory(auth_context)
+        return await self._dispatch_route(
+            decision.route, messages, latest_user_message, session_id, auth_context, memory_context
+        )
+
+    async def _dispatch_route(
+        self,
+        route: str,
+        messages: List[Dict[str, Any]],
+        latest_user_message: Dict[str, Any],
+        session_id: Optional[str],
+        auth_context: Optional[AuthContext],
+        memory_context: str,
+    ) -> Dict[str, Any]:
+        if route == "PERSONAL":
+            return await self._handle_personal_request(
+                messages, latest_user_message, session_id, auth_context, memory_context
             )
-        
-        # 3. Classify intent FIRST: CHAT | PERSONAL | MCL_QUERY.
-        # Routing must not depend on GPT's non-deterministic "auto" tool choice,
-        # otherwise personal questions intermittently fall through to RAG.
-        intent = await self._classify_intent(latest_user_message)
-        logger.info(f"[ROUTE] intent={intent} authed={bool(auth_context and auth_context.access_token)}")
-
-        # 4. Personal data → force a tool call (requires a connected session).
-        if intent == "PERSONAL":
-            if auth_context and auth_context.access_token:
-                fc_result = await self._handle_function_calling(
-                    messages, latest_user_message, auth_context
-                )
-                if fc_result is not None:
-                    return fc_result
-                # Tool path produced nothing — fall through to RAG as a last resort.
-            else:
-                return {
-                    "response": (
-                        "To answer questions about your own MCL data (your profile, "
-                        "markets, checklists or tasks) I need your MCL session. "
-                        "Please open the assistant from the MCL app, or connect a token first."
-                    ),
-                    "success": True,
-                    "has_vision": False,
-                }
-
-        # 5. Small talk
-        if intent == "CHAT":
-            return await self._handle_chat(messages)
-
-        # 6. General MCL question → RAG
+        if route == "CHAT":
+            return await self._handle_chat(messages, memory_context)
         return await self._handle_text_request(
-            messages,
-            latest_user_message,
-            situational_context,
-            session_id=session_id
+            messages, latest_user_message, session_id=session_id, memory_context=memory_context
+        )
+
+    async def _handle_personal_request(
+        self,
+        messages: List[Dict[str, Any]],
+        latest_user_message: Dict[str, Any],
+        session_id: Optional[str],
+        auth_context: Optional[AuthContext],
+        memory_context: str,
+    ) -> Dict[str, Any]:
+        if not _is_authenticated(auth_context):
+            return _needs_session_response()
+        tool_result = await self._handle_function_calling(
+            messages, latest_user_message, auth_context, memory_context
+        )
+        if tool_result is not None:
+            return tool_result
+        return await self._handle_text_request(
+            messages, latest_user_message, session_id=session_id, memory_context=memory_context
         )
 
     async def _handle_vision_request(
         self,
         messages: List[Dict[str, Any]],
-        image_urls: List[str],
-        situational_context: Optional[ContextAnalysis]
+        image_urls: List[str]
     ) -> Dict[str, Any]:
         logger.info(f"Processing vision request with {len(image_urls)} images")
         
@@ -180,7 +214,8 @@ class ChatService:
         self,
         messages: List[Dict[str, Any]],
         latest_user_message: Dict[str, Any],
-        auth_context: AuthContext
+        auth_context: AuthContext,
+        memory_context: str = ""
     ) -> Optional[Dict[str, Any]]:
         """
         Run GPT function-calling for an authenticated, personal-data query.
@@ -194,17 +229,7 @@ class ChatService:
         if isinstance(user_query, list):
             user_query = " ".join([item["text"] for item in user_query if item.get("type") == "text"])
 
-        system_prompt = """You are MarieClaire, the MCL Support Specialist.
-You have access to tools that can look up user-specific information from the MCL system:
-- the user's profile (name, company, role)
-- the markets assigned to the user
-- the checklists available to the user
-- how many open tasks the user has
-Use these tools when the user asks about their own data (e.g., "who am I", "my company",
-"my markets", "my checklists", "how many open tasks do I have").
-If the user is asking a general MCL question that doesn't require personal data,
-do NOT call any tools — let the knowledge base handle it.
-Always respond in the same language as the user."""
+        system_prompt = get_system_prompt("tools", tools_catalog=MCL_USER_TOOLS, memory=memory_context or None)
 
         api_messages = [
             {"role": "system", "content": system_prompt},
@@ -234,6 +259,13 @@ Always respond in the same language as the user."""
             tool_call = choice.message.tool_calls[0]
             function_name = tool_call.function.name
             logger.info(f"[FC] Tool called: {function_name}")
+
+            if not check_tool_call(function_name, auth_context).allowed:
+                return {
+                    "response": "I'm not able to do that.",
+                    "success": True,
+                    "has_vision": False,
+                }
 
             mcl = MCLServiceClient()
             if function_name == "get_user_info":
@@ -370,99 +402,15 @@ Always respond in the same language as the user."""
             logger.error(f"Failed to fetch curated knowledge: {e}")
             return []
 
-    async def _classify_intent(self, latest_user_message: Dict[str, Any]) -> str:
-        user_query = latest_user_message.get("content", "")
-        if isinstance(user_query, list):
-            user_query = " ".join([item["text"] for item in user_query if item.get("type") == "text"])
-        user_query = user_query.strip()
-        if not user_query:
-            return "CHAT"
 
-        lower = user_query.lower()
-
-        # Fast-path heuristics for very short messages
-        short = lower.rstrip("!?.")
-        if short in ("hi", "hello", "hey", "ok", "okay", "thanks", "thank you", "bye", "yes", "no", "test", "testing", "good", "nice", "cool", "great", "lol", "haha"):
-            return "CHAT"
-        if len(user_query) < 4 and short not in ("mcl", "app", "ios", "bug", "faq"):
-            return "CHAT"
-
-        # Fast-path heuristics for clearly personal-data questions (EN/ES/DE).
-        # These are unambiguous "my own data" phrasings — route straight to the
-        # tools without a model round-trip.
-        personal_markers = (
-            "my market", "my checklist", "my task", "my account", "my profile",
-            "my company", "my role", "who am i", "what's my", "what is my",
-            "how many tasks", "how many open", "assigned to me", "do i have",
-            "mis mercados", "mis tareas", "mis listas", "mi empresa", "mi cuenta",
-            "mi perfil", "mi rol", "quien soy", "quién soy", "cuántas tareas",
-            "cuantas tareas", "tengo tareas", "tengo asignad",
-            "meine märkte", "meine aufgaben", "meine checklist", "wer bin ich",
+    async def _handle_chat(self, messages: List[Dict[str, Any]], memory_context: str = "") -> Dict[str, Any]:
+        system_prompt = get_system_prompt(
+            "chat",
+            memory=memory_context or None,
+            tools_catalog=MCL_USER_TOOLS,
         )
-        if any(marker in lower for marker in personal_markers):
-            logger.info(f"[CLASSIFY] '{user_query[:60]}' → PERSONAL (heuristic)")
-            return "PERSONAL"
-
-        system_prompt = """Classify this message into exactly one word.
-
-PERSONAL — the user asks about their OWN MCL records: their profile/account, their company or role, the markets assigned to them, their checklists, or how many tasks they have. Typical phrasing: "my ...", "do I have ...", "who am I", "what is assigned to me", "how many tasks do I have".
-
-MCL_QUERY — general MCL help NOT tied to the user's own records: how to use a feature, troubleshooting, platform differences, what something is/means, dashboards, definitions, sync issues.
-
-CHAT — the user is just talking: greeting, thanks, small talk, testing the bot, asking about YOU (the bot), casual conversation.
-
-Output ONLY one word: PERSONAL, MCL_QUERY, or CHAT"""
-
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_query}
-                ],
-                max_tokens=10,
-                temperature=0,
-                timeout=10
-            )
-            result = response.choices[0].message.content.strip().upper()
-            logger.info(f"[CLASSIFY] '{user_query[:60]}' → {result}")
-            if "PERSONAL" in result:
-                return "PERSONAL"
-            if "CHAT" in result:
-                return "CHAT"
-            return "MCL_QUERY"
-        except Exception as e:
-            logger.warning(f"[CLASSIFY] Failed, defaulting to MCL_QUERY: {e}")
-            return "MCL_QUERY"
-
-    async def _handle_chat(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
-        system_prompt = """You are MarieClaire, the MCL Support Specialist. You help users with the MCL (Mobile Checklist) application for retail operations.
-
-You are having a casual conversation right now. Be warm, friendly, and concise.
-
-Your personality:
-- Professional but approachable — like a helpful colleague
-- Concise — 1 to 3 short sentences unless the user asks for more
-- Use plain language, no markdown walls
-- If the user is testing you, play along warmly
-- If they ask what you can do, briefly mention MCL help: Dashboard, Checklists, Tasks, Inspections, Sync troubleshooting
-- If they share personal info, show interest but don't overreact
-- Stay on brand as MarieClaire from MCL
-
-MEMORY: You have a persistent memory system. When the user shares personal info (name, preferences, projects), it IS saved for future conversations — tell them "I'll remember that!" or "Got it, saved!". When the user closes the chat or starts a new one, important details are automatically preserved. If they ask "what do you remember", tell them you can recall previous conversations. NEVER say you can't remember or save things.
-
-NEVER fabricate MCL features or steps when just chatting. If they want MCL help, offer to switch modes."""
 
         api_messages = [{"role": "system", "content": system_prompt}]
-
-        # Inject memory context if available
-        try:
-            memory_service = MemoryService()
-            context = memory_service.recall_context()
-            if context:
-                api_messages.insert(0, {"role": "system", "content": context})
-        except Exception:
-            pass
 
         for msg in messages:
             role = msg.get("role", "user")
@@ -490,94 +438,27 @@ NEVER fabricate MCL features or steps when just chatting. If they want MCL help,
         self,
         messages: List[Dict[str, Any]],
         latest_user_message: Dict[str, Any],
-        situational_context: Optional[ContextAnalysis],
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        memory_context: str = ""
     ) -> Dict[str, Any]:
-        start_time = time.monotonic()
-
         user_query = latest_user_message.get("content", "")
         if isinstance(user_query, list):
-            # Extract text from list content
-            user_query = " ".join([item["text"] for item in user_query if item.get("type") == "text"])
+            user_query = " ".join(item["text"] for item in user_query if item.get("type") == "text")
+        user_query = user_query.strip()
 
-        logger.info(f"Processing text request via Graph: {user_query[:50]}...")
-        
-        # Convert messages to LangChain format
-        lc_messages = []
-        for msg in messages:
-            role = msg.get("role")
-            content = msg.get("content")
-            if isinstance(content, list):
-                 content = " ".join([item["text"] for item in content if item.get("type") == "text"])
-            
-            if role == "user":
-                lc_messages.append(HumanMessage(content=content))
-            elif role == "assistant":
-                lc_messages.append(AIMessage(content=content))
-            elif role == "system":
-                lc_messages.append(SystemMessage(content=content))
-
-        # Fetch Curated Knowledge (Fallback/Augmentation)
-        # Filtered by query keywords to prevent context pollution
-        curated_docs = await self._get_curated_knowledge(user_query)
-
-        # Invoke Graph
-        thread_id = session_id or "anonymous"
-        logger.info(f"[SESSION] thread_id={thread_id}")
-        inputs = {
-            # Full state reset on every invocation — prevents MemorySaver checkpoint
-            # from bleeding stale values (e.g. language="de") into a new request.
-            "messages": lc_messages,
-            "query": user_query,
-            "language": "",            # detect_language will overwrite this immediately
-            "documents": curated_docs,
-            "answer": None,
-            "error": None,
-            "grade": None,
-            "retry_count": 0,
-            "contextualized_query": None,
-        }
-        config = {"configurable": {"thread_id": thread_id}}
-        logger.info(
-            f"[TRACE] ainvoke inputs: "
-            f"query='{user_query[:60]}' | "
-            f"language='{inputs['language']}' | "
-            f"messages_count={len(lc_messages)} | "
-            f"thread_id={thread_id}"
-        )
+        language = self.language_service.detect_language(user_query)
+        logger.info(f"[KNOWLEDGE] query='{user_query[:60]}' language='{language}'")
 
         try:
-            result = await self.workflow.ainvoke(inputs, config=config)
-
-            duration_ms = int((time.monotonic() - start_time) * 1000)
-            graph_path = _infer_graph_path(result)
-            logger.info(
-                f"[TRACE] ainvoke result: "
-                f"language='{result.get('language')}' | "
-                f"grade='{result.get('grade')}' | "
-                f"retry_count={result.get('retry_count')} | "
-                f"answer_preview='{str(result.get('answer', ''))[:80]}'"
-            )
-            logger.info(
-                f"[CHAT_SUMMARY] query='{user_query[:60]}' "
-                f"curated_docs={len(curated_docs)} "
-                f"graph_path={graph_path} "
-                f"duration_ms={duration_ms}"
-            )
-
-            return {
-                "response": _rewrite_image_urls(result.get("answer", "No response generated.")),
-                "success": True,
-                "has_vision": False
-            }
+            result = run_retrieval(user_query, messages, language=language, memory=memory_context or None)
+            return {"response": result["answer"], "success": True, "has_vision": False}
         except Exception as e:
-            duration_ms = int((time.monotonic() - start_time) * 1000)
-            logger.error(f"Error in graph execution after {duration_ms}ms: {e}")
+            logger.error(f"[KNOWLEDGE] retrieval failed: {e}")
             return {
                 "response": "I encountered an error processing your request.",
                 "success": False,
                 "has_vision": False,
-                "error": str(e)
+                "error": str(e),
             }
 
 

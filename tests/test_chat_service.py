@@ -157,44 +157,40 @@ class TestProcessChatRequestRouting:
 
 
 # ---------------------------------------------------------------------------
-# _handle_text_request (mocked workflow)
+# _handle_text_request (KNOWLEDGE path → Ragie retrieval, mocked)
 # ---------------------------------------------------------------------------
 
 class TestHandleTextRequest:
     @pytest.mark.asyncio
-    async def test_returns_answer_from_graph(
+    async def test_returns_answer_from_retrieval(
         self, mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
     ):
         service = make_service(
             mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
         )
-        service.workflow = MagicMock()
-        service.workflow.ainvoke = AsyncMock(
-            return_value={"answer": "Here is the answer.", "grade": "relevant", "retry_count": 0}
-        )
-        service._get_curated_knowledge = AsyncMock(return_value=[])
-
         messages = [{"role": "user", "content": "How do I create a task?"}]
-        latest = messages[0]
-        result = await service._handle_text_request(messages, latest, None)
+        with patch(
+            "app.services.chat_service.run_retrieval",
+            return_value={"answer": "Here is the answer.", "sources": []},
+        ):
+            result = await service._handle_text_request(messages, messages[0], None)
 
         assert result["success"] is True
         assert result["response"] == "Here is the answer."
         assert result["has_vision"] is False
 
     @pytest.mark.asyncio
-    async def test_returns_error_on_graph_exception(
+    async def test_returns_error_on_retrieval_exception(
         self, mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
     ):
         service = make_service(
             mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
         )
-        service.workflow = MagicMock()
-        service.workflow.ainvoke = AsyncMock(side_effect=RuntimeError("graph failure"))
-        service._get_curated_knowledge = AsyncMock(return_value=[])
-
         messages = [{"role": "user", "content": "test"}]
-        result = await service._handle_text_request(messages, messages[0], None)
+        with patch(
+            "app.services.chat_service.run_retrieval", side_effect=RuntimeError("retrieval failure")
+        ):
+            result = await service._handle_text_request(messages, messages[0], None)
 
         assert result["success"] is False
         assert "error" in result["response"].lower()

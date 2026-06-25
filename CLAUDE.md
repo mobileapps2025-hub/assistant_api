@@ -63,7 +63,6 @@ MCL Assistant is a FastAPI RAG app serving the MCL (Mobile Checklist) mobile app
 | LangGraph workflow | `app/graph/` | Agentic RAG state machine |
 | VectorStoreService | `app/services/vector_store.py` | Weaviate hybrid search + Cohere reranking |
 | ChatService | `app/services/chat_service.py` | Orchestrates text/vision routing |
-| ContextAnalyzer | `app/core/context.py` | Infers user interface/device/expertise from query |
 | IngestionService | `app/services/ingestion_service.py` | Loads PDF/MD/DOCX/PPTX from `app/documents/` into Weaviate |
 | DSPy optimizer | `app/optimization/` | Prompt optimization via feedback; `compiled_rag.json` loaded at startup |
 | Feedback loop | `app/core/database.py`, `app/routers/admin.py` | Stores feedback → CuratedQA → DSPy retraining |

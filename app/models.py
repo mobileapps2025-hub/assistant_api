@@ -156,6 +156,7 @@ def generate_response_id() -> str:
 class MemorySaveRequest(BaseModel):
     messages: List[Dict[str, Any]]
     session_id: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 class MemoryInfo(BaseModel):
@@ -191,3 +192,4 @@ class MemoryRecallResponse(BaseModel):
 class MemoryStoreRequest(BaseModel):
     session_id: str
     messages: List[Dict[str, Any]]
+    user_id: Optional[str] = None
