@@ -10,18 +10,20 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 MEMORIES_DIR = os.path.join(os.path.dirname(__file__), "..", "memories")
-
-
-def _ensure_dir():
-    os.makedirs(MEMORIES_DIR, exist_ok=True)
+ANONYMOUS_SCOPE = "_anonymous"
+RECALL_MAX_ITEMS = int(os.getenv("MEMORY_RECALL_MAX_ITEMS", "20"))
+RECALL_MAX_CHARS = int(os.getenv("MEMORY_RECALL_MAX_CHARS", "4000"))
+_IMPORTANCE_RANK = {"high": 0, "medium": 1, "low": 2}
 
 
 def _generate_id() -> str:
     return f"mem_{uuid.uuid4().hex[:8]}"
 
 
-def _file_path(memory_id: str) -> str:
-    return os.path.join(MEMORIES_DIR, f"{memory_id}.md")
+def _sanitize_scope(user_id: Optional[str]) -> str:
+    if not user_id:
+        return ANONYMOUS_SCOPE
+    return re.sub(r"[^A-Za-z0-9_-]", "_", str(user_id))[:64] or ANONYMOUS_SCOPE
 
 
 def _parse_frontmatter(content: str) -> Dict[str, Any]:
@@ -59,8 +61,7 @@ def _format_frontmatter(meta: Dict[str, Any]) -> str:
     for key in ["id", "title", "category", "importance", "tags", "created", "updated"]:
         val = meta.get(key, "")
         if isinstance(val, list):
-            tags_str = ", ".join(val)
-            lines.append(f"{key}: [{tags_str}]")
+            lines.append(f"{key}: [{', '.join(val)}]")
         elif val:
             lines.append(f"{key}: {val}")
     lines.append("---")
@@ -107,28 +108,32 @@ Output ONLY valid JSON with no markdown wrapper, no explanation:
 
 
 class MemoryService:
+    """Durable memory, scoped to a single user. Without a user_id, durable memory is
+    disabled (recall returns nothing) so one user never sees another's memories."""
 
-    def __init__(self):
-        _ensure_dir()
+    def __init__(self, user_id: Optional[str] = None):
+        self.scoped = bool(user_id)
+        self.dir = os.path.join(MEMORIES_DIR, _sanitize_scope(user_id))
+        os.makedirs(self.dir, exist_ok=True)
+
+    def _path(self, memory_id: str) -> str:
+        return os.path.join(self.dir, f"{memory_id}.md")
 
     def list_memories(self) -> List[Dict[str, Any]]:
-        _ensure_dir()
         results = []
-        for fname in os.listdir(MEMORIES_DIR):
+        for fname in os.listdir(self.dir):
             if not fname.endswith(".md"):
                 continue
-            fpath = os.path.join(MEMORIES_DIR, fname)
-            with open(fpath, "r", encoding="utf-8") as f:
+            with open(os.path.join(self.dir, fname), "r", encoding="utf-8") as f:
                 raw = f.read()
             meta = _parse_frontmatter(raw)
-            body = _get_body(raw)
             results.append({
                 "id": meta.get("id", fname[:-3]),
                 "title": meta.get("title", ""),
                 "category": meta.get("category", ""),
                 "importance": meta.get("importance", "low"),
                 "tags": meta.get("tags", []),
-                "content": body,
+                "content": _get_body(raw),
                 "created": meta.get("created", ""),
                 "updated": meta.get("updated", ""),
             })
@@ -136,20 +141,19 @@ class MemoryService:
         return results
 
     def get_memory(self, memory_id: str) -> Optional[Dict[str, Any]]:
-        fpath = _file_path(memory_id)
+        fpath = self._path(memory_id)
         if not os.path.exists(fpath):
             return None
         with open(fpath, "r", encoding="utf-8") as f:
             raw = f.read()
         meta = _parse_frontmatter(raw)
-        body = _get_body(raw)
         return {
             "id": meta.get("id", memory_id),
             "title": meta.get("title", ""),
             "category": meta.get("category", ""),
             "importance": meta.get("importance", "low"),
             "tags": meta.get("tags", []),
-            "content": body,
+            "content": _get_body(raw),
             "created": meta.get("created", ""),
             "updated": meta.get("updated", ""),
         }
@@ -169,14 +173,13 @@ class MemoryService:
             "updated": now,
         }
         content = memory.get("content", "")
-        fpath = _file_path(memory_id)
-        with open(fpath, "w", encoding="utf-8") as f:
+        with open(self._path(memory_id), "w", encoding="utf-8") as f:
             f.write(_format_frontmatter(meta))
             f.write(content)
         return {**meta, "content": content}
 
     def delete_memory(self, memory_id: str) -> bool:
-        fpath = _file_path(memory_id)
+        fpath = self._path(memory_id)
         if os.path.exists(fpath):
             os.remove(fpath)
             return True
@@ -190,83 +193,81 @@ class MemoryService:
         return self.save_memory(existing)
 
     def recall_context(self) -> str:
+        if not self.scoped:
+            return ""
         memories = self.list_memories()
         if not memories:
             return ""
+        memories.sort(key=lambda m: (_IMPORTANCE_RANK.get(m.get("importance", "low"), 2),))
         lines = ["## User Context (from previous conversations)\n"]
-        for m in memories:
-            imp = m.get("importance", "low")
-            prefix_map = {"high": "IMPORTANT:", "medium": "Noted:", "low": "Info:"}
-            prefix = prefix_map.get(imp, "")
-            title = m.get("title", "Memory")
-            category = m.get("category", "general")
-            tags_list = m.get("tags", [])
-            tags_str = ", ".join(tags_list)
-            lines.append(f"### {prefix} {title}")
-            lines.append(f"_Category: {category} | Tags: {tags_str}_")
-            lines.append("")
-            lines.append(m.get("content", ""))
-            lines.append("")
+        used = 0
+        for m in memories[:RECALL_MAX_ITEMS]:
+            prefix = {"high": "IMPORTANT:", "medium": "Noted:", "low": "Info:"}.get(m.get("importance", "low"), "")
+            block = (
+                f"### {prefix} {m.get('title', 'Memory')}\n"
+                f"_Category: {m.get('category', 'general')} | Tags: {', '.join(m.get('tags', []))}_\n\n"
+                f"{m.get('content', '')}\n"
+            )
+            if used + len(block) > RECALL_MAX_CHARS:
+                break
+            lines.append(block)
+            used += len(block)
         return "\n".join(lines).strip()
 
     def store_messages(self, session_id: str, messages: List[Dict[str, Any]]):
-        pending_dir = os.path.join(MEMORIES_DIR, "pending")
+        pending_dir = os.path.join(self.dir, "pending")
         os.makedirs(pending_dir, exist_ok=True)
-        fpath = os.path.join(pending_dir, f"{session_id}.json")
-        with open(fpath, "w", encoding="utf-8") as f:
+        with open(os.path.join(pending_dir, f"{session_id}.json"), "w", encoding="utf-8") as f:
             json.dump(messages, f, ensure_ascii=False)
 
     def get_stored_messages(self, session_id: str) -> List[Dict[str, Any]]:
-        pending_dir = os.path.join(MEMORIES_DIR, "pending")
-        fpath = os.path.join(pending_dir, f"{session_id}.json")
+        fpath = os.path.join(self.dir, "pending", f"{session_id}.json")
         if os.path.exists(fpath):
             with open(fpath, "r", encoding="utf-8") as f:
                 return json.load(f)
         return []
 
     def clear_stored_messages(self, session_id: str):
-        pending_dir = os.path.join(MEMORIES_DIR, "pending")
-        fpath = os.path.join(pending_dir, f"{session_id}.json")
+        fpath = os.path.join(self.dir, "pending", f"{session_id}.json")
         if os.path.exists(fpath):
             os.remove(fpath)
 
-    async def extract_memories(
-        self, messages: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def extract_memories(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         existing = self.list_memories()
         existing_json = json.dumps(existing, ensure_ascii=False, default=str)
 
-        user_messages = []
+        rendered = []
         for msg in messages:
-            role = msg.get("role", "")
             content = msg.get("content", "")
             if isinstance(content, list):
-                content = " ".join([item.get("text", "") for item in content if item.get("type") == "text"])
+                content = " ".join(item.get("text", "") for item in content if item.get("type") == "text")
             if content:
-                user_messages.append(f"[{role.upper()}] {content}")
+                rendered.append(f"[{msg.get('role', '').upper()}] {content}")
 
-        conversation_text = "\n".join(user_messages)
+        conversation_text = "\n".join(rendered)
         if len(conversation_text) > 12000:
             conversation_text = conversation_text[-12000:]
 
-        user_prompt = "Existing memories:\n" + existing_json + "\n\nConversation to review:\n" + conversation_text + "\n\nExtract important memories as JSON:"
+        user_prompt = (
+            "Existing memories:\n" + existing_json
+            + "\n\nConversation to review:\n" + conversation_text
+            + "\n\nExtract important memories as JSON:"
+        )
 
         try:
-            logger.info(f"[MEMORY] Extracting from {len(user_messages)} messages, {len(existing)} existing memories")
+            logger.info(f"[MEMORY] Extracting from {len(rendered)} messages, {len(existing)} existing")
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {"role": "system", "content": EXTRACTION_PROMPT},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": user_prompt},
                 ],
                 response_format={"type": "json_object"},
                 temperature=0,
-                timeout=60
+                timeout=60,
             )
-            raw = response.choices[0].message.content.strip()
-            data = json.loads(raw)
-            count = len(data.get("memories", []))
-            logger.info(f"[MEMORY] Extracted {count} memory actions")
+            data = json.loads(response.choices[0].message.content.strip())
+            logger.info(f"[MEMORY] Extracted {len(data.get('memories', []))} actions")
             return data
         except Exception as e:
             logger.error(f"[MEMORY] Extraction failed: {e}")
@@ -274,9 +275,7 @@ class MemoryService:
 
     async def process_and_save(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         extracted = await self.extract_memories(messages)
-        saved = []
-        updated = []
-        deleted = []
+        saved, updated, deleted = [], [], []
 
         for mem in extracted.get("memories", []):
             action = mem.get("action", "create")
@@ -285,29 +284,15 @@ class MemoryService:
                     mem_id = mem.get("id")
                     if mem_id and self.delete_memory(mem_id):
                         deleted.append(mem_id)
-                elif action == "update":
-                    mem_id = mem.get("id")
-                    if mem_id:
-                        existing = self.get_memory(mem_id)
-                        if existing:
-                            existing["title"] = mem.get("title", existing.get("title", ""))
-                            existing["category"] = mem.get("category", existing.get("category", ""))
-                            existing["importance"] = mem.get("importance", existing.get("importance", "low"))
-                            existing["tags"] = mem.get("tags", existing.get("tags", []))
-                            existing["content"] = mem.get("content", existing.get("content", ""))
-                            result = self.save_memory(existing)
-                            updated.append(result)
-                        else:
-                            result = self.save_memory(mem)
-                            saved.append(result)
-                    else:
-                        result = self.save_memory(mem)
-                        saved.append(result)
+                elif action == "update" and mem.get("id") and self.get_memory(mem.get("id")):
+                    existing = self.get_memory(mem["id"])
+                    for field in ("title", "category", "importance", "tags", "content"):
+                        existing[field] = mem.get(field, existing.get(field))
+                    updated.append(self.save_memory(existing))
                 else:
-                    result = self.save_memory(mem)
-                    saved.append(result)
+                    saved.append(self.save_memory(mem))
             except Exception as e:
-                logger.error(f"[MEMORY] Error processing memory action '{action}': {e}")
+                logger.error(f"[MEMORY] Error processing action '{action}': {e}")
 
         logger.info(f"[MEMORY] Processed: {len(saved)} created, {len(updated)} updated, {len(deleted)} deleted")
         return {"saved": saved, "updated": updated, "deleted": deleted}

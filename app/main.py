@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 import tempfile
 import os
 from datetime import datetime
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,15 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import exc
 
-from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, LoginRequest, LoginResponse, MarketInfo, UserMarketsResponse, AuthContext, MemorySaveRequest, MemoryInfo, MemoryListResponse, MemorySaveResponse, MemoryUpdateRequest, MemoryRecallResponse, MemoryStoreRequest
-from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH, CORS_ORIGINS, AsyncSessionLocal
+from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, SessionRequest, SessionResponse, MarketInfo, UserMarketsResponse, AuthContext, MemorySaveRequest, MemoryInfo, MemoryListResponse, MemorySaveResponse, MemoryUpdateRequest, MemoryRecallResponse, MemoryStoreRequest
+from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH, CORS_ORIGINS, AsyncSessionLocal, RAGIE_API_KEY
 from app.core.database import Feedback, Base
 from app.core.dependencies import get_vector_store_service, get_chat_service, get_speech_service
 from app.services.chat_service import ChatService
 from app.services.vector_store import VectorStoreService
 from app.services.ingestion_service import IngestionService
 from app.services.speech_service import SpeechService
-from app.core.context import analyze_situational_context
 from app.routers import vision, admin
 from app.core.logging import setup_logging, get_logger, request_id_var
 from app.clients.mcl_service_client import MCLServiceClient
@@ -70,16 +70,6 @@ async def lifespan(app: FastAPI):
             logger.info("Verifying Weaviate schema...")
             vector_store.ensure_schema()
             
-            logger.info("Checking for documents to ingest...")
-            stats = vector_store.get_stats()
-            if stats.get("count", 0) == 0:
-                logger.info("Vector store is empty. Triggering initial ingestion...")
-                ingestion_service = IngestionService(vector_store)
-                # In docs folder
-                ingestion_service.ingest_all("app/documents")
-            else:
-                logger.info(f"Vector store already contains {stats['count']} documents. Skipping ingestion.")
-        
         logger.info("MCL knowledge base service initialized.")
 
         logger.info("MCL Assistant startup completed.")
@@ -202,103 +192,105 @@ async def search_chunks(
         ]
     }
 
+def _content_item_to_dict(item: ContentItem) -> dict[str, Any] | None:
+    if item.type == "text" and item.text:
+        return {"type": "text", "text": item.text}
+    if item.type == "image_url" and item.image_url:
+        return {"type": "image_url", "image_url": item.image_url}
+    return None
+
+
+def _message_to_ai_dict(message: Message) -> dict[str, Any]:
+    if isinstance(message.content, list):
+        converted = (_content_item_to_dict(item) for item in message.content)
+        return {"role": message.role, "content": [item for item in converted if item]}
+    return {"role": message.role, "content": str(message.content)}
+
+
+def _to_ai_messages(messages: list[Message]) -> list[dict[str, Any]]:
+    return [_message_to_ai_dict(message) for message in messages if message.content]
+
+
+def _build_chat_response(result: dict[str, Any], response_id: str) -> ChatResponse:
+    if not result["success"]:
+        error_message = result.get("error", "Unknown error occurred")
+        logger.error(f"[CHAT API] Error: {error_message}")
+        raise HTTPException(status_code=500, detail=error_message)
+    return ChatResponse(response=result["response"], response_id=response_id, sources=[])
+
+
 @app.post("/api/chat")
 async def chat(
     body: ChatRequest,
     chat_service: ChatService = Depends(get_chat_service)
 ) -> ChatResponse:
-    """
-    Chat endpoint for MCL Assistant with vision support.
-    
-    Supports both text-only and multimodal (text + images) messages.
-    Images should be sent as base64-encoded data URLs in the content array.
-    """
+    response_id = generate_response_id()
+    logger.info(f"[CHAT API] New chat request received (ID: {response_id})")
+
     try:
-        # Generate unique response ID for tracking
-        response_id = generate_response_id()
-        
-        logger.info(f"[CHAT API] New chat request received (ID: {response_id})")
-        
-        # Convert Pydantic messages to dicts for the AI service
-        messages_for_ai = []
-        for msg in body.messages:
-            if msg.content:
-                # Handle multimodal content (text + images)
-                if isinstance(msg.content, list):
-                    content_items = []
-                    for item in msg.content:
-                        if hasattr(item, 'type'):
-                            if item.type == 'text' and item.text:
-                                content_items.append({
-                                    "type": "text",
-                                    "text": item.text
-                                })
-                            elif item.type == 'image_url' and item.image_url:
-                                content_items.append({
-                                    "type": "image_url",
-                                    "image_url": item.image_url
-                                })
-                    
-                    messages_for_ai.append({
-                        "role": msg.role,
-                        "content": content_items
-                    })
-                else:
-                    # Simple text content
-                    content_text = str(msg.content)
-                    messages_for_ai.append({
-                        "role": msg.role,
-                        "content": content_text
-                    })
-
-        context_analysis = analyze_situational_context(messages_for_ai)
-        
+        messages = _to_ai_messages(body.messages)
         result = await chat_service.process_chat_request(
-            messages_for_ai,
-            situational_context=context_analysis,
+            messages,
             session_id=body.session_id,
-            auth_context=body.auth_context
+            auth_context=body.auth_context,
         )
-        
-        if result["success"]:
-            return ChatResponse(
-                response=result["response"],
-                response_id=response_id,
-                sources=[]
-            )
-        else:
-            error_msg = result.get("error", "Unknown error occurred")
-            logger.error(f"[CHAT API] Error: {error_msg}")
-            raise HTTPException(status_code=500, detail=error_msg)
-
+        return _build_chat_response(result, response_id)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"An unexpected error occurred: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
+
+@app.get("/api/ragie/image")
+async def ragie_image(document_id: str, chunk_id: str):
+    if not RAGIE_API_KEY:
+        raise HTTPException(status_code=503, detail="Image service unavailable")
+
+    upstream_url = (
+        f"https://api.ragie.ai/documents/{document_id}/chunks/{chunk_id}/content"
+        "?media_type=image/jpeg"
+    )
+    async with httpx.AsyncClient() as http:
+        upstream = await http.get(
+            upstream_url, headers={"Authorization": f"Bearer {RAGIE_API_KEY}"}, timeout=30
+        )
+    if upstream.status_code != 200:
+        raise HTTPException(status_code=502, detail="Could not fetch image from Ragie")
+    return Response(
+        content=upstream.content,
+        media_type=upstream.headers.get("content-type", "image/jpeg"),
+    )
+
 # --- Feedback Endpoint ---
 
-@app.post("/api/auth/login", response_model=LoginResponse)
-async def login(body: LoginRequest):
-    """Proxy login to MCL Services and return token + user info."""
+@app.post("/api/auth/session", response_model=SessionResponse)
+async def resolve_session(body: SessionRequest):
+    """Establish a session from a token shared by the MCL app.
+
+    The MCL app hands off the user's bearer token (no login here). We call
+    MCL's UserInfo to resolve the identity (user_id, company_id, ...) needed
+    by the user-specific data endpoints, and return it to the frontend to
+    store for the duration of the chat session.
+    """
+    if not body.access_token:
+        raise HTTPException(status_code=400, detail="access_token is required")
     try:
         client = MCLServiceClient()
-        result = await client.login(body.userName, body.password)
-        logger.info(f"[AUTH] User '{body.user_name}' logged in successfully")
-        return LoginResponse(
-            access_token=result["access_token"],
-            user_id=result["user_id"],
-            company_id=result["company_id"],
-            company_name=result.get("company_name", ""),
-            full_name=result.get("full_name", ""),
-            email=result.get("email", ""),
+        info = await client.get_user_info(body.access_token)
+        return SessionResponse(
+            access_token=body.access_token,
+            user_id=info.get("id", ""),
+            company_id=info.get("companyId", ""),
+            company_name=info.get("companyName", ""),
+            full_name=info.get("fullName", ""),
+            email=info.get("email", ""),
         )
     except httpx.HTTPStatusError as e:
-        logger.error(f"[AUTH] Login failed: {e.response.status_code}")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        logger.error(f"[SESSION] UserInfo failed: {e.response.status_code}")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
     except Exception as e:
-        logger.error(f"[AUTH] Login error: {e}")
+        logger.error(f"[SESSION] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -335,7 +327,7 @@ async def get_user_markets(body: AuthContext):
 async def store_messages(body: MemoryStoreRequest):
     """Store raw messages for a session (no GPT extraction — fast)."""
     try:
-        service = MemoryService()
+        service = MemoryService(body.user_id)
         service.store_messages(body.session_id, body.messages)
         return {"stored": True, "session_id": body.session_id, "count": len(body.messages)}
     except Exception as e:
@@ -347,7 +339,7 @@ async def store_messages(body: MemoryStoreRequest):
 async def save_memories(body: MemorySaveRequest):
     """Extract and save important memories from a conversation. If session_id is provided, reads from store."""
     try:
-        service = MemoryService()
+        service = MemoryService(body.user_id)
         messages = body.messages
         if (not messages or len(messages) == 0) and body.session_id:
             messages = service.get_stored_messages(body.session_id)
@@ -369,10 +361,10 @@ async def save_memories(body: MemorySaveRequest):
 
 
 @app.get("/api/memory/list", response_model=MemoryListResponse)
-async def list_memories():
-    """List all saved memories."""
+async def list_memories(user_id: Optional[str] = None):
+    """List the user's saved memories."""
     try:
-        service = MemoryService()
+        service = MemoryService(user_id)
         memories = service.list_memories()
         return MemoryListResponse(memories=[MemoryInfo(**m) for m in memories])
     except Exception as e:
@@ -381,9 +373,9 @@ async def list_memories():
 
 
 @app.get("/api/memory/{memory_id}", response_model=MemoryInfo)
-async def get_memory(memory_id: str):
+async def get_memory(memory_id: str, user_id: Optional[str] = None):
     """Get a single memory by ID."""
-    service = MemoryService()
+    service = MemoryService(user_id)
     mem = service.get_memory(memory_id)
     if not mem:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -391,9 +383,9 @@ async def get_memory(memory_id: str):
 
 
 @app.put("/api/memory/{memory_id}", response_model=MemoryInfo)
-async def update_memory(memory_id: str, body: MemoryUpdateRequest):
+async def update_memory(memory_id: str, body: MemoryUpdateRequest, user_id: Optional[str] = None):
     """Update the content of a memory (user edit)."""
-    service = MemoryService()
+    service = MemoryService(user_id)
     result = service.update_memory_content(memory_id, body.content)
     if not result:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -401,19 +393,19 @@ async def update_memory(memory_id: str, body: MemoryUpdateRequest):
 
 
 @app.delete("/api/memory/{memory_id}")
-async def delete_memory(memory_id: str):
+async def delete_memory(memory_id: str, user_id: Optional[str] = None):
     """Delete a memory file."""
-    service = MemoryService()
+    service = MemoryService(user_id)
     if service.delete_memory(memory_id):
         return {"deleted": True}
     raise HTTPException(status_code=404, detail="Memory not found")
 
 
 @app.post("/api/memory/recall", response_model=MemoryRecallResponse)
-async def recall_memories():
-    """Recall all memories as formatted context for system prompt injection."""
+async def recall_memories(user_id: Optional[str] = None):
+    """Recall the user's memories as formatted context for system prompt injection."""
     try:
-        service = MemoryService()
+        service = MemoryService(user_id)
         context = service.recall_context()
         memories = service.list_memories()
         return MemoryRecallResponse(

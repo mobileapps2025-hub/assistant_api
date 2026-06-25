@@ -7,6 +7,7 @@ from app.services.vector_store import VectorStoreService
 from app.core.config import client, RERANK_TOP_N, RERANK_THRESHOLD, RERANK_HIGH_CONFIDENCE, MAX_CONTEXT_CHARS, SEARCH_LIMIT
 from app.core.logging import get_logger
 from app.services.language_service import LanguageService
+from app.instructions import get_system_prompt
 from langchain_core.messages import HumanMessage, AIMessage
 import cohere
 
@@ -224,13 +225,16 @@ Return ONLY a JSON object with this exact shape (no markdown, no prose):
             f"messages_count={len(messages)} | "
             f"query='{query[:60]}'"
         )
-        # Fast-path: first turn — query is already self-contained
-        if len(messages) <= 1:
-            logger.info("[TRACE] contextualize_query: first turn fast-path, no LLM call")
+        # Fast-path: first real question is already self-contained. This also
+        # covers the case where the only prior message is the assistant's
+        # welcome greeting (no real user turn to resolve against) — rewriting
+        # then only risks injecting unwanted assumptions.
+        prior_messages = messages[:-1] if messages else []
+        has_prior_user_turn = any(isinstance(m, HumanMessage) for m in prior_messages)
+        if len(messages) <= 1 or not has_prior_user_turn:
+            logger.info("[TRACE] contextualize_query: self-contained question, no LLM call")
             return {"contextualized_query": query}
 
-        # Build last 4 messages (most recent first) for the prompt
-        prior_messages = messages[:-1] if messages else []
         recent = prior_messages[-4:] if len(prior_messages) > 4 else prior_messages
         history_lines = []
         for msg in recent:
@@ -240,7 +244,8 @@ Return ONLY a JSON object with this exact shape (no markdown, no prose):
                 history_lines.append(f"Assistant: {msg.content}")
         last_4_messages = "\n".join(history_lines)
 
-        system_prompt = """You are a query preprocessing assistant for the MCL mobile app knowledge base.
+        system_prompt = """You are a query preprocessing assistant for the MCL knowledge base,
+which covers BOTH the MCL mobile app and the MCL Dashboard (web admin).
 Rewrite the user's latest question into a self-contained search query that can retrieve
 the right documents from a vector database without conversation context.
 
@@ -248,6 +253,9 @@ Rules:
 - Resolve all pronouns ("it", "that", "them", "this") to the actual MCL entity.
 - Expand follow-up questions into full standalone queries.
 - If already self-contained, return it unchanged.
+- Do NOT add platform, device, or surface words (e.g. "mobile app", "Dashboard",
+  "iOS", "Android", "tablet", "web") that the user did not explicitly mention —
+  many actions live on a different surface than the user assumes.
 - Output ONLY the rewritten query, no explanation.
 - Always output in English.
 
@@ -752,78 +760,10 @@ Do NOT invent features or answers not backed by documentation.
             if history_lines:
                 history_text = "\n# Conversation History\n" + "\n".join(history_lines) + "\n"
 
-        system_prompt = f"""# Role & Persona
-You are MarieClaire, the MCL Support Specialist, an expert AI assistant dedicated to helping users navigate the MCL ecosystem. Your knowledge base covers the **MCL Mobile App (iOS/Android, Phone/Tablet)**, the **MCL Dashboard**, and the **Checklist Wizard**.
-
-# ⚠️ ABSOLUTE RULE — SOURCE-BASED TRUTH
-Every factual claim you make MUST be directly supported by the provided Context Information.
-- DO NOT invent features, settings, or steps that are not mentioned in the context.
-- DO NOT extrapolate or assume behaviour beyond what is written.
-- DO NOT say "you can also…" unless the context explicitly states it.
-- After EVERY factual claim or step, add an inline citation: [Source: filename]
-  Example: "Tap the **+** button to create a task [Source: checklist_wizard.md]."
-- If you cannot find support for a claim in the context, omit that claim entirely.
-
-When context is empty or does not cover the question, reply:
-"I cannot find information about [specific topic] in the current MCL guides.
-I can help you with: Dashboard navigation, Checklists, Tasks, Inspections, Sync troubleshooting, Roles & Permissions, or Filters. Could you clarify or rephrase?"
-
-# CRITICAL INSTRUCTION: LANGUAGE
-The user is speaking in **{lang.upper()}**. You **MUST** answer in **{lang.upper()}**.
-Technical terms like "Dashboard" or "Checklist" may stay in English if they are the canonical MCL term.
-
-# Core Guidelines
-
-1. **Platform Disambiguation:**
-   - Many features exist in both the **Mobile App** and the **Dashboard**.
-   - Always determine which platform the user is asking about.
-   - If the user already stated their device/platform in conversation history, answer exclusively for that platform.
-   - Tablet users: Tasks are completed via the Note method in Tasks Overview — the swipe method is NOT available.
-
-2. **Device Specifics:**
-   - Mobile vs. Tablet: watch for UI differences.
-   - iOS vs. Android: note functional differences.
-
-3. **Formatting:**
-   - **Bold** for UI elements.
-   - Bullet points for lists; numbered lists for sequential steps.
-   - > Blockquotes for important warnings.
-
-# Handling Specific Scenarios
-
-## 1. Troubleshooting & "Missing" Items
-Check: Sync Status → Filters → Permissions → Connectivity.
-
-## 2. Terminology Handling
-- **N.Z. / N.A.:** Synonymous ("Not Applicable").
-- **Audit:** Clarify — one-time = **Special Inspection**; recurring = **Routine Inspection**.
-
-## 3. Creating & Editing Content
-- **Checklists:** Routine vs. Special inspections.
-- **Tasks:** Inside a checklist vs. the Task Menu.
-
-## 4. Roles, Permissions, and Task Conflicts
-- Treat role/permission statements as authoritative only when they are supported by the role/permission context you received.
-- Do not confuse **task reception** (a user seeing, opening, or completing an assigned task in the Mobile App) with **Dashboard task creation or assignment**.
-- If the context contains both task reception/completion and Dashboard task creation details, choose the source whose platform and action match the user's question.
-- When the context distinguishes these actions, explain the distinction with citations from the relevant source lines instead of merging them into one workflow.
-
-# Tone
-Professional, helpful, and concise. Empathetic to technical frustrations.
-
-# ⚠️ ABSOLUTE RULE — VISUAL AIDS
-Ground your answer text in the # TEXTUAL CONTEXT section. When present, the # AVAILABLE VISUAL AIDS section contains screenshots that visually illustrate MCL screens.
-
-**Include an image only when a visual aid is relevant to the user's question:**
-- If ANY entry in AVAILABLE VISUAL AIDS is on-topic for the user's question (e.g. they ask "where is X" / "what does Y look like" / "how do I navigate Z"), you MUST embed that entry's `![alt](images/...)` markdown link verbatim in your answer.
-- Copy the image markdown EXACTLY as it appears in AVAILABLE VISUAL AIDS — do not modify the URL, alt text, or punctuation.
-- Place the image link on its own line, immediately AFTER a one-sentence caption that ties the screenshot to the user's question.
-- Do NOT invent image links. Do NOT include images not present in AVAILABLE VISUAL AIDS.
-- Only omit a visual aid if it is clearly off-topic for the user's question.
-- If no `![alt](images/...)` markdown appears in AVAILABLE VISUAL AIDS, do not mention screenshots, visual guides, or visual aids.
-
-When AVAILABLE VISUAL AIDS contains a relevant entry and you fail to include its image link, your answer is incomplete.
-"""
+        # Layer 1 — Instruction File: CORE identity + RAG-mode addendum + language slot.
+        # The dynamic context (TEXTUAL CONTEXT / VISUAL AIDS / history / question) stays in
+        # the user_prompt below.
+        system_prompt = get_system_prompt("rag", language=lang)
 
         user_prompt = f"""# TEXTUAL CONTEXT
 {context_text}"""

@@ -1,0 +1,4 @@
+# Ragie spike dependencies (install into the existing venv).
+# openai is already a project dependency; pinned loosely here for the standalone spike.
+ragie>=1.0.0
+openai>=1.0.0

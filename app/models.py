@@ -49,14 +49,13 @@ class AuthContext(BaseModel):
     email: Optional[str] = None
 
 
-class LoginRequest(BaseModel):
-    userName: str = Field(alias="userName")
-    password: str
-
-    model_config = {"populate_by_name": True}
+class SessionRequest(BaseModel):
+    """Request to establish a session from a token shared by the MCL app."""
+    access_token: str
 
 
-class LoginResponse(BaseModel):
+class SessionResponse(BaseModel):
+    """Resolved session identity, derived from the shared token via UserInfo."""
     access_token: str
     user_id: str
     company_id: str
@@ -157,6 +156,7 @@ def generate_response_id() -> str:
 class MemorySaveRequest(BaseModel):
     messages: List[Dict[str, Any]]
     session_id: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 class MemoryInfo(BaseModel):
@@ -192,3 +192,4 @@ class MemoryRecallResponse(BaseModel):
 class MemoryStoreRequest(BaseModel):
     session_id: str
     messages: List[Dict[str, Any]]
+    user_id: Optional[str] = None
