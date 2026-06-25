@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 from app import retrieval
 from app.retrieval import answerer, contextualizer, retriever
+from app.retrieval.contextualizer import build_vision_query
 from app.retrieval.pipeline import _history_text
 
 
@@ -51,6 +52,32 @@ def test_contextualize_followup_uses_llm_rewrite():
         mock_client.chat.completions.create.return_value = _response("How do I delete a checklist?")
         out = contextualizer.contextualize("and how do I delete it?", messages)
     assert out == "How do I delete a checklist?"
+
+
+def test_build_vision_query_returns_model_query():
+    messages = [
+        {"role": "user", "content": [
+            {"type": "text", "text": "ok what do I do here?"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,x"}},
+        ]},
+    ]
+    with patch("app.retrieval.contextualizer.client") as mock_client:
+        mock_client.chat.completions.create.return_value = _response("How do I use the Checklist Wizard?")
+        out = build_vision_query(messages)
+    assert out == "How do I use the Checklist Wizard?"
+
+
+def test_build_vision_query_empty_when_no_messages():
+    with patch("app.retrieval.contextualizer.client") as mock_client:
+        assert build_vision_query([]) == ""
+    mock_client.chat.completions.create.assert_not_called()
+
+
+def test_build_vision_query_falls_back_to_empty_on_error():
+    messages = [{"role": "user", "content": "x"}]
+    with patch("app.retrieval.contextualizer.client") as mock_client:
+        mock_client.chat.completions.create.side_effect = RuntimeError("boom")
+        assert build_vision_query(messages) == ""
 
 
 def test_contextualize_llm_error_falls_back_to_original():

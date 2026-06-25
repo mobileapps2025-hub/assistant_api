@@ -6,6 +6,7 @@ is stripped; an embedded image link that wasn't provided this turn is stripped. 
 import re
 from typing import Iterable, List, Tuple
 
+from app.core.flow import flow
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -54,6 +55,7 @@ def enforce_image_refs(answer: str, allowed_urls: Iterable[str]) -> Tuple[str, L
 
 
 def enforce_answer(answer: str, *, allowed_sources: Iterable[str], allowed_image_urls: Iterable[str]) -> str:
-    answer, _ = enforce_citations(answer, allowed_sources)
-    answer, _ = enforce_image_refs(answer, allowed_image_urls)
+    answer, fabricated = enforce_citations(answer, allowed_sources)
+    answer, removed = enforce_image_refs(answer, allowed_image_urls)
+    flow(f"🛡 enforce: removed {len(fabricated)} bad citation(s), {len(removed)} bad image(s)")
     return re.sub(r"\n{3,}", "\n\n", answer).strip()

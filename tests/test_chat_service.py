@@ -1,93 +1,12 @@
+import types
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from app.services.chat_service import ChatService, _infer_graph_path, _rewrite_image_urls
-from app.services.vector_store import VectorStoreService
-from app.services.vision_service import VisionService
-from app.services.image_validator import ImageValidatorService
-from app.services.language_service import LanguageService
+from unittest.mock import AsyncMock, MagicMock, patch
+from app.services.chat_service import ChatService
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def make_service(mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service):
+def make_service(mock_vision_service, mock_image_validator):
     """Construct a ChatService with all external dependencies mocked."""
-    with patch("app.services.chat_service.COHERE_API_KEY", ""):
-        return ChatService(
-            mock_vector_store,
-            mock_vision_service,
-            mock_image_validator,
-            mock_language_service,
-        )
-
-
-# ---------------------------------------------------------------------------
-# _infer_graph_path (pure function — no mocking needed)
-# ---------------------------------------------------------------------------
-
-class TestInferGraphPath:
-    def test_clarify_path(self):
-        result = _infer_graph_path({"grade": "irrelevant", "retry_count": 0})
-        assert result == "retrieve→grade→clarify"
-
-    def test_rewrite_path(self):
-        result = _infer_graph_path({"grade": "relevant", "retry_count": 1})
-        assert result == "retrieve→grade→rewrite→retrieve→generate"
-
-    def test_direct_generate_path(self):
-        result = _infer_graph_path({"grade": "relevant", "retry_count": 0})
-        assert result == "retrieve→grade→generate"
-
-    def test_missing_keys_defaults_to_generate(self):
-        result = _infer_graph_path({})
-        assert result == "retrieve→grade→generate"
-
-
-class TestRewriteImageUrls:
-    def test_local_default_uses_running_backend(self, monkeypatch):
-        monkeypatch.delenv("API_PUBLIC_URL", raising=False)
-        monkeypatch.delenv("WEBSITE_HOSTNAME", raising=False)
-
-        result = _rewrite_image_urls("![Guide](images/example.png)")
-
-        assert result == "![Guide](http://127.0.0.1:8001/images/example.png)"
-
-    def test_website_hostname_uses_https(self, monkeypatch):
-        monkeypatch.delenv("API_PUBLIC_URL", raising=False)
-        monkeypatch.setenv("WEBSITE_HOSTNAME", "assistant.example.com")
-
-        result = _rewrite_image_urls("![Guide](images/example.png)")
-
-        assert result == "![Guide](https://assistant.example.com/images/example.png)"
-
-
-# ---------------------------------------------------------------------------
-# ChatService construction
-# ---------------------------------------------------------------------------
-
-class TestChatServiceInit:
-    def test_cohere_disabled_when_no_key(
-        self, mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
-    ):
-        service = make_service(
-            mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
-        )
-        assert service.cohere_client is None
-
-    def test_cohere_enabled_when_key_present(
-        self, mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
-    ):
-        with patch("app.services.chat_service.COHERE_API_KEY", "dummy-key"):
-            with patch("app.services.chat_service.cohere.Client") as mock_cohere_cls:
-                service = ChatService(
-                    mock_vector_store,
-                    mock_vision_service,
-                    mock_image_validator,
-                    mock_language_service,
-                )
-        mock_cohere_cls.assert_called_once_with("dummy-key")
-        assert service.cohere_client is mock_cohere_cls.return_value
+    return ChatService(mock_vision_service, mock_image_validator)
 
 
 # ---------------------------------------------------------------------------
@@ -98,16 +17,13 @@ class TestProcessChatRequestRouting:
     """Verify vision vs. text routing based on message content."""
 
     @pytest.mark.asyncio
-    async def test_routes_to_vision_when_image_present(
-        self, mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
+    async def test_image_message_goes_through_router_not_forked(
+        self, mock_vision_service, mock_image_validator
     ):
-        service = make_service(
-            mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
+        service = make_service(mock_vision_service, mock_image_validator)
+        service._handle_text_request = AsyncMock(
+            return_value={"response": "screen help", "success": True, "has_vision": True}
         )
-        service._handle_vision_request = AsyncMock(
-            return_value={"response": "vision answer", "success": True, "has_vision": True}
-        )
-        service._handle_text_request = AsyncMock()
 
         messages = [
             {
@@ -118,26 +34,30 @@ class TestProcessChatRequestRouting:
                 ],
             }
         ]
-        result = await service.process_chat_request(messages)
+        with patch("app.services.chat_service.classify_route") as mock_route:
+            mock_route.return_value.route = "KNOWLEDGE"
+            mock_route.return_value.reason = "screen help"
+            result = await service.process_chat_request(messages)
 
-        service._handle_vision_request.assert_called_once()
-        service._handle_text_request.assert_not_called()
+        mock_route.assert_called_once()  # the image went THROUGH the router, not around it
+        service._handle_text_request.assert_called_once()
         assert result["has_vision"] is True
 
     @pytest.mark.asyncio
     async def test_routes_to_text_when_no_image(
-        self, mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
+        self, mock_vision_service, mock_image_validator
     ):
-        service = make_service(
-            mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
-        )
+        service = make_service(mock_vision_service, mock_image_validator)
         service._handle_vision_request = AsyncMock()
         service._handle_text_request = AsyncMock(
             return_value={"response": "text answer", "success": True, "has_vision": False}
         )
 
         messages = [{"role": "user", "content": "How do I sync?"}]
-        result = await service.process_chat_request(messages)
+        with patch("app.services.chat_service.classify_route") as mock_route:
+            mock_route.return_value.route = "KNOWLEDGE"
+            mock_route.return_value.reason = "general how-to"
+            result = await service.process_chat_request(messages)
 
         service._handle_text_request.assert_called_once()
         service._handle_vision_request.assert_not_called()
@@ -145,11 +65,9 @@ class TestProcessChatRequestRouting:
 
     @pytest.mark.asyncio
     async def test_returns_error_when_no_user_message(
-        self, mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
+        self, mock_vision_service, mock_image_validator
     ):
-        service = make_service(
-            mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
-        )
+        service = make_service(mock_vision_service, mock_image_validator)
         result = await service.process_chat_request([{"role": "assistant", "content": "Hi"}])
 
         assert result["success"] is False
@@ -163,11 +81,9 @@ class TestProcessChatRequestRouting:
 class TestHandleTextRequest:
     @pytest.mark.asyncio
     async def test_returns_answer_from_retrieval(
-        self, mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
+        self, mock_vision_service, mock_image_validator
     ):
-        service = make_service(
-            mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
-        )
+        service = make_service(mock_vision_service, mock_image_validator)
         messages = [{"role": "user", "content": "How do I create a task?"}]
         with patch(
             "app.services.chat_service.run_retrieval",
@@ -181,11 +97,9 @@ class TestHandleTextRequest:
 
     @pytest.mark.asyncio
     async def test_returns_error_on_retrieval_exception(
-        self, mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
+        self, mock_vision_service, mock_image_validator
     ):
-        service = make_service(
-            mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
-        )
+        service = make_service(mock_vision_service, mock_image_validator)
         messages = [{"role": "user", "content": "test"}]
         with patch(
             "app.services.chat_service.run_retrieval", side_effect=RuntimeError("retrieval failure")
@@ -197,17 +111,36 @@ class TestHandleTextRequest:
 
 
 # ---------------------------------------------------------------------------
-# _get_curated_knowledge keyword filtering
+# KNOWLEDGE + image → _answer_over_image (Decision 12 — Layer 1 + retrieval)
 # ---------------------------------------------------------------------------
 
-class TestGetCuratedKnowledge:
+class TestAnswerOverImage:
     @pytest.mark.asyncio
-    async def test_returns_empty_when_no_db(
-        self, mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
+    async def test_image_knowledge_uses_instruction_and_retrieval(
+        self, mock_vision_service, mock_image_validator
     ):
-        with patch("app.services.chat_service.AsyncSessionLocal", None):
-            service = make_service(
-                mock_vector_store, mock_vision_service, mock_image_validator, mock_language_service
-            )
-            result = await service._get_curated_knowledge("any query")
-        assert result == []
+        service = make_service(mock_vision_service, mock_image_validator)
+        chunk = types.SimpleNamespace(document_name="guide.pdf", text="Tap the + button.")
+        latest = {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "what is this screen?"},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,x"}},
+            ],
+        }
+        with patch("app.services.chat_service.build_vision_query", return_value="checklist wizard departments") as mock_bq, \
+             patch("app.services.chat_service.retrieve", return_value=[chunk]) as mock_retrieve, \
+             patch("app.services.chat_service.client") as mock_client:
+            resp = MagicMock()
+            resp.choices[0].message.content = "This is the Checklist Wizard [Source: guide.pdf]."
+            mock_client.chat.completions.create.return_value = resp
+            # entry via the KNOWLEDGE handler, which now branches to the image path
+            result = await service._handle_text_request([latest], latest, None, "")
+            sent = mock_client.chat.completions.create.call_args.kwargs["messages"]
+
+        assert result["success"] is True and result["has_vision"] is True
+        mock_bq.assert_called_once()
+        mock_retrieve.assert_called_once_with("checklist wizard departments")
+        assert "MCL Support Specialist" in sent[0]["content"]
+        assert any(m["role"] == "system" and "# TEXTUAL CONTEXT" in m["content"] for m in sent)
+        assert "[Source: guide.pdf]" in result["response"]

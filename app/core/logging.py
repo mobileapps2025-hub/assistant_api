@@ -41,7 +41,7 @@ def setup_logging() -> None:
     root_logger.addHandler(handler)
 
     # Suppress noisy third-party loggers
-    for lib in ("httpx", "httpcore", "openai", "weaviate"):
+    for lib in ("httpx", "httpcore", "openai"):
         logging.getLogger(lib).setLevel(logging.WARNING)
 
 

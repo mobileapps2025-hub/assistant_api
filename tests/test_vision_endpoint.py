@@ -2,32 +2,22 @@ import unittest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from app.main import app
-from app.core.dependencies import get_vision_service, get_image_validator_service, get_vector_store_service
+from app.core.dependencies import get_vision_service, get_image_validator_service
 from app.services.vision_service import VisionService
 from app.services.image_validator import ImageValidatorService
-from app.services.vector_store import VectorStoreService
 
 class TestVisionEndpoint(unittest.TestCase):
 
     def setUp(self):
-        # Patch the lifespan context manager or the specific function it calls
-        self.startup_patcher = patch("app.main.get_vector_store_service")
-        self.mock_get_vector_store = self.startup_patcher.start()
-        self.mock_vector_store = MagicMock(spec=VectorStoreService)
-        self.mock_get_vector_store.return_value = self.mock_vector_store
-        
         self.client = TestClient(app)
-        
-        # Mock Services
+
         self.mock_vision_service = MagicMock(spec=VisionService)
         self.mock_image_validator = MagicMock(spec=ImageValidatorService)
-        
-        # Override dependencies
+
         app.dependency_overrides[get_vision_service] = lambda: self.mock_vision_service
         app.dependency_overrides[get_image_validator_service] = lambda: self.mock_image_validator
 
     def tearDown(self):
-        self.startup_patcher.stop()
         app.dependency_overrides = {}
 
     def test_analyze_screenshot_success(self):

@@ -16,6 +16,7 @@ MODE_MARKERS = {
     "chat": "Casual conversation",
     "tools": "live MCL lookup",
     "rag": "SOURCE-BASED TRUTH",
+    "vision": "Screenshot help",
 }
 # Unique to the *injected* tool catalog block (the mode files only mention the header in
 # prose, so we key off the block's descriptive sentence, not the header).
@@ -26,12 +27,12 @@ SAMPLE_CATALOG = [
 ]
 
 
-@pytest.mark.parametrize("mode", ["chat", "tools", "rag"])
+@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision"])
 def test_core_identity_present_in_every_mode(mode):
     assert CORE_MARKER in get_system_prompt(mode)
 
 
-@pytest.mark.parametrize("mode", ["chat", "tools", "rag"])
+@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision"])
 def test_mode_includes_only_its_own_addendum(mode):
     prompt = get_system_prompt(mode)
     assert MODE_MARKERS[mode] in prompt

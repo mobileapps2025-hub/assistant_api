@@ -1,31 +1,19 @@
-import logging
-import time
-import os
-import re
 import json
 from datetime import datetime, timedelta
-import cohere
 from typing import List, Dict, Any, Optional
-from app.services.vector_store import VectorStoreService
 from app.services.vision_service import VisionService
 from app.services.image_validator import ImageValidatorService
-from app.services.language_service import LanguageService
-from app.core.config import client, ENABLE_MCL_IMAGE_VALIDATION, COHERE_API_KEY
+from app.core.config import client, ENABLE_MCL_IMAGE_VALIDATION
 from app.core.logging import get_logger
-from app.graph.nodes import AgentNodes
-from app.graph.workflow import create_workflow
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from app.core.database import CuratedQA
-from app.core.config import AsyncSessionLocal
-from sqlalchemy import select
+from app.core.flow import flow
 from app.models import AuthContext
 from app.tools import MCL_USER_TOOLS
 from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
 from app.instructions import get_system_prompt
 from app.routing import classify_route
-from app.retrieval import run as run_retrieval
-from app.enforcement import check_tool_call
+from app.retrieval import run as run_retrieval, retrieve, build_vision_query
+from app.enforcement import check_tool_call, enforce_answer
 
 logger = get_logger(__name__)
 
@@ -52,6 +40,26 @@ def _image_urls(message: Dict[str, Any]) -> List[str]:
 
 def _is_authenticated(auth_context: Optional[AuthContext]) -> bool:
     return bool(auth_context and auth_context.access_token)
+
+
+def _model_content(message: Dict[str, Any]) -> Any:
+    """Pass content to the model preserving an attached image; flatten text-only lists."""
+    content = message.get("content", "")
+    if isinstance(content, list):
+        if any(item.get("type") == "image_url" for item in content):
+            return content
+        return " ".join(item.get("text", "") for item in content if item.get("type") == "text")
+    return content or ""
+
+
+def _preview(message: Dict[str, Any]) -> str:
+    content = message.get("content", "")
+    if isinstance(content, list):
+        text = " ".join(i.get("text", "") for i in content if i.get("type") == "text").strip()
+        has_image = any(i.get("type") == "image_url" for i in content)
+    else:
+        text, has_image = str(content or "").strip(), False
+    return f"{'[image] ' if has_image else ''}\"{text[:50]}\""
 
 
 def _no_user_message_response() -> Dict[str, Any]:
@@ -81,30 +89,11 @@ def _recall_memory(auth_context: Optional[AuthContext]) -> str:
 class ChatService:
     def __init__(
         self,
-        vector_store_service: VectorStoreService,
         vision_service: VisionService,
         image_validator_service: ImageValidatorService,
-        language_service: LanguageService # Injected
     ):
-        self.vector_store = vector_store_service
         self.vision_service = vision_service
         self.image_validator = image_validator_service
-        self.language_service = language_service 
-        
-        # Initialize Cohere client if key is available
-        self.cohere_client = None
-        if COHERE_API_KEY:
-            try:
-                self.cohere_client = cohere.Client(COHERE_API_KEY)
-                logger.info("Cohere client initialized for re-ranking.")
-            except Exception as e:
-                logger.warning(f"Failed to initialize Cohere client: {e}")
-        else:
-            logger.warning("COHERE_API_KEY not found. Re-ranking will be disabled.")
-
-        # Initialize Graph
-        self.nodes = AgentNodes(self.vector_store, self.language_service, self.cohere_client)
-        self.workflow = create_workflow(self.nodes)
 
     async def process_chat_request(
         self,
@@ -116,20 +105,22 @@ class ChatService:
         if not latest_user_message:
             return _no_user_message_response()
 
-        image_urls = _image_urls(latest_user_message)
-        if image_urls:
-            return await self._handle_vision_request(messages, image_urls)
+        flow(f"📥 /api/chat · {_preview(latest_user_message)}")
+        memory_context = _recall_memory(auth_context)
+        flow(f"🧠 memory: {'recalled' if memory_context else 'none'}")
 
         decision = classify_route(messages)
         logger.info(
             f"[ROUTE] route={decision.route} authed={_is_authenticated(auth_context)} "
             f"reason={decision.reason[:80]}"
         )
+        flow(f"🧭 router → {decision.route}  ({decision.reason[:50]})")
 
-        memory_context = _recall_memory(auth_context)
-        return await self._dispatch_route(
+        result = await self._dispatch_route(
             decision.route, messages, latest_user_message, session_id, auth_context, memory_context
         )
+        flow(f"✅ response ready ({decision.route})")
+        return result
 
     async def _dispatch_route(
         self,
@@ -158,7 +149,9 @@ class ChatService:
         auth_context: Optional[AuthContext],
         memory_context: str,
     ) -> Dict[str, Any]:
+        flow("👤 PERSONAL (user's own data)")
         if not _is_authenticated(auth_context):
+            flow("⛔ no MCL session → ask to connect")
             return _needs_session_response()
         tool_result = await self._handle_function_calling(
             messages, latest_user_message, auth_context, memory_context
@@ -169,14 +162,15 @@ class ChatService:
             messages, latest_user_message, session_id=session_id, memory_context=memory_context
         )
 
-    async def _handle_vision_request(
+    async def _answer_over_image(
         self,
         messages: List[Dict[str, Any]],
-        image_urls: List[str]
+        latest_user_message: Dict[str, Any],
+        image_urls: List[str],
+        memory_context: str = "",
     ) -> Dict[str, Any]:
-        logger.info(f"Processing vision request with {len(image_urls)} images")
-        
-        # Validate images if enabled
+        logger.info(f"Answering over {len(image_urls)} image(s)")
+
         if ENABLE_MCL_IMAGE_VALIDATION:
             for url in image_urls:
                 validation = self.image_validator.validate_image(url)
@@ -185,29 +179,53 @@ class ChatService:
                         "response": validation["suggestion"],
                         "success": True,
                         "has_vision": True,
-                        "metadata": {"validation_failed": True}
+                        "metadata": {"validation_failed": True},
                     }
+
+        search_query = build_vision_query(messages)
+        if not search_query:
+            raw = latest_user_message.get("content", "")
+            if isinstance(raw, list):
+                raw = " ".join(item.get("text", "") for item in raw if item.get("type") == "text")
+            search_query = raw.strip()
+        flow(f"🔎 vision query → '{search_query[:50]}'")
+
+        chunks = retrieve(search_query) if search_query else []
+        flow(f"📄 retrieved {len(chunks)} chunk(s) from Ragie")
+
+        api_messages = [
+            {"role": "system", "content": get_system_prompt("vision", memory=memory_context or None)}
+        ]
+        if chunks:
+            context = "\n".join(
+                f"[Source: {getattr(c, 'document_name', 'unknown')}]: {c.text}" for c in chunks
+            )
+            api_messages.append({"role": "system", "content": f"# TEXTUAL CONTEXT\n{context}"})
+        api_messages.extend(messages)
 
         try:
             response = client.chat.completions.create(
                 model="gpt-4o",
-                messages=messages,
+                messages=api_messages,
                 max_tokens=1500,
                 temperature=0,
-                timeout=30
+                timeout=30,
             )
-            return {
-                "response": response.choices[0].message.content,
-                "success": True,
-                "has_vision": True
-            }
+            content = response.choices[0].message.content or ""
+            if chunks:
+                content = enforce_answer(
+                    content,
+                    allowed_sources={getattr(c, "document_name", "") for c in chunks},
+                    allowed_image_urls=set(),
+                )
+            return {"response": content, "success": True, "has_vision": True}
         except Exception as e:
             logger.error(f"Error in vision processing: {e}")
             return {
                 "response": "I encountered an error processing the image.",
                 "success": False,
                 "has_vision": True,
-                "error": str(e)
+                "error": str(e),
             }
 
     async def _handle_function_calling(
@@ -231,15 +249,8 @@ class ChatService:
 
         system_prompt = get_system_prompt("tools", tools_catalog=MCL_USER_TOOLS, memory=memory_context or None)
 
-        api_messages = [
-            {"role": "system", "content": system_prompt},
-        ]
-        for msg in messages:
-            role = msg.get("role")
-            content = msg.get("content")
-            if isinstance(content, list):
-                content = " ".join([item.get("text", "") for item in content if item.get("type") == "text"])
-            api_messages.append({"role": role, "content": content or ""})
+        api_messages = [{"role": "system", "content": system_prompt}]
+        api_messages.extend({"role": m.get("role"), "content": _model_content(m)} for m in messages)
 
         try:
             response = client.chat.completions.create(
@@ -259,13 +270,16 @@ class ChatService:
             tool_call = choice.message.tool_calls[0]
             function_name = tool_call.function.name
             logger.info(f"[FC] Tool called: {function_name}")
+            flow(f"🔧 tool requested: {function_name}")
 
             if not check_tool_call(function_name, auth_context).allowed:
+                flow("🛡 enforcement: tool BLOCKED (deny-by-default)")
                 return {
                     "response": "I'm not able to do that.",
                     "success": True,
                     "has_vision": False,
                 }
+            flow("🛡 enforcement: tool allowed")
 
             mcl = MCLServiceClient()
             if function_name == "get_user_info":
@@ -350,60 +364,8 @@ class ChatService:
                 "has_vision": False,
             }
 
-    async def _get_curated_knowledge(self, query: str) -> List[Dict[str, Any]]:
-        """
-        Fetch curated Q&A pairs to use as fallback context.
-        Performs simple keyword filtering to avoid polluting context with irrelevant facts.
-        """
-        if not AsyncSessionLocal:
-            return []
-            
-        try:
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(select(CuratedQA).where(CuratedQA.active == True))
-                rows = result.scalars().all()
-                
-                docs = []
-                # Simple keyword extraction (lowercase, split by space)
-                # We use a set for O(1) lookups
-                query_words = set(query.lower().split())
-                
-                # Expanded stop words list to prevent false positives
-                stop_words = {
-                    "the", "is", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", 
-                    "what", "how", "why", "when", "where", "who", "which",
-                    "i", "you", "he", "she", "it", "we", "they", "my", "your", "his", "her", "its", "our", "their",
-                    "do", "does", "did", "can", "could", "will", "would", "should", "have", "has", "had", "be", "am", "are", "was", "were"
-                }
-                keywords = query_words - stop_words
-                
-                for row in rows:
-                    # Tokenize the curated question to ensure we match whole words, not substrings
-                    question_words = set(row.question.lower().split())
-                    
-                    is_relevant = False
-                    if not keywords:
-                        # If query has no keywords (e.g. "Hello"), don't inject anything
-                        is_relevant = False
-                    elif not keywords.isdisjoint(question_words):
-                        # Check for intersection between query keywords and question words
-                        is_relevant = True
-                    
-                    if is_relevant:
-                        docs.append({
-                            "text": f"Question: {row.question}\nAnswer: {row.answer}",
-                            "source": "Learned Knowledge",
-                            "header_path": "Curated QA",
-                            "chunk_index": 0,
-                            "score": 1.0 # High confidence
-                        })
-                return docs
-        except Exception as e:
-            logger.error(f"Failed to fetch curated knowledge: {e}")
-            return []
-
-
     async def _handle_chat(self, messages: List[Dict[str, Any]], memory_context: str = "") -> Dict[str, Any]:
+        flow("💬 CHAT → direct reply")
         system_prompt = get_system_prompt(
             "chat",
             memory=memory_context or None,
@@ -411,13 +373,7 @@ class ChatService:
         )
 
         api_messages = [{"role": "system", "content": system_prompt}]
-
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            if isinstance(content, list):
-                content = " ".join([item.get("text", "") for item in content if item.get("type") == "text"])
-            api_messages.append({"role": role, "content": content})
+        api_messages.extend({"role": m.get("role", "user"), "content": _model_content(m)} for m in messages)
 
         try:
             response = client.chat.completions.create(
@@ -441,16 +397,21 @@ class ChatService:
         session_id: Optional[str] = None,
         memory_context: str = ""
     ) -> Dict[str, Any]:
+        image_urls = _image_urls(latest_user_message)
+        if image_urls:
+            flow("📚 KNOWLEDGE → image path")
+            return await self._answer_over_image(messages, latest_user_message, image_urls, memory_context)
+
+        flow("📚 KNOWLEDGE → text path")
         user_query = latest_user_message.get("content", "")
         if isinstance(user_query, list):
             user_query = " ".join(item["text"] for item in user_query if item.get("type") == "text")
         user_query = user_query.strip()
 
-        language = self.language_service.detect_language(user_query)
-        logger.info(f"[KNOWLEDGE] query='{user_query[:60]}' language='{language}'")
+        logger.info(f"[KNOWLEDGE] query='{user_query[:60]}'")
 
         try:
-            result = run_retrieval(user_query, messages, language=language, memory=memory_context or None)
+            result = run_retrieval(user_query, messages, memory=memory_context or None)
             return {"response": result["answer"], "success": True, "has_vision": False}
         except Exception as e:
             logger.error(f"[KNOWLEDGE] retrieval failed: {e}")
@@ -460,25 +421,3 @@ class ChatService:
                 "has_vision": False,
                 "error": str(e),
             }
-
-
-def _infer_graph_path(result: dict) -> str:
-    """Derive which graph branch was taken from the final state."""
-    retry_count = result.get("retry_count", 0)
-    grade = result.get("grade", "")
-    if grade == "irrelevant" and retry_count == 0:
-        return "retrieve→grade→clarify"
-    if retry_count >= 1:
-        return "retrieve→grade→rewrite→retrieve→generate"
-    return "retrieve→grade→generate"
-
-
-def _rewrite_image_urls(text: str) -> str:
-    """Rewrite relative image URLs to absolute backend URLs so they load correctly."""
-    import re
-    base_url = os.getenv("API_PUBLIC_URL") or os.getenv("WEBSITE_HOSTNAME")
-    if not base_url:
-        base_url = "http://127.0.0.1:8001"
-    if not base_url.startswith("http"):
-        base_url = f"https://{base_url}"
-    return re.sub(r"\]\(images/", f"]({base_url}/images/", text)

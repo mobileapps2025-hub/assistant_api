@@ -48,22 +48,25 @@ class RouteDecision:
     reason: str
 
 
-def _message_text(message: Dict[str, Any]) -> str:
+def _turn_content(message: Dict[str, Any]) -> Any:
+    """Text for normal turns; the full multimodal content (text + image) when a turn carries
+    a screenshot, so the classifier can route image messages by what's on screen."""
     content = message.get("content")
     if isinstance(content, list):
-        parts = [item.get("text", "") for item in content if item.get("type") == "text"]
-        return " ".join(parts).strip()
+        if any(item.get("type") == "image_url" for item in content):
+            return content
+        return " ".join(item.get("text", "") for item in content if item.get("type") == "text").strip()
     return str(content or "").strip()
 
 
-def _recent_turns(messages: List[Dict[str, Any]], history_turns: int) -> List[Dict[str, str]]:
+def _recent_turns(messages: List[Dict[str, Any]], history_turns: int) -> List[Dict[str, Any]]:
     turns = []
     for message in messages[-history_turns:]:
         if message.get("role") not in ("user", "assistant"):
             continue
-        text = _message_text(message)
-        if text:
-            turns.append({"role": message["role"], "content": text})
+        content = _turn_content(message)
+        if content:
+            turns.append({"role": message["role"], "content": content})
     return turns
 
 

@@ -16,14 +16,12 @@ from sqlalchemy.future import select
 from sqlalchemy import exc
 
 from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, SessionRequest, SessionResponse, MarketInfo, UserMarketsResponse, AuthContext, MemorySaveRequest, MemoryInfo, MemoryListResponse, MemorySaveResponse, MemoryUpdateRequest, MemoryRecallResponse, MemoryStoreRequest
-from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, VECTOR_STORE_PATH, CORS_ORIGINS, AsyncSessionLocal, RAGIE_API_KEY
+from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, CORS_ORIGINS, AsyncSessionLocal, RAGIE_API_KEY, RAGIE_PARTITION
 from app.core.database import Feedback, Base
-from app.core.dependencies import get_vector_store_service, get_chat_service, get_speech_service
+from app.core.dependencies import get_chat_service, get_speech_service
 from app.services.chat_service import ChatService
-from app.services.vector_store import VectorStoreService
-from app.services.ingestion_service import IngestionService
 from app.services.speech_service import SpeechService
-from app.routers import vision, admin
+from app.routers import vision
 from app.core.logging import setup_logging, get_logger, request_id_var
 from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
@@ -61,17 +59,7 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("Database not available - feedback system disabled")
         
-        # Initialize MCL knowledge base
-        logger.info("Initializing MCL knowledge base...")
-        # Just initialize the service holder - specific connection happens lazily
-        vector_store = get_vector_store_service()
-        
-        if vector_store.client:
-            logger.info("Verifying Weaviate schema...")
-            vector_store.ensure_schema()
-            
-        logger.info("MCL knowledge base service initialized.")
-
+        logger.info("Retrieval is served by Ragie (no local vector store).")
         logger.info("MCL Assistant startup completed.")
         yield
     except Exception as e:
@@ -100,7 +88,6 @@ app.add_middleware(
 )
 
 app.include_router(vision.router)
-app.include_router(admin.router)
 
 # Serve visual guide images as static files
 app.mount("/images", StaticFiles(directory="static/images"), name="images")
@@ -124,72 +111,17 @@ async def root():
             "chat": "/api/chat",
             "feedback": "/api/feedback",
             "health": "/health",
-            "chunks": "/api/chunks",
-            "search": "/api/search"
         }
     }
 
 @app.get("/health")
-async def health_check(vector_store: VectorStoreService = Depends(get_vector_store_service)):
+async def health_check():
     """Health check endpoint — reports real infrastructure status."""
-    stats = vector_store.get_stats()
-    weaviate_status = stats.get("status", "unknown")
-    weaviate_healthy = weaviate_status == "connected"
     db_healthy = AsyncSessionLocal is not None
-
-    overall = "healthy" if (weaviate_healthy and db_healthy) else "degraded"
-
     return {
-        "status": overall,
-        "weaviate": weaviate_status,
-        "document_count": stats.get("count", 0),
+        "status": "healthy",
+        "retrieval": "ragie" if RAGIE_API_KEY else "unconfigured",
         "database": "connected" if db_healthy else "unavailable",
-    }
-
-@app.get("/api/chunks")
-async def get_chunks_info(vector_store: VectorStoreService = Depends(get_vector_store_service)):
-    """Get information about available MCL document chunks."""
-    stats = vector_store.get_stats()
-    
-    return {
-        "message": "Detailed chunk listing is available via search endpoint",
-        "stats": stats
-    }
-
-@app.post("/api/search")
-async def search_chunks(
-    query_data: dict,
-    vector_store: VectorStoreService = Depends(get_vector_store_service)
-):
-    """Search for relevant MCL chunks based on a query."""
-    query = str(query_data.get("query", "")).strip()
-    try:
-        max_results = int(query_data.get("max_results", 5))
-    except (TypeError, ValueError):
-        max_results = 5
-    max_results = max(1, max_results)
-    
-    if not query:
-        return {"error": "Query is required"}
-    
-    relevant_chunks = vector_store.hybrid_search(query, limit=max_results)
-    
-    return {
-        "query": query,
-        "total_results": len(relevant_chunks),
-        "results": [
-            {
-                "source": chunk.get("source"),
-                "source_title": chunk.get("source_title") or chunk.get("source"),
-                "header_path": chunk.get("header_path"),
-                "doc_type": chunk.get("doc_type"),
-                "chunk_index": chunk.get("chunk_index", 0),
-                "score": chunk.get("score", 0),
-                "uuid": chunk.get("uuid"),
-                "content_preview": (chunk.get("text") or "")[:500],
-            }
-            for chunk in relevant_chunks
-        ]
     }
 
 def _content_item_to_dict(item: ContentItem) -> dict[str, Any] | None:
@@ -253,7 +185,9 @@ async def ragie_image(document_id: str, chunk_id: str):
     )
     async with httpx.AsyncClient() as http:
         upstream = await http.get(
-            upstream_url, headers={"Authorization": f"Bearer {RAGIE_API_KEY}"}, timeout=30
+            upstream_url,
+            headers={"Authorization": f"Bearer {RAGIE_API_KEY}", "partition": RAGIE_PARTITION},
+            timeout=30,
         )
     if upstream.status_code != 200:
         raise HTTPException(status_code=502, detail="Could not fetch image from Ragie")

@@ -20,58 +20,6 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 ENABLE_MCL_IMAGE_VALIDATION = os.getenv("ENABLE_MCL_IMAGE_VALIDATION", "false").lower() == "true"
 MCL_VALIDATION_CONFIDENCE_THRESHOLD = float(os.getenv("MCL_VALIDATION_CONFIDENCE_THRESHOLD", "0.5"))
 
-# --- Vector store ---
-VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "mcl_vector_store")
-
-
-def _default_weaviate_url() -> str:
-    """Use embedded Weaviate by default on Azure App Service."""
-    return "embedded" if _is_azure_app_service() else "http://localhost:8080"
-
-
-def _is_azure_app_service() -> bool:
-    return any(
-        os.getenv(name)
-        for name in (
-            "WEBSITE_SITE_NAME",
-            "WEBSITE_INSTANCE_ID",
-            "WEBSITE_HOSTNAME",
-            "APPSETTING_WEBSITE_SITE_NAME",
-        )
-    )
-
-
-def _is_local_weaviate_url(url: str) -> bool:
-    normalized = url.strip().lower()
-    return normalized.startswith(("http://localhost", "http://127.0.0.1"))
-
-
-def _resolve_weaviate_url() -> str:
-    configured_url = os.getenv("WEAVIATE_URL") or os.getenv("APPSETTING_WEAVIATE_URL")
-    if configured_url and _is_azure_app_service() and _is_local_weaviate_url(configured_url):
-        _logger.warning(
-            "Ignoring local WEAVIATE_URL on Azure App Service and using embedded Weaviate. "
-            "Set WEAVIATE_URL to a reachable external Weaviate endpoint to override."
-        )
-        return "embedded"
-    return configured_url or _default_weaviate_url()
-
-
-WEAVIATE_URL = _resolve_weaviate_url()
-WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY") or os.getenv("APPSETTING_WEAVIATE_API_KEY", "")
-
-# --- Reranking ---
-COHERE_API_KEY = os.getenv("COHERE_API_KEY", "")
-
-# --- RAG search tuning ---
-SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "60"))
-SEARCH_ALPHA = float(os.getenv("SEARCH_ALPHA", "0.5"))
-RERANK_TOP_N = int(os.getenv("RERANK_TOP_N", "15"))          # was 10; more candidates survive for grading
-RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "0.15"))    # was 0.3; eliminates the score-cliff
-RERANK_HIGH_CONFIDENCE = float(os.getenv("RERANK_HIGH_CONFIDENCE", "0.5"))  # tier boundary: high vs medium
-MIN_SEARCH_SCORE = float(os.getenv("MIN_SEARCH_SCORE", "0.0"))  # 0 = no filter; tune after testing
-MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "24000"))  # ~6000 tokens
-
 # --- Ragie retrieval (Layer 5) ---
 RAGIE_API_KEY = os.getenv("RAGIE_API_KEY", "")
 RAGIE_PARTITION = os.getenv("RAGIE_PARTITION", "mcl_spike")

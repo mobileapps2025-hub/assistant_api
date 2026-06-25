@@ -1,6 +1,7 @@
 """Layer 5 — the retrieval pipeline: contextualize → retrieve → answer."""
 from typing import Any, Dict, List, Optional
 
+from app.core.flow import flow
 from app.retrieval.answerer import answer
 from app.retrieval.contextualizer import contextualize
 from app.retrieval.retriever import retrieve
@@ -27,6 +28,8 @@ def _history_text(messages: List[Dict[str, Any]]) -> str:
 def run(query: str, messages: List[Dict[str, Any]], *, language: Optional[str] = None,
         memory: Optional[str] = None) -> Dict[str, Any]:
     contextualized = contextualize(query, messages)
+    flow(f"🔁 query → '{contextualized[:50]}'")
     chunks = retrieve(contextualized)
+    flow(f"📄 retrieved {len(chunks)} chunk(s) from Ragie")
     return answer(contextualized, chunks, language=language,
                   history_text=_history_text(messages), memory=memory)

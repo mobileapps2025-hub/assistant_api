@@ -18,10 +18,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, List, Literal, Optional
 
-Mode = Literal["chat", "tools", "rag"]
+Mode = Literal["chat", "tools", "rag", "vision"]
 
 _INSTRUCTIONS_DIR = Path(__file__).parent
-_VALID_MODES = ("chat", "tools", "rag")
+_VALID_MODES = ("chat", "tools", "rag", "vision")
 
 
 @lru_cache(maxsize=None)

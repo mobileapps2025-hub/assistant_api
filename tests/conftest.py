@@ -1,21 +1,8 @@
 """Shared pytest fixtures for the MCL Assistant test suite."""
 import pytest
 from unittest.mock import MagicMock, AsyncMock
-from app.services.vector_store import VectorStoreService
 from app.services.vision_service import VisionService
 from app.services.image_validator import ImageValidatorService
-from app.services.language_service import LanguageService
-
-
-@pytest.fixture
-def mock_vector_store():
-    """Mock VectorStoreService with a connected client."""
-    mock = MagicMock(spec=VectorStoreService)
-    mock.client = MagicMock()
-    mock.hybrid_search.return_value = []
-    mock.add_documents.return_value = True
-    mock.get_stats.return_value = {"status": "connected", "count": 10}
-    return mock
 
 
 @pytest.fixture
@@ -27,14 +14,6 @@ def mock_vision_service():
 def mock_image_validator():
     mock = MagicMock(spec=ImageValidatorService)
     mock.validate_image.return_value = {"is_mcl": True, "confidence": 0.95}
-    return mock
-
-
-@pytest.fixture
-def mock_language_service():
-    """Mock LanguageService that always returns 'en'."""
-    mock = MagicMock(spec=LanguageService)
-    mock.detect_language.return_value = "en"
     return mock
 
 

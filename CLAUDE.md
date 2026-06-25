@@ -2,88 +2,71 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> Also read the repo-root `PROJECT_KNOWLEDGE.md` for the layered-rebuild decisions and module status.
+
 ## Commands
 
 ```bash
-# Install dev dependencies (pytest, asyncio, coverage)
-pip install -r requirements-dev.txt
-
-# Start dev server
-python -m uvicorn app.main:app --reload
-
-# Run all tests
-python -m pytest tests/ -v
-
-# Run a single test file or class
-python -m pytest tests/test_chat_service.py::TestInferGraphPath -v
-
-# Run with coverage report
+pip install -r requirements.txt           # runtime deps
+python -m uvicorn app.main:app --reload    # dev server
+python -m pytest tests/ -q                 # all tests
+python -m pytest tests/test_routing.py -q  # a single file
 python -m pytest tests/ --cov=app --cov-report=term-missing
-
-# Start local Weaviate
-docker-compose up weaviate
-
-# Trigger document ingestion (requires ADMIN_API_KEY)
-curl -X POST http://localhost:8000/admin/ingest -H "X-Admin-Key: your-key"
-
-# Train agent from feedback (requires ADMIN_API_KEY)
-python train_agent.py
 ```
+
+Ragie ingestion is manual (Ragie dashboard, or the `spikes/ragie_spike.py` helper). There is
+no local vector store and no startup ingestion.
 
 ## Environment Variables
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `OPENAI_API_KEY` | ✅ Yes | — | GPT-4o + embeddings; app refuses to start without it |
-| `WEAVIATE_URL` | No | `http://localhost:8080` | Vector store |
-| `WEAVIATE_API_KEY` | No | `""` | Weaviate auth (cloud deployments) |
-| `COHERE_API_KEY` | No | `""` | Reranking; falls back to top-10 without it |
+| `OPENAI_API_KEY` | ✅ Yes | — | GPT-4o (answers, routing, vision); app refuses to start without it |
+| `RAGIE_API_KEY` | For KB answers | `""` | Ragie retrieval + image proxy; KNOWLEDGE answers degrade to a fallback without it |
+| `RAGIE_PARTITION` | No | `mcl_spike` | Ragie partition holding the MCL docs |
+| `RAGIE_TOP_K` | No | `6` | Chunks retrieved per query |
+| `API_PUBLIC_URL` | No | `http://127.0.0.1:8001` | Public base URL used to build `/api/ragie/image` links the frontend can load |
 | `DATABASE_CONNECTION_STRING` | No | `""` | Async SQL Server; feedback system disabled without it |
-| `ADMIN_API_KEY` | No | `""` | Protects `/admin/*` routes; returns 503 if unset |
 | `CORS_ORIGINS` | No | localhost ports | Comma-separated allowed origins |
+| `ENABLE_MCL_IMAGE_VALIDATION` | No | `false` | Pre-check uploaded images are MCL screens |
+| `FLOW_TRACE` | No | `true` | Prints a human-readable, arrow-connected flow trace to stderr for manual testing (`app/core/flow.py`). Set `false` in production. |
 
 ## Architecture
 
-MCL Assistant is a FastAPI RAG app serving the MCL (Mobile Checklist) mobile app.
+A FastAPI agent for the MCL (Mobile Checklist) app, built in five layers (see
+`PROJECT_KNOWLEDGE.md`). Retrieval is served by **Ragie** (managed RAG) — there is no
+in-house vector store.
 
-### Request flow
+### Request flow (`app/services/chat_service.py`)
 
-1. `POST /api/chat` → `ChatService.process_chat_request()` (`app/services/chat_service.py`)
-2. If image attached → `VisionService` (GPT-4o vision)
-3. Otherwise → **LangGraph state machine** (`app/graph/`):
-   - `detect_language` → `retrieve_documents` → `grade_documents`
-   - Relevant docs: `generate_answer`
-   - Irrelevant / grading error: `rewrite_query` (max 1 retry) → `generate_answer` or `clarify_ambiguity`
-4. Returns `{response, response_id, sources}`
+1. `POST /api/chat` → `ChatService.process_chat_request()`.
+2. **Route** every message via `classify_route` (one deterministic `gpt-4o-mini` call;
+   **vision-aware** — the screenshot is included when present) into one of:
+   - **CHAT** → `_handle_chat` (direct reply; sees the image if attached).
+   - **KNOWLEDGE** → `_handle_text_request` → `app/retrieval` (contextualize → Ragie retrieve → grounded, cited answer). **With an image** it runs `_answer_over_image` instead (`build_vision_query` → Ragie → answer over the screenshot, cited + enforced).
+   - **PERSONAL** → `_handle_personal_request` → forced MCL tool call (needs a connected session); the image rides along as context.
+4. Per-user **memory** is recalled once and injected into every path's system prompt.
+5. **Enforcement** sanitizes answers (citations/images) and gates tool calls (deny-by-default allowlist).
 
-### Key components
+### The five layers → packages
 
-| Component | Location | Role |
-|-----------|----------|------|
-| LangGraph workflow | `app/graph/` | Agentic RAG state machine |
-| VectorStoreService | `app/services/vector_store.py` | Weaviate hybrid search + Cohere reranking |
-| ChatService | `app/services/chat_service.py` | Orchestrates text/vision routing |
-| IngestionService | `app/services/ingestion_service.py` | Loads PDF/MD/DOCX/PPTX from `app/documents/` into Weaviate |
-| DSPy optimizer | `app/optimization/` | Prompt optimization via feedback; `compiled_rag.json` loaded at startup |
-| Feedback loop | `app/core/database.py`, `app/routers/admin.py` | Stores feedback → CuratedQA → DSPy retraining |
+| Layer | Package | Role |
+|-------|---------|------|
+| 1 Instruction | `app/instructions/` | `get_system_prompt(mode, ...)` — one CORE identity + per-mode files |
+| 2 Routing | `app/routing/` | `classify_route` → CHAT / KNOWLEDGE / PERSONAL (structured output) |
+| 3 Memory | `app/services/memory_service.py` | per-user durable memory (`app/memories/{user_id}/`), capped recall |
+| 4 Hooks/enforcement | `app/enforcement/` | citation/image sanitize + tool allowlist (deny-by-default) + audit |
+| 5 Retrieval & tools | `app/retrieval/`, `app/tools.py`, `app/clients/` | Ragie retrieve+answer; MCL user tools |
 
-### Admin routes (require `X-Admin-Key` header)
+### Other endpoints
 
-- `POST /admin/ingest` — re-ingest all documents from `app/documents/`
-- `POST /admin/curated-qa` — add a curated Q&A pair
-- `POST /admin/train` — trigger DSPy retraining from feedback
-
-### Search strategy
-
-Weaviate hybrid search (semantic + keyword, `alpha=0.5`) → Cohere reranker (threshold `>0.7`) → top-N chunks → GPT-4o.
-
-### Self-improvement pipeline
-
-User feedback → `Feedback` DB table → `CuratedQA` table → DSPy `BootstrapFewShot` → `app/optimization/compiled_rag.json`.
+- `POST /api/auth/session` — resolve identity from the MCL bearer token.
+- `GET /api/ragie/image?document_id=&chunk_id=` — proxies a Ragie screenshot (auth'd) so the frontend can render it.
+- `/api/memory/*` — list/get/save/store/recall/update/delete (scoped by `user_id`).
+- `POST /api/vision/analyze-screenshot`, `/api/feedback`, `/health`.
 
 ### Startup sequence (`app/main.py` lifespan)
 
-1. Validate `OPENAI_API_KEY` (raises at import if missing)
-2. Create async DB tables (if DB available)
-3. Initialize Weaviate schema
-4. If vector store empty → auto-ingest from `app/documents/`
+1. Validate `OPENAI_API_KEY` (raises at import if missing).
+2. Create async DB tables (if DB available).
+3. That's it — retrieval is Ragie; nothing to ingest locally.

@@ -5,43 +5,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - WEAVIATE_URL=http://weaviate:8080
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - COHERE_API_KEY=${COHERE_API_KEY}
+      - RAGIE_API_KEY=${RAGIE_API_KEY}
       - DATABASE_CONNECTION_STRING=${DATABASE_CONNECTION_STRING}
-    depends_on:
-      weaviate:
-        condition: service_healthy
     restart: unless-stopped
-
-  weaviate:
-    command:
-    - --host
-    - 0.0.0.0
-    - --port
-    - '8080'
-    - --scheme
-    - http
-    image: semitechnologies/weaviate:1.27.0
-    ports:
-    - 8080:8080
-    - 50051:50051
-    volumes:
-    - weaviate_data:/var/lib/weaviate
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/.well-known/ready"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    environment:
-      QUERY_DEFAULTS_LIMIT: 25
-      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
-      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
-      DEFAULT_VECTORIZER_MODULE: 'none'
-      ENABLE_MODULES: 'text2vec-openai,generative-openai'
-      CLUSTER_HOSTNAME: 'node1'
-
-volumes:
-  weaviate_data:

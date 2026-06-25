@@ -63,3 +63,37 @@ def contextualize(query: str, messages: List[Dict[str, Any]]) -> str:
     except Exception as e:
         logger.warning(f"[RETRIEVAL] contextualize failed, using original query: {e}")
         return query
+
+
+_VISION_QUERY_PROMPT = """You are preparing a documentation search for the MCL (Mobile
+Checklist) app. The user has shared a screenshot and possibly a message. Using BOTH the
+screenshot and the conversation, write ONE standalone English search query that captures
+exactly what MCL help the user needs. Resolve references like "here", "this", "that", "it"
+by what is visible on the screen. Output ONLY the query — no preamble, no explanation."""
+
+
+def build_vision_query(messages: List[Dict[str, Any]], *, history_turns: int = 6) -> str:
+    """Turn a screenshot + conversation into one standalone text query for Ragie.
+
+    Ragie is text-only, so the image is read here (by a vision model) and described into the
+    query. Returns "" on failure so the caller can fall back to the raw user text.
+    """
+    recent = [
+        m for m in messages[-history_turns:]
+        if m.get("role") in ("user", "assistant") and m.get("content")
+    ]
+    if not recent:
+        return ""
+    try:
+        response = client.chat.completions.create(
+            model=CONTEXTUALIZE_MODEL,
+            messages=[{"role": "system", "content": _VISION_QUERY_PROMPT}, *recent],
+            temperature=0,
+            timeout=20,
+        )
+        query = (response.choices[0].message.content or "").strip()
+        logger.info(f"[RETRIEVAL] vision query: '{query[:80]}'")
+        return query
+    except Exception as e:
+        logger.warning(f"[RETRIEVAL] vision query build failed: {e}")
+        return ""

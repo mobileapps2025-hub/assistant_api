@@ -19,17 +19,3 @@ class Feedback(Base):
     
     def __repr__(self):
         return f"<Feedback(id={self.id}, response_id='{self.response_id}', type='{self.feedback_type}')>"
-
-class CuratedQA(Base):
-    """Curated Q&A table for storing high-quality question-answer pairs."""
-    __tablename__ = "curated_qa"
-    
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    question = Column(Text, nullable=False)
-    answer = Column(Text, nullable=False)
-    source_feedback_id = Column(Integer, nullable=True)  # Reference to feedback that inspired this
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    active = Column(Boolean, default=True, nullable=False)
-    
-    def __repr__(self):
-        return f"<CuratedQA(id={self.id}, question='{self.question[:50]}...')>"

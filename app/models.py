@@ -112,26 +112,6 @@ class FeedbackResponse(BaseModel):
         from_attributes = True
 
 
-class CuratedQaRequest(BaseModel):
-    """Schema for creating curated Q&A pairs."""
-    question: str
-    answer: str
-    source_feedback_id: Optional[int] = None
-
-
-class CuratedQaResponse(BaseModel):
-    """Schema for curated Q&A response."""
-    id: int
-    question: str
-    answer: str
-    source_feedback_id: Optional[int]
-    created_at: datetime
-    active: bool
-
-    class Config:
-        from_attributes = True
-
-
 class ChatResponse(BaseModel):
     """Chat response with tracking ID."""
     response: str
