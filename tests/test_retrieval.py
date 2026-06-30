@@ -118,12 +118,15 @@ def test_retrieve_error_returns_empty():
 
 # --- answerer ---
 
-def test_answer_no_chunks_returns_fallback_without_llm():
+def test_answer_no_chunks_still_calls_llm_for_language_correct_refusal():
     with patch("app.retrieval.answerer.client") as mock_client:
-        result = answerer.answer("q", [])
-    assert "could not find" in result["answer"].lower()
+        mock_client.chat.completions.create.return_value = _response("Ich konnte dazu nichts finden.")
+        result = answerer.answer("q", [], language="German")
+        system_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    assert result["answer"] == "Ich konnte dazu nichts finden."
     assert result["sources"] == []
-    mock_client.chat.completions.create.assert_not_called()
+    mock_client.chat.completions.create.assert_called_once()
+    assert "GERMAN" in system_prompt
 
 
 def test_answer_builds_context_and_returns_sources():

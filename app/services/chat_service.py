@@ -11,7 +11,7 @@ from app.tools import MCL_USER_TOOLS
 from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
 from app.instructions import get_system_prompt
-from app.routing import classify_route
+from app.routing import classify_route, detect_language
 from app.retrieval import run as run_retrieval, retrieve, build_vision_query
 from app.enforcement import check_tool_call, enforce_answer
 
@@ -109,6 +109,9 @@ class ChatService:
         memory_context = _recall_memory(auth_context)
         flow(f"🧠 memory: {'recalled' if memory_context else 'none'}")
 
+        language = detect_language(messages)
+        flow(f"🗣 language → {language}")
+
         decision = classify_route(messages)
         logger.info(
             f"[ROUTE] route={decision.route} authed={_is_authenticated(auth_context)} "
@@ -117,7 +120,8 @@ class ChatService:
         flow(f"🧭 router → {decision.route}  ({decision.reason[:50]})")
 
         result = await self._dispatch_route(
-            decision.route, messages, latest_user_message, session_id, auth_context, memory_context
+            decision.route, messages, latest_user_message, session_id, auth_context,
+            memory_context, language
         )
         flow(f"✅ response ready ({decision.route})")
         return result
@@ -130,15 +134,17 @@ class ChatService:
         session_id: Optional[str],
         auth_context: Optional[AuthContext],
         memory_context: str,
+        language: str,
     ) -> Dict[str, Any]:
         if route == "PERSONAL":
             return await self._handle_personal_request(
-                messages, latest_user_message, session_id, auth_context, memory_context
+                messages, latest_user_message, session_id, auth_context, memory_context, language
             )
         if route == "CHAT":
-            return await self._handle_chat(messages, memory_context)
+            return await self._handle_chat(messages, memory_context, language)
         return await self._handle_text_request(
-            messages, latest_user_message, session_id=session_id, memory_context=memory_context
+            messages, latest_user_message, session_id=session_id,
+            memory_context=memory_context, language=language
         )
 
     async def _handle_personal_request(
@@ -148,18 +154,20 @@ class ChatService:
         session_id: Optional[str],
         auth_context: Optional[AuthContext],
         memory_context: str,
+        language: str,
     ) -> Dict[str, Any]:
         flow("👤 PERSONAL (user's own data)")
         if not _is_authenticated(auth_context):
             flow("⛔ no MCL session → ask to connect")
             return _needs_session_response()
         tool_result = await self._handle_function_calling(
-            messages, latest_user_message, auth_context, memory_context
+            messages, latest_user_message, auth_context, memory_context, language
         )
         if tool_result is not None:
             return tool_result
         return await self._handle_text_request(
-            messages, latest_user_message, session_id=session_id, memory_context=memory_context
+            messages, latest_user_message, session_id=session_id,
+            memory_context=memory_context, language=language
         )
 
     async def _answer_over_image(
@@ -168,6 +176,7 @@ class ChatService:
         latest_user_message: Dict[str, Any],
         image_urls: List[str],
         memory_context: str = "",
+        language: str = "",
     ) -> Dict[str, Any]:
         logger.info(f"Answering over {len(image_urls)} image(s)")
 
@@ -194,7 +203,9 @@ class ChatService:
         flow(f"📄 retrieved {len(chunks)} chunk(s) from Ragie")
 
         api_messages = [
-            {"role": "system", "content": get_system_prompt("vision", memory=memory_context or None)}
+            {"role": "system", "content": get_system_prompt(
+                "vision", language=language or None, memory=memory_context or None
+            )}
         ]
         if chunks:
             context = "\n".join(
@@ -233,7 +244,8 @@ class ChatService:
         messages: List[Dict[str, Any]],
         latest_user_message: Dict[str, Any],
         auth_context: AuthContext,
-        memory_context: str = ""
+        memory_context: str = "",
+        language: str = "",
     ) -> Optional[Dict[str, Any]]:
         """
         Run GPT function-calling for an authenticated, personal-data query.
@@ -247,7 +259,9 @@ class ChatService:
         if isinstance(user_query, list):
             user_query = " ".join([item["text"] for item in user_query if item.get("type") == "text"])
 
-        system_prompt = get_system_prompt("tools", tools_catalog=MCL_USER_TOOLS, memory=memory_context or None)
+        system_prompt = get_system_prompt(
+            "tools", language=language or None, tools_catalog=MCL_USER_TOOLS, memory=memory_context or None
+        )
 
         api_messages = [{"role": "system", "content": system_prompt}]
         api_messages.extend({"role": m.get("role"), "content": _model_content(m)} for m in messages)
@@ -364,10 +378,13 @@ class ChatService:
                 "has_vision": False,
             }
 
-    async def _handle_chat(self, messages: List[Dict[str, Any]], memory_context: str = "") -> Dict[str, Any]:
+    async def _handle_chat(
+        self, messages: List[Dict[str, Any]], memory_context: str = "", language: str = ""
+    ) -> Dict[str, Any]:
         flow("💬 CHAT → direct reply")
         system_prompt = get_system_prompt(
             "chat",
+            language=language or None,
             memory=memory_context or None,
             tools_catalog=MCL_USER_TOOLS,
         )
@@ -395,12 +412,15 @@ class ChatService:
         messages: List[Dict[str, Any]],
         latest_user_message: Dict[str, Any],
         session_id: Optional[str] = None,
-        memory_context: str = ""
+        memory_context: str = "",
+        language: str = "",
     ) -> Dict[str, Any]:
         image_urls = _image_urls(latest_user_message)
         if image_urls:
             flow("📚 KNOWLEDGE → image path")
-            return await self._answer_over_image(messages, latest_user_message, image_urls, memory_context)
+            return await self._answer_over_image(
+                messages, latest_user_message, image_urls, memory_context, language
+            )
 
         flow("📚 KNOWLEDGE → text path")
         user_query = latest_user_message.get("content", "")
@@ -411,7 +431,7 @@ class ChatService:
         logger.info(f"[KNOWLEDGE] query='{user_query[:60]}'")
 
         try:
-            result = run_retrieval(user_query, messages, memory=memory_context or None)
+            result = run_retrieval(user_query, messages, language=language or None, memory=memory_context or None)
             return {"response": result["answer"], "success": True, "has_vision": False}
         except Exception as e:
             logger.error(f"[KNOWLEDGE] retrieval failed: {e}")

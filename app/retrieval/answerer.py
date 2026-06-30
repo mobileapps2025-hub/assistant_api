@@ -15,12 +15,6 @@ logger = get_logger(__name__)
 
 ANSWER_MODEL = "gpt-4o"
 
-_NO_CONTEXT_ANSWER = (
-    "I could not find information about that in the current MCL guides. I can help with "
-    "Checklists, Tasks, Inspections, the Dashboard, Sync, and Roles & Permissions — could "
-    "you rephrase or add a little detail?"
-)
-
 
 def _image_proxy_url(chunk: Any) -> Optional[str]:
     links = getattr(chunk, "links", None) or {}
@@ -64,9 +58,8 @@ def _build_user_prompt(query: str, chunks: List[Any], history_text: str) -> str:
 
 def answer(query: str, chunks: List[Any], *, language: Optional[str] = None,
            history_text: str = "", memory: Optional[str] = None) -> Dict[str, Any]:
-    if not chunks:
-        return {"answer": _NO_CONTEXT_ANSWER, "sources": []}
-
+    # Empty context still goes through the model so rag.md produces a refusal in the
+    # user's language, rather than a hardcoded English string.
     response = client.chat.completions.create(
         model=ANSWER_MODEL,
         messages=[
