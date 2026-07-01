@@ -67,6 +67,14 @@ def _language_directive(language: str) -> str:
     )
 
 
+def _device_directive(device: str) -> str:
+    return (
+        "# DEVICE\n"
+        f"The user is on **{device.strip()}**. Answer for this platform and do not ask which "
+        "platform they are on unless their question is genuinely ambiguous across platforms."
+    )
+
+
 def _memory_block(memory: str) -> str:
     return f"# MEMORY CONTEXT\n{memory.strip()}"
 
@@ -75,6 +83,7 @@ def get_system_prompt(
     mode: Mode,
     *,
     language: Optional[str] = None,
+    device: Optional[str] = None,
     memory: Optional[str] = None,
     tools_catalog: Optional[List[Any]] = None,
 ) -> str:
@@ -104,6 +113,8 @@ def get_system_prompt(
         sections.append(_tools_block(tools_catalog))
     if language:
         sections.append(_language_directive(language))
+    if device:
+        sections.append(_device_directive(device))
     if memory:
         sections.append(_memory_block(memory))
     return "\n\n".join(sections)

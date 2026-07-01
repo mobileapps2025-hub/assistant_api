@@ -182,7 +182,7 @@ def test_run_threads_contextualized_query(monkeypatch):
         captured["retrieved"] = query
         return [_chunk("ctx")]
 
-    def fake_answer(query, chunks, *, language=None, history_text="", memory=None):
+    def fake_answer(query, chunks, *, language=None, device=None, history_text="", memory=None):
         captured["answered"] = query
         return {"answer": "A", "sources": ["doc.pdf"]}
 

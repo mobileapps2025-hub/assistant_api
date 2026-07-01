@@ -165,6 +165,7 @@ async def chat(
             messages,
             session_id=body.session_id,
             auth_context=body.auth_context,
+            device=body.device,
         )
         return _build_chat_response(result, response_id)
     except HTTPException:

@@ -57,13 +57,13 @@ def _build_user_prompt(query: str, chunks: List[Any], history_text: str) -> str:
 
 
 def answer(query: str, chunks: List[Any], *, language: Optional[str] = None,
-           history_text: str = "", memory: Optional[str] = None) -> Dict[str, Any]:
+           device: Optional[str] = None, history_text: str = "", memory: Optional[str] = None) -> Dict[str, Any]:
     # Empty context still goes through the model so rag.md produces a refusal in the
     # user's language, rather than a hardcoded English string.
     response = client.chat.completions.create(
         model=ANSWER_MODEL,
         messages=[
-            {"role": "system", "content": get_system_prompt("rag", language=language, memory=memory)},
+            {"role": "system", "content": get_system_prompt("rag", language=language, device=device, memory=memory)},
             {"role": "user", "content": _build_user_prompt(query, chunks, history_text)},
         ],
         temperature=0,

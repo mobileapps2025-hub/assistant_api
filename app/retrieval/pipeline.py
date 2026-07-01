@@ -26,10 +26,10 @@ def _history_text(messages: List[Dict[str, Any]]) -> str:
 
 
 def run(query: str, messages: List[Dict[str, Any]], *, language: Optional[str] = None,
-        memory: Optional[str] = None) -> Dict[str, Any]:
+        device: Optional[str] = None, memory: Optional[str] = None) -> Dict[str, Any]:
     contextualized = contextualize(query, messages)
     flow(f"🔁 query → '{contextualized[:50]}'")
     chunks = retrieve(contextualized)
     flow(f"📄 retrieved {len(chunks)} chunk(s) from Ragie")
-    return answer(contextualized, chunks, language=language,
+    return answer(contextualized, chunks, language=language, device=device,
                   history_text=_history_text(messages), memory=memory)

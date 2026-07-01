@@ -6,7 +6,7 @@ from app.services.image_validator import ImageValidatorService
 from app.core.config import client, ENABLE_MCL_IMAGE_VALIDATION
 from app.core.logging import get_logger
 from app.core.flow import flow
-from app.models import AuthContext
+from app.models import AuthContext, Device
 from app.tools import MCL_USER_TOOLS
 from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
@@ -78,6 +78,15 @@ def _needs_session_response() -> Dict[str, Any]:
     }
 
 
+def _format_device(device: Optional[Device]) -> str:
+    if not device:
+        return ""
+    label = " ".join(p for p in (device.platform, device.form_factor) if p)
+    if device.app_version:
+        label = f"{label} (app v{device.app_version})".strip()
+    return label.strip()
+
+
 def _recall_memory(auth_context: Optional[AuthContext], query: str = "") -> str:
     user_id = auth_context.user_id if auth_context else None
     try:
@@ -99,12 +108,14 @@ class ChatService:
         self,
         messages: List[Dict[str, Any]],
         session_id: Optional[str] = None,
-        auth_context: Optional[AuthContext] = None
+        auth_context: Optional[AuthContext] = None,
+        device: Optional[Device] = None,
     ) -> Dict[str, Any]:
         latest_user_message = _latest_user_message(messages)
         if not latest_user_message:
             return _no_user_message_response()
 
+        device_context = _format_device(device)
         flow(f"📥 /api/chat · {_preview(latest_user_message)}")
         recall_query = _model_content(latest_user_message)
         if isinstance(recall_query, list):
@@ -114,6 +125,8 @@ class ChatService:
 
         language = detect_language(messages)
         flow(f"🗣 language → {language}")
+        if device_context:
+            flow(f"📱 device → {device_context}")
 
         decision = classify_route(messages)
         logger.info(
@@ -124,7 +137,7 @@ class ChatService:
 
         result = await self._dispatch_route(
             decision.route, messages, latest_user_message, session_id, auth_context,
-            memory_context, language
+            memory_context, language, device_context
         )
         flow(f"✅ response ready ({decision.route})")
         return result
@@ -138,16 +151,18 @@ class ChatService:
         auth_context: Optional[AuthContext],
         memory_context: str,
         language: str,
+        device_context: str,
     ) -> Dict[str, Any]:
         if route == "PERSONAL":
             return await self._handle_personal_request(
-                messages, latest_user_message, session_id, auth_context, memory_context, language
+                messages, latest_user_message, session_id, auth_context,
+                memory_context, language, device_context
             )
         if route == "CHAT":
-            return await self._handle_chat(messages, memory_context, language)
+            return await self._handle_chat(messages, memory_context, language, device_context)
         return await self._handle_text_request(
             messages, latest_user_message, session_id=session_id,
-            memory_context=memory_context, language=language
+            memory_context=memory_context, language=language, device_context=device_context
         )
 
     async def _handle_personal_request(
@@ -158,19 +173,20 @@ class ChatService:
         auth_context: Optional[AuthContext],
         memory_context: str,
         language: str,
+        device_context: str,
     ) -> Dict[str, Any]:
         flow("👤 PERSONAL (user's own data)")
         if not _is_authenticated(auth_context):
             flow("⛔ no MCL session → ask to connect")
             return _needs_session_response()
         tool_result = await self._handle_function_calling(
-            messages, latest_user_message, auth_context, memory_context, language
+            messages, latest_user_message, auth_context, memory_context, language, device_context
         )
         if tool_result is not None:
             return tool_result
         return await self._handle_text_request(
             messages, latest_user_message, session_id=session_id,
-            memory_context=memory_context, language=language
+            memory_context=memory_context, language=language, device_context=device_context
         )
 
     async def _answer_over_image(
@@ -180,6 +196,7 @@ class ChatService:
         image_urls: List[str],
         memory_context: str = "",
         language: str = "",
+        device_context: str = "",
     ) -> Dict[str, Any]:
         logger.info(f"Answering over {len(image_urls)} image(s)")
 
@@ -207,7 +224,8 @@ class ChatService:
 
         api_messages = [
             {"role": "system", "content": get_system_prompt(
-                "vision", language=language or None, memory=memory_context or None
+                "vision", language=language or None, device=device_context or None,
+                memory=memory_context or None
             )}
         ]
         if chunks:
@@ -249,6 +267,7 @@ class ChatService:
         auth_context: AuthContext,
         memory_context: str = "",
         language: str = "",
+        device_context: str = "",
     ) -> Optional[Dict[str, Any]]:
         """
         Run GPT function-calling for an authenticated, personal-data query.
@@ -263,7 +282,8 @@ class ChatService:
             user_query = " ".join([item["text"] for item in user_query if item.get("type") == "text"])
 
         system_prompt = get_system_prompt(
-            "tools", language=language or None, tools_catalog=MCL_USER_TOOLS, memory=memory_context or None
+            "tools", language=language or None, device=device_context or None,
+            tools_catalog=MCL_USER_TOOLS, memory=memory_context or None
         )
 
         api_messages = [{"role": "system", "content": system_prompt}]
@@ -382,12 +402,14 @@ class ChatService:
             }
 
     async def _handle_chat(
-        self, messages: List[Dict[str, Any]], memory_context: str = "", language: str = ""
+        self, messages: List[Dict[str, Any]], memory_context: str = "", language: str = "",
+        device_context: str = ""
     ) -> Dict[str, Any]:
         flow("💬 CHAT → direct reply")
         system_prompt = get_system_prompt(
             "chat",
             language=language or None,
+            device=device_context or None,
             memory=memory_context or None,
             tools_catalog=MCL_USER_TOOLS,
         )
@@ -417,12 +439,13 @@ class ChatService:
         session_id: Optional[str] = None,
         memory_context: str = "",
         language: str = "",
+        device_context: str = "",
     ) -> Dict[str, Any]:
         image_urls = _image_urls(latest_user_message)
         if image_urls:
             flow("📚 KNOWLEDGE → image path")
             return await self._answer_over_image(
-                messages, latest_user_message, image_urls, memory_context, language
+                messages, latest_user_message, image_urls, memory_context, language, device_context
             )
 
         flow("📚 KNOWLEDGE → text path")
@@ -434,7 +457,10 @@ class ChatService:
         logger.info(f"[KNOWLEDGE] query='{user_query[:60]}'")
 
         try:
-            result = run_retrieval(user_query, messages, language=language or None, memory=memory_context or None)
+            result = run_retrieval(
+                user_query, messages, language=language or None,
+                device=device_context or None, memory=memory_context or None
+            )
             return {"response": result["answer"], "success": True, "has_vision": False}
         except Exception as e:
             logger.error(f"[KNOWLEDGE] retrieval failed: {e}")

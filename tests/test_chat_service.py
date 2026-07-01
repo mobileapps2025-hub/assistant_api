@@ -1,7 +1,16 @@
 import types
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.services.chat_service import ChatService
+from app.services.chat_service import ChatService, _format_device
+from app.models import Device
+
+
+def test_format_device_combines_present_fields():
+    assert _format_device(Device(platform="iOS", form_factor="phone", app_version="8.2.1")) == "iOS phone (app v8.2.1)"
+    assert _format_device(Device(platform="Android")) == "Android"
+    assert _format_device(Device(form_factor="tablet")) == "tablet"
+    assert _format_device(None) == ""
+    assert _format_device(Device()) == ""
 
 
 def make_service(mock_vision_service, mock_image_validator):

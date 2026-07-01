@@ -55,6 +55,14 @@ def test_memory_block_injected_only_when_requested():
     assert "# MEMORY CONTEXT" in with_memory
     assert "The user's name is Tomas." in with_memory
 
+
+def test_device_directive_injected_only_when_requested():
+    with_device = get_system_prompt("rag", device="iOS phone")
+    assert "# DEVICE" in with_device
+    assert "iOS phone" in with_device
+
+    assert "# DEVICE" not in get_system_prompt("rag")
+
     assert "# MEMORY CONTEXT" not in get_system_prompt("chat")
 
 

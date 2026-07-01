@@ -77,10 +77,17 @@ class UserMarketsResponse(BaseModel):
     total: int
 
 
+class Device(BaseModel):
+    platform: Optional[str] = None      # iOS | Android | Web
+    form_factor: Optional[str] = None   # phone | tablet | desktop
+    app_version: Optional[str] = None
+
+
 class ChatRequest(BaseModel):
     messages: List[Message]
     session_id: Optional[str] = None
     auth_context: Optional[AuthContext] = None
+    device: Optional[Device] = None
 
 
 class FeedbackRequest(BaseModel):
