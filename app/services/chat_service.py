@@ -78,10 +78,10 @@ def _needs_session_response() -> Dict[str, Any]:
     }
 
 
-def _recall_memory(auth_context: Optional[AuthContext]) -> str:
+def _recall_memory(auth_context: Optional[AuthContext], query: str = "") -> str:
     user_id = auth_context.user_id if auth_context else None
     try:
-        return MemoryService(user_id).recall_context()
+        return MemoryService(user_id).recall_context(query)
     except Exception:
         return ""
 
@@ -106,7 +106,10 @@ class ChatService:
             return _no_user_message_response()
 
         flow(f"📥 /api/chat · {_preview(latest_user_message)}")
-        memory_context = _recall_memory(auth_context)
+        recall_query = _model_content(latest_user_message)
+        if isinstance(recall_query, list):
+            recall_query = " ".join(i.get("text", "") for i in recall_query if i.get("type") == "text")
+        memory_context = _recall_memory(auth_context, recall_query)
         flow(f"🧠 memory: {'recalled' if memory_context else 'none'}")
 
         language = detect_language(messages)

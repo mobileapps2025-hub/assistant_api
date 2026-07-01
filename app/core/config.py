@@ -33,6 +33,21 @@ def _resolve_public_url() -> str:
 
 API_PUBLIC_URL = _resolve_public_url()
 
+
+def _resolve_memories_dir() -> str:
+    explicit = os.getenv("MEMORIES_DIR")
+    if explicit:
+        return explicit
+    # On Azure App Service the app dir is wiped on each redeploy, but everything under
+    # $HOME (Azure Files-backed) persists and is shared across instances. Default there
+    # when we detect Azure; otherwise use a local dir for dev.
+    if os.getenv("WEBSITE_HOSTNAME"):
+        return os.path.join(os.getenv("HOME", "/home"), "data", "memories")
+    return os.path.join(os.path.dirname(__file__), "..", "memories")
+
+
+MEMORIES_DIR = _resolve_memories_dir()
+
 # --- CORS ---
 # Comma-separated list of allowed origins, e.g. "https://myapp.azurewebsites.net,http://localhost:5001"
 CORS_ORIGINS = [

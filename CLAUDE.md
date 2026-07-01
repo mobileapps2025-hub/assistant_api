@@ -28,6 +28,8 @@ no local vector store and no startup ingestion.
 | `API_PUBLIC_URL` | No | `http://127.0.0.1:8001` | Public base URL used to build `/api/ragie/image` links the frontend can load |
 | `DATABASE_CONNECTION_STRING` | No | `""` | Async SQL Server; feedback system disabled without it |
 | `CORS_ORIGINS` | No | localhost ports | Comma-separated allowed origins |
+| `MEMORIES_DIR` | No | `$HOME/data/memories` on Azure, else `app/memories` | Where per-user durable memory is stored. Defaults to Azure's persistent `$HOME` (survives redeploys) when `WEBSITE_HOSTNAME` is set; override to relocate. |
+| `MEMORY_SELECT_THRESHOLD` | No | `8` | Above this many stored memories, recall runs a `gpt-4o-mini` relevance selector for the current question; at/below it, all memories are sent (no extra call). |
 | `ENABLE_MCL_IMAGE_VALIDATION` | No | `false` | Pre-check uploaded images are MCL screens |
 | `FLOW_TRACE` | No | `true` | Prints a human-readable, arrow-connected flow trace to stderr for manual testing (`app/core/flow.py`). Set `false` in production. |
 

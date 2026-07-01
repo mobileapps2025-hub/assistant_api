@@ -4,16 +4,26 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
-from app.core.config import client
+from app.core.config import client, MEMORIES_DIR
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-MEMORIES_DIR = os.path.join(os.path.dirname(__file__), "..", "memories")
 ANONYMOUS_SCOPE = "_anonymous"
 RECALL_MAX_ITEMS = int(os.getenv("MEMORY_RECALL_MAX_ITEMS", "20"))
 RECALL_MAX_CHARS = int(os.getenv("MEMORY_RECALL_MAX_CHARS", "4000"))
+# Below this many memories, sending them all is cheaper than an LLM call to narrow them.
+RECALL_SELECT_THRESHOLD = int(os.getenv("MEMORY_SELECT_THRESHOLD", "8"))
+SELECT_MODEL = "gpt-4o-mini"
 _IMPORTANCE_RANK = {"high": 0, "medium": 1, "low": 2}
+
+SELECT_PROMPT = """You pick which stored memories about a user are relevant to their CURRENT question.
+You get the question and a list of memories (id, title, content).
+Return the ids worth injecting to answer THIS question well.
+- ALWAYS include general preferences that shape any answer (language, response format, tone, the user's role).
+- Include topic memories only when they relate to the question.
+- Return an empty list only if truly nothing applies.
+Output ONLY valid JSON: {"relevant_ids": ["mem_x", "mem_y"]}"""
 
 
 def _generate_id() -> str:
@@ -192,10 +202,45 @@ class MemoryService:
         existing["content"] = content
         return self.save_memory(existing)
 
-    def recall_context(self) -> str:
+    def _select_relevant(self, query: str, memories: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
+        """Ask a cheap model which memories matter for this question.
+
+        Returns the relevant subset, ``[]`` if the model judges none apply, or ``None`` on
+        failure so the caller can fall back to sending everything.
+        """
+        catalog = [
+            {"id": m["id"], "title": m.get("title", ""), "content": m.get("content", "")[:200]}
+            for m in memories
+        ]
+        try:
+            response = client.chat.completions.create(
+                model=SELECT_MODEL,
+                messages=[
+                    {"role": "system", "content": SELECT_PROMPT},
+                    {"role": "user", "content": json.dumps({"question": query, "memories": catalog}, ensure_ascii=False)},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0,
+                timeout=10,
+            )
+            ids = set(json.loads(response.choices[0].message.content).get("relevant_ids", []))
+            selected = [m for m in memories if m["id"] in ids]
+            logger.info(f"[MEMORY] selector kept {len(selected)}/{len(memories)} for query")
+            return selected
+        except Exception as e:
+            logger.warning(f"[MEMORY] selector failed, sending all: {e}")
+            return None
+
+    def recall_context(self, query: str = "") -> str:
         if not self.scoped:
             return ""
         memories = self.list_memories()
+        if not memories:
+            return ""
+        if query and len(memories) > RECALL_SELECT_THRESHOLD:
+            selected = self._select_relevant(query, memories)
+            if selected is not None:
+                memories = selected
         if not memories:
             return ""
         memories.sort(key=lambda m: (_IMPORTANCE_RANK.get(m.get("importance", "low"), 2),))
