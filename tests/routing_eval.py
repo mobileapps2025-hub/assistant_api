@@ -16,6 +16,11 @@ except Exception:
     pass
 
 from app.routing import classify_route
+from app.tools import MCL_USER_TOOLS
+
+
+def route(messages):
+    return classify_route(messages, tools_catalog=MCL_USER_TOOLS)
 
 
 def U(text):
@@ -33,6 +38,16 @@ LABELED = [
     {"messages": [U("what can you do?")], "expected": "CHAT"},
     {"messages": [U("are you a real person?")], "expected": "CHAT"},
     {"messages": [U("Hallo, wie geht's?")], "expected": "CHAT"},
+
+    # Capability / meta questions about the assistant herself (must NOT go to KNOWLEDGE)
+    {"messages": [U("What kind of data can you get me?")], "expected": "CHAT", "note": "capability"},
+    {"messages": [U("Can you delete a task for me?")], "expected": "CHAT", "note": "capability (no write route yet)"},
+    {"messages": [U("What can you help me with"),
+                  A("I can help with MCL how-to questions and look up your own MCL data, like your checklists or open tasks."),
+                  U('about "my data" what do you mean? What kind of data')],
+     "expected": "CHAT", "note": "self-reference to the bot's own words"},
+    {"messages": [A("Anything else?"), U("what do you mean by that?")],
+     "expected": "CHAT", "note": "refers back to assistant's words"},
 
     # KNOWLEDGE
     {"messages": [U("How do I create a checklist?")], "expected": "KNOWLEDGE"},
@@ -74,7 +89,7 @@ def run_accuracy():
     passed = 0
     misroutes = []
     for case in LABELED:
-        decision = classify_route(case["messages"])
+        decision = route(case["messages"])
         ok = decision.route == case["expected"]
         passed += ok
         latest = case["messages"][-1]["content"]
@@ -95,7 +110,7 @@ def run_determinism(repeats=3):
     print("\n=== Determinism (same input must give same route) ===")
     all_stable = True
     for messages in DETERMINISM_SUBSET:
-        routes = [classify_route(messages).route for _ in range(repeats)]
+        routes = [route(messages).route for _ in range(repeats)]
         stable = len(set(routes)) == 1
         all_stable = all_stable and stable
         latest = messages[-1]["content"]

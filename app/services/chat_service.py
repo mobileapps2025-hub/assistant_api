@@ -128,7 +128,7 @@ class ChatService:
         if device_context:
             flow(f"📱 device → {device_context}")
 
-        decision = classify_route(messages)
+        decision = classify_route(messages, tools_catalog=MCL_USER_TOOLS)
         logger.info(
             f"[ROUTE] route={decision.route} authed={_is_authenticated(auth_context)} "
             f"reason={decision.reason[:80]}"

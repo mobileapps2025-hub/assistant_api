@@ -21,11 +21,35 @@ ROUTING_MODEL = "gpt-4o-mini"
 DEFAULT_ROUTE: Route = "KNOWLEDGE"
 HISTORY_TURNS = 6
 
-ROUTING_SYSTEM_PROMPT = """You route a user's message to exactly one handler. Read the whole conversation, but classify the user's LATEST message; earlier turns are context only (use them to resolve follow-ups like "and how do I delete it?").
-PERSONAL — the user wants their OWN live data, which the assistant must fetch from the MCL service API using the user's session token: their profile/account, their company or role, the markets assigned to them, their own checklists, or how many open tasks they have. Typical phrasing: "my ...", "do I have ...", "who am I", "how many tasks do I have".
-KNOWLEDGE — a GENERAL question about how the MCL app works that does NOT need the user's own data or any live service call, answerable from the documentation: how to use a feature, what something is or means, troubleshooting, platform/device differences, dashboards, sync issues.
-CHAT — the user is just talking: greeting, thanks, small talk, testing the bot, asking about YOU (the bot), casual conversation.
+_ROUTING_SYSTEM_TEMPLATE = """You route a user's message for MarieClaire, an MCL (Mobile Checklist) support assistant. MarieClaire can do exactly three things:
+- answer general MCL how-to questions from documentation,
+- look up the user's OWN live data via these tools: {tools},
+- chat, and explain what she herself is and can do.
+
+Read the whole conversation, but classify the user's LATEST message; earlier turns are context (use them to resolve follow-ups like "and how do I delete it?" and references like "what do you mean by that?").
+
+PERSONAL — the user wants their OWN live data that MarieClaire must fetch via the tools above: their profile/account, company or role, assigned markets, their own checklists, or their open task count. Typical phrasing: "my ...", "do I have ...", "who am I", "how many tasks do I have".
+KNOWLEDGE — a GENERAL question about how the MCL app works, answerable from documentation: how to use a feature, what something is or means IN MCL, troubleshooting, platform/device differences, dashboards, sync. This is about the PRODUCT, not about the assistant.
+CHAT — small talk AND anything about the ASSISTANT HERSELF: greetings, thanks, testing; who she is; what she can do or fetch for you ("what can you help with", "what kind of data can you get me", "can you delete a task?"); or a message that refers back to her own words ("what do you mean by 'my data'?").
+
+Decisive rule: if the message is about what the ASSISTANT can do, her scope, or her own prior words, choose CHAT — even when it mentions MCL data or features. KNOWLEDGE is only for questions about the MCL product itself.
 Pick the single best route for the latest message."""
+
+_DEFAULT_TOOLS_SUMMARY = "the user's profile, their markets, their checklists, and their open task count"
+
+
+def _render_tools(tools_catalog: List[Any]) -> str:
+    names = []
+    for tool in tools_catalog or []:
+        fn = tool.get("function", tool) if isinstance(tool, dict) else {}
+        name = fn.get("name")
+        if name:
+            names.append(name)
+    return ", ".join(names) if names else _DEFAULT_TOOLS_SUMMARY
+
+
+def _system_prompt(tools_catalog: List[Any]) -> str:
+    return _ROUTING_SYSTEM_TEMPLATE.format(tools=_render_tools(tools_catalog))
 
 _ROUTE_SCHEMA = {
     "name": "route_decision",
@@ -70,7 +94,8 @@ def _recent_turns(messages: List[Dict[str, Any]], history_turns: int) -> List[Di
     return turns
 
 
-def classify_route(messages: List[Dict[str, Any]], *, history_turns: int = HISTORY_TURNS) -> RouteDecision:
+def classify_route(messages: List[Dict[str, Any]], *, history_turns: int = HISTORY_TURNS,
+                   tools_catalog: List[Any] = None) -> RouteDecision:
     turns = _recent_turns(messages, history_turns)
     if not turns or turns[-1]["role"] != "user":
         return RouteDecision("CHAT", "no user message to classify")
@@ -78,7 +103,7 @@ def classify_route(messages: List[Dict[str, Any]], *, history_turns: int = HISTO
     try:
         response = client.chat.completions.create(
             model=ROUTING_MODEL,
-            messages=[{"role": "system", "content": ROUTING_SYSTEM_PROMPT}, *turns],
+            messages=[{"role": "system", "content": _system_prompt(tools_catalog)}, *turns],
             response_format={"type": "json_schema", "json_schema": _ROUTE_SCHEMA},
             temperature=0,
             timeout=10,

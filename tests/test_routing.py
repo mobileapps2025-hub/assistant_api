@@ -113,6 +113,24 @@ def test_multimodal_text_is_extracted():
     assert sent[-1]["content"] == "who am I"
 
 
+def test_tool_catalog_and_capability_rule_reach_system_prompt():
+    catalog = [{"type": "function", "function": {"name": "get_open_task_count", "description": "..."}}]
+    with patch("app.routing.router.client") as mock_client:
+        mock_client.chat.completions.create.return_value = _response(_decision_json("CHAT"))
+        classify_route([{"role": "user", "content": "what data can you get me?"}], tools_catalog=catalog)
+        system_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    assert "get_open_task_count" in system_prompt          # real capabilities injected
+    assert "ASSISTANT" in system_prompt                    # capability-vs-product rule present
+
+
+def test_system_prompt_has_default_tools_summary_without_catalog():
+    with patch("app.routing.router.client") as mock_client:
+        mock_client.chat.completions.create.return_value = _response(_decision_json("CHAT"))
+        classify_route([{"role": "user", "content": "hi"}])
+        system_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    assert "open task count" in system_prompt
+
+
 def test_public_api_surface():
     assert hasattr(routing, "classify_route")
     assert hasattr(routing, "Route")
