@@ -1,5 +1,4 @@
 import json
-from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from app.services.vision_service import VisionService
 from app.services.image_validator import ImageValidatorService
@@ -7,7 +6,7 @@ from app.core.config import client, ENABLE_MCL_IMAGE_VALIDATION
 from app.core.logging import get_logger
 from app.core.flow import flow
 from app.models import AuthContext, Device
-from app.tools import MCL_USER_TOOLS
+from app.tools import MCL_USER_TOOLS, get_spec
 from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
 from app.instructions import get_system_prompt
@@ -318,42 +317,16 @@ class ChatService:
                 }
             flow("🛡 enforcement: tool allowed")
 
-            mcl = MCLServiceClient()
-            if function_name == "get_user_info":
-                info = await mcl.get_user_info(auth_context.access_token)
-                data = {
-                    "full_name": info.get("fullName"),
-                    "email": info.get("email"),
-                    "company_id": info.get("companyId"),
-                    "company_name": info.get("companyName"),
-                    "role_id": info.get("roleId"),
-                    "can_create_task": info.get("createTask"),
-                }
-            elif function_name == "get_user_markets":
-                data = await mcl.get_markets_by_username(
-                    auth_context.access_token,
-                    auth_context.email,
-                )
-            elif function_name == "get_user_checklists":
-                # CheckListDate needs a window; use a wide range around today.
-                now = datetime.utcnow()
-                date_from = (now - timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%S")
-                date_to = (now + timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%S")
-                data = await mcl.get_checklists_by_date(
-                    auth_context.access_token,
-                    auth_context.user_id,
-                    date_from,
-                    date_to,
-                )
-            elif function_name == "get_open_task_count":
-                data = await mcl.get_open_task_count(
-                    auth_context.access_token,
-                    auth_context.user_id,
-                )
-            else:
-                logger.warning(f"[FC] Unknown tool '{function_name}' — falling through to RAG")
+            spec = get_spec(function_name)
+            if spec is None or spec.handler is None:
+                logger.warning(f"[FC] Unknown/handlerless tool '{function_name}' — falling through to RAG")
                 return None
 
+            try:
+                tool_args = json.loads(tool_call.function.arguments or "{}")
+            except (ValueError, TypeError):
+                tool_args = {}
+            data = await spec.handler(MCLServiceClient(), auth_context, tool_args)
             tool_result = json.dumps(data, ensure_ascii=False)
 
             api_messages.append({

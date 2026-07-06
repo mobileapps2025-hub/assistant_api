@@ -65,6 +65,10 @@ LABELED = [
     {"messages": [U("Show me my checklists")], "expected": "PERSONAL"},
     {"messages": [U("What's my role and company?")], "expected": "PERSONAL"},
     {"messages": [U("Wie viele offene Aufgaben habe ich?")], "expected": "PERSONAL"},
+    # Company-config reads (new tools) — the user's own company data, fetched via tools
+    {"messages": [U("What departments does my company have?")], "expected": "PERSONAL", "note": "company tool"},
+    {"messages": [U("What questions are configured in our checklists?")], "expected": "PERSONAL", "note": "company tool"},
+    {"messages": [U("Which markets belong to each department?")], "expected": "PERSONAL", "note": "company tool"},
 
     # Follow-ups that need conversation context
     {"messages": [U("How do I create a checklist?"), A("Use the Checklist Wizard."), U("and how do I delete one?")],

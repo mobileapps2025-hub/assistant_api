@@ -28,7 +28,7 @@ _ROUTING_SYSTEM_TEMPLATE = """You route a user's message for MarieClaire, an MCL
 
 Read the whole conversation, but classify the user's LATEST message; earlier turns are context (use them to resolve follow-ups like "and how do I delete it?" and references like "what do you mean by that?").
 
-PERSONAL — the user wants their OWN live data that MarieClaire must fetch via the tools above: their profile/account, company or role, assigned markets, their own checklists, or their open task count. Typical phrasing: "my ...", "do I have ...", "who am I", "how many tasks do I have".
+PERSONAL — the user wants their OWN live data that MarieClaire must fetch via the tools above: their profile/account, company or role, assigned markets, their own checklists, their open task count, or their company's actual configuration (its departments, its checklist questions, how its markets map to departments). Typical phrasing: "my ...", "our ...", "do I have ...", "who am I", "what departments/questions/markets does my company have". Prefer PERSONAL when the question asks about the user's own company's concrete data, even without the word "my".
 KNOWLEDGE — a GENERAL question about how the MCL app works, answerable from documentation: how to use a feature, what something is or means IN MCL, troubleshooting, platform/device differences, dashboards, sync. This is about the PRODUCT, not about the assistant.
 CHAT — small talk AND anything about the ASSISTANT HERSELF: greetings, thanks, testing; who she is; what she can do or fetch for you ("what can you help with", "what kind of data can you get me", "can you delete a task?"); or a message that refers back to her own words ("what do you mean by 'my data'?").
 

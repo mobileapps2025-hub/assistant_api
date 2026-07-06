@@ -110,6 +110,36 @@ class MCLServiceClient:
             params={"UserId": user_id, "From": date_from, "To": date_to},
         )
 
+    # --- Company config reads (verified 200 against mcl-dev-services) ---------
+
+    async def get_company_questions(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/CompanyQuestions", access_token, params={"CompanyId": company_id})
+
+    async def get_company_departments(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/CompanyDepartments", access_token, params={"CompanyId": company_id})
+
+    async def get_company_departments_markets(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/CompanyDepartmentsMarkets", access_token, params={"CompanyId": company_id})
+
+    async def get_services_to_download(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/ServicesToDownload", access_token, params={"CompanyId": company_id})
+
+    async def get_synchronization(self, access_token: str, company_id: str, user_id: str) -> Dict[str, Any]:
+        return await self._get(
+            "/v8/Synchronization", access_token, params={"CompanyId": company_id, "UserId": user_id}
+        )
+
+    async def get_company_emails(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/CompanyEmails", access_token, params={"CompanyId": company_id})
+
+    async def get_task_users(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/api/Task/TaskUsers", access_token, params={"CompanyId": company_id})
+
+    async def get_task_todos(self, access_token: str, company_id: str, user_id: str) -> List[Dict[str, Any]]:
+        return await self._get(
+            "/v8/api/Task/ToDos", access_token, params={"CompanyId": company_id, "UserId": user_id}
+        )
+
     async def get_open_task_count(
         self, access_token: str, user_id: str
     ) -> int:
