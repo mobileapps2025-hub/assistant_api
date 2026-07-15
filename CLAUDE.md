@@ -42,12 +42,13 @@ in-house vector store.
 ### Request flow (`app/services/chat_service.py`)
 
 1. `POST /api/chat` → `ChatService.process_chat_request()`.
-2. **Route** every message via `classify_route` (one deterministic `gpt-4o-mini` call;
-   **vision-aware** — the screenshot is included when present) into one of:
-   - **CHAT** → `_handle_chat` (direct reply; sees the image if attached).
-   - **KNOWLEDGE** → `_handle_text_request` → `app/retrieval` (contextualize → Ragie retrieve → grounded, cited answer). **With an image** it runs `_answer_over_image` instead (`build_vision_query` → Ragie → answer over the screenshot, cited + enforced).
+2. **Detect language** (`detect_language`, gpt-4o-mini on the last ≤3 user messages) and **format the caller's `device`** (`{platform, form_factor, app_version}`); both feed prompt slots (`# LANGUAGE`, `# DEVICE`) on every path.
+3. **Route** every message via `classify_route` (one deterministic `gpt-4o-mini` call;
+   **vision-aware** — the screenshot is included when present; **capability-aware** — it receives `MCL_USER_TOOLS` so it knows the agent's real tools) into one of:
+   - **CHAT** → `_handle_chat` (direct reply; also owns questions **about the assistant itself** — what it is / can do / its own prior words; carries the tool catalog so it answers from real capabilities). Sees the image if attached.
+   - **KNOWLEDGE** → `_handle_text_request` → `app/retrieval` (contextualize → Ragie retrieve → grounded, cited answer). Only for questions about the **MCL product**. **With an image** it runs `_answer_over_image` instead (`build_vision_query` → Ragie → answer over the screenshot, cited + enforced).
    - **PERSONAL** → `_handle_personal_request` → forced MCL tool call (needs a connected session); the image rides along as context.
-4. Per-user **memory** is recalled once and injected into every path's system prompt.
+4. Per-user **memory** is recalled once (query-aware: a gpt-4o-mini selector narrows to relevant memories when the user has > `MEMORY_SELECT_THRESHOLD`) and injected into every path's system prompt.
 5. **Enforcement** sanitizes answers (citations/images) and gates tool calls (deny-by-default allowlist).
 
 ### The five layers → packages
@@ -55,7 +56,7 @@ in-house vector store.
 | Layer | Package | Role |
 |-------|---------|------|
 | 1 Instruction | `app/instructions/` | `get_system_prompt(mode, ...)` — one CORE identity + per-mode files |
-| 2 Routing | `app/routing/` | `classify_route` → CHAT / KNOWLEDGE / PERSONAL (structured output) |
+| 2 Routing | `app/routing/` | `classify_route` (capability-aware — takes `tools_catalog`) → CHAT / KNOWLEDGE / PERSONAL; `detect_language` (structured output) |
 | 3 Memory | `app/services/memory_service.py` | per-user durable memory (`app/memories/{user_id}/`), capped recall |
 | 4 Hooks/enforcement | `app/enforcement/` | citation/image sanitize + tool allowlist (deny-by-default) + audit |
 | 5 Retrieval & tools | `app/retrieval/`, `app/tools.py`, `app/clients/` | Ragie retrieve+answer; MCL user tools |

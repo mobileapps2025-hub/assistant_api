@@ -4,12 +4,12 @@ Deterministic guardrails: fabricated citations and unverified image links are st
 tool execution is deny-by-default (only allowlisted read tools run; write/destructive denied).
 """
 from app.enforcement import (
-    ALLOWED_TOOLS,
     check_tool_call,
     enforce_answer,
     enforce_citations,
     enforce_image_refs,
 )
+from app.tools import exposed_specs
 
 
 # --- citation grounding ---
@@ -62,9 +62,11 @@ def test_enforce_answer_combines_both():
 
 # --- tool security ---
 
-def test_allowlisted_read_tools_pass():
-    for name in ALLOWED_TOOLS:
-        assert check_tool_call(name).allowed is True
+def test_exposed_read_tools_pass():
+    exposed = exposed_specs()
+    assert exposed  # registry has live tools
+    for spec in exposed:
+        assert check_tool_call(spec.name).allowed is True
 
 
 def test_unknown_tool_denied_by_default():
@@ -76,3 +78,9 @@ def test_unknown_tool_denied_by_default():
 def test_write_style_tool_denied():
     for name in ("delete_user", "update_checklist", "create_task", "drop_table"):
         assert check_tool_call(name).allowed is False
+
+
+def test_registered_but_gated_tool_denied():
+    # in the registry, but exposed/executable = false → must not run
+    assert check_tool_call("get_company_markets").allowed is False
+    assert check_tool_call("get_company_checklists").allowed is False

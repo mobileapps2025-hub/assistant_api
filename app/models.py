@@ -119,11 +119,31 @@ class FeedbackResponse(BaseModel):
         from_attributes = True
 
 
+class Confirmation(BaseModel):
+    id: str
+    risk: str                # write | destructive
+    action_summary: str
+
+
 class ChatResponse(BaseModel):
     """Chat response with tracking ID."""
     response: str
     response_id: str
     sources: Optional[List[str]] = None
+    requires_confirmation: bool = False
+    confirmation: Optional[Confirmation] = None
+
+
+class ConfirmRequest(BaseModel):
+    confirmation_id: str
+    decision: str            # approve | reject
+    auth_context: Optional[AuthContext] = None
+
+
+# temporary: username/password login for testing, until the MCL shared-session handoff lands.
+class LoginRequest(BaseModel):
+    user_name: str
+    password: str
 
     class Config:
         json_schema_extra = {

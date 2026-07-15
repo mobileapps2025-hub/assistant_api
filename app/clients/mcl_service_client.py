@@ -42,6 +42,56 @@ class MCLServiceClient:
             resp.raise_for_status()
             return resp.json()
 
+    async def _post(
+        self,
+        path: str,
+        access_token: str,
+        json_body: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Perform an authenticated POST against the MCL service."""
+        url = f"{self.base_url}{path}"
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(url, json=json_body, headers=self._auth_headers(access_token))
+            if resp.status_code >= 400:
+                logger.error(f"[MCL] POST {path} -> {resp.status_code}: {resp.text[:600]}")
+            resp.raise_for_status()
+            return resp.json() if resp.content else None
+
+    async def delete_task(self, access_token: str, company_id: str, todo_id: str) -> Any:
+        return await self._post("/v8/DeleteTask", access_token, {"companyId": company_id, "todoId": todo_id})
+
+    async def add_task(self, access_token: str, company_id: str, user_id: str, todo: Dict[str, Any]) -> Any:
+        body = {"todo": {**todo, "com_id": company_id, "tdo_mcl": True}, "userId": user_id}
+        return await self._post("/v8/AddTaskMCL", access_token, body)
+
+    async def edit_task(
+        self, access_token: str, company_id: str, todo_id: str,
+        description: Optional[str] = None, due_date: Optional[str] = None,
+    ) -> Any:
+        body: Dict[str, Any] = {"companyId": company_id, "todoId": todo_id}
+        if description is not None:
+            body["descripction"] = description   # upstream field is misspelled
+        if due_date is not None:
+            body["dueDate"] = due_date
+        return await self._post("/v8/EditTask", access_token, body)
+
+    async def add_task_note(
+        self, access_token: str, company_id: str, user_id: str, todo_id: str, note: str,
+    ) -> Any:
+        body = {
+            "companyId": company_id, "todoId": todo_id, "noteDescription": note, "closeTask": False,
+            "userCreatedId": user_id, "noteOwnerId": user_id, "userAssignedId": user_id,
+        }
+        return await self._post("/v8/AddTaskNoteMCL", access_token, body)
+
+    async def login(self, user_name: str, password: str) -> str:
+        """Temporary: exchange MCL credentials for a bearer token via /Token (no auth header)."""
+        url = f"{self.base_url}/Token"
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(url, json={"userName": user_name, "password": password})
+            resp.raise_for_status()
+            return resp.json().get("access_token", "")
+
     async def get_user_info(self, access_token: str) -> Dict[str, Any]:
         """Resolve the user's identity from a shared MCL bearer token.
 
@@ -108,6 +158,36 @@ class MCLServiceClient:
             "/v8/CheckListDate",
             access_token,
             params={"UserId": user_id, "From": date_from, "To": date_to},
+        )
+
+    # --- Company config reads (verified 200 against mcl-dev-services) ---------
+
+    async def get_company_questions(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/CompanyQuestions", access_token, params={"CompanyId": company_id})
+
+    async def get_company_departments(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/CompanyDepartments", access_token, params={"CompanyId": company_id})
+
+    async def get_company_departments_markets(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/CompanyDepartmentsMarkets", access_token, params={"CompanyId": company_id})
+
+    async def get_services_to_download(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/ServicesToDownload", access_token, params={"CompanyId": company_id})
+
+    async def get_synchronization(self, access_token: str, company_id: str, user_id: str) -> Dict[str, Any]:
+        return await self._get(
+            "/v8/Synchronization", access_token, params={"CompanyId": company_id, "UserId": user_id}
+        )
+
+    async def get_company_emails(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/CompanyEmails", access_token, params={"CompanyId": company_id})
+
+    async def get_task_users(self, access_token: str, company_id: str) -> List[Dict[str, Any]]:
+        return await self._get("/v8/api/Task/TaskUsers", access_token, params={"CompanyId": company_id})
+
+    async def get_task_todos(self, access_token: str, company_id: str, user_id: str) -> List[Dict[str, Any]]:
+        return await self._get(
+            "/v8/api/Task/ToDos", access_token, params={"CompanyId": company_id, "UserId": user_id}
         )
 
     async def get_open_task_count(

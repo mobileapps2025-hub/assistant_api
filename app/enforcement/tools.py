@@ -10,16 +10,9 @@ from typing import Optional
 
 from app.core.logging import get_logger
 from app.models import AuthContext
+from app.tools import is_executable
 
 logger = get_logger(__name__)
-
-READ_TOOLS = frozenset({
-    "get_user_info",
-    "get_user_markets",
-    "get_user_checklists",
-    "get_open_task_count",
-})
-ALLOWED_TOOLS = READ_TOOLS
 
 
 @dataclass(frozen=True)
@@ -29,10 +22,10 @@ class ToolDecision:
 
 
 def check_tool_call(tool_name: str, auth_context: Optional[AuthContext] = None) -> ToolDecision:
-    if tool_name in ALLOWED_TOOLS:
-        decision = ToolDecision(True, "allowlisted read tool")
+    if is_executable(tool_name):
+        decision = ToolDecision(True, "registry: executable tool")
     else:
-        decision = ToolDecision(False, "denied: not in allowlist (deny-by-default)")
+        decision = ToolDecision(False, "denied: not executable in registry (deny-by-default)")
     user = auth_context.user_id if auth_context else None
     logger.info(
         f"[AUDIT] tool={tool_name} user={user} allowed={decision.allowed} reason={decision.reason}"
