@@ -83,4 +83,4 @@ def test_write_style_tool_denied():
 def test_registered_but_gated_tool_denied():
     # in the registry, but exposed/executable = false → must not run
     assert check_tool_call("get_company_markets").allowed is False
-    assert check_tool_call("get_tasks_mcl").allowed is False
+    assert check_tool_call("get_company_checklists").allowed is False

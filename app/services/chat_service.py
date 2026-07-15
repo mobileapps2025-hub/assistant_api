@@ -13,8 +13,11 @@ from app.instructions import get_system_prompt
 from app.routing import classify_route, detect_language
 from app.retrieval import run as run_retrieval, retrieve, build_vision_query
 from app.enforcement import check_tool_call, enforce_answer
+from app.enforcement.pending import create_pending, take_pending
 
 logger = get_logger(__name__)
+
+MAX_TOOL_STEPS = 5   # bound the read->act tool loop per request
 
 
 def _latest_user_message(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -140,6 +143,32 @@ class ChatService:
         )
         flow(f"✅ response ready ({decision.route})")
         return result
+
+    async def execute_confirmed_action(
+        self, confirmation_id: str, decision: str, auth_context: Optional[AuthContext]
+    ) -> Dict[str, Any]:
+        if decision != "approve":
+            return {"response": "Okay — cancelled. No changes were made.", "success": True, "has_vision": False}
+
+        user_id = auth_context.user_id if auth_context else None
+        pending = take_pending(confirmation_id, user_id)
+        if not pending:
+            return {
+                "response": "That confirmation has expired or wasn't found. Please ask again.",
+                "success": True, "has_vision": False,
+            }
+
+        spec = get_spec(pending["tool"])
+        if spec is None or spec.handler is None or not check_tool_call(pending["tool"], auth_context).allowed:
+            return {"response": "I'm not able to perform that action.", "success": True, "has_vision": False}
+
+        flow(f"✅ confirmed → executing {pending['tool']}")
+        try:
+            await spec.handler(MCLServiceClient(), auth_context, pending["args"])
+            return {"response": f"✓ Done: {pending['summary']}.", "success": True, "has_vision": False}
+        except Exception as e:
+            logger.error(f"[ACTION] confirmed execution failed: {e}")
+            return {"response": "The action failed to complete. Please try again.", "success": True, "has_vision": False}
 
     async def _dispatch_route(
         self,
@@ -289,76 +318,75 @@ class ChatService:
         api_messages.extend({"role": m.get("role"), "content": _model_content(m)} for m in messages)
 
         try:
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=api_messages,
-                tools=MCL_USER_TOOLS,
-                tool_choice="required",
-                temperature=0,
-                timeout=30
-            )
+            # Multi-step loop: run read tools inline and feed results back so the model can
+            # chain (e.g. resolve a task name -> id, then act). First step forces a tool
+            # (PERSONAL must fetch fresh data); after that the model may call another tool or
+            # answer. A write/destructive tool pauses the loop for confirmation.
+            for step in range(MAX_TOOL_STEPS):
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=api_messages,
+                    tools=MCL_USER_TOOLS,
+                    tool_choice="required" if step == 0 else "auto",
+                    parallel_tool_calls=False,
+                    temperature=0,
+                    timeout=30,
+                )
+                choice = response.choices[0]
 
-            choice = response.choices[0]
-            if not choice.message.tool_calls:
-                logger.info("[FC] No tool calls despite required — falling through to RAG")
-                return None
+                if not choice.message.tool_calls:
+                    if step == 0:
+                        logger.info("[FC] No tool calls despite required — falling through to RAG")
+                        return None
+                    return {"response": choice.message.content or "", "success": True, "has_vision": False}
 
-            tool_call = choice.message.tool_calls[0]
-            function_name = tool_call.function.name
-            logger.info(f"[FC] Tool called: {function_name}")
-            flow(f"🔧 tool requested: {function_name}")
+                tool_call = choice.message.tool_calls[0]
+                function_name = tool_call.function.name
+                logger.info(f"[FC] Tool called: {function_name}")
+                flow(f"🔧 tool requested: {function_name}")
 
-            if not check_tool_call(function_name, auth_context).allowed:
-                flow("🛡 enforcement: tool BLOCKED (deny-by-default)")
-                return {
-                    "response": "I'm not able to do that.",
-                    "success": True,
-                    "has_vision": False,
-                }
-            flow("🛡 enforcement: tool allowed")
+                if not check_tool_call(function_name, auth_context).allowed:
+                    flow("🛡 enforcement: tool BLOCKED (deny-by-default)")
+                    return {"response": "I'm not able to do that.", "success": True, "has_vision": False}
+                flow("🛡 enforcement: tool allowed")
 
-            spec = get_spec(function_name)
-            if spec is None or spec.handler is None:
-                logger.warning(f"[FC] Unknown/handlerless tool '{function_name}' — falling through to RAG")
-                return None
+                spec = get_spec(function_name)
+                if spec is None or spec.handler is None:
+                    logger.warning(f"[FC] Unknown/handlerless tool '{function_name}' — falling through to RAG")
+                    return None
 
-            try:
-                tool_args = json.loads(tool_call.function.arguments or "{}")
-            except (ValueError, TypeError):
-                tool_args = {}
-            data = await spec.handler(MCLServiceClient(), auth_context, tool_args)
-            tool_result = json.dumps(data, ensure_ascii=False)
+                try:
+                    tool_args = json.loads(tool_call.function.arguments or "{}")
+                except (ValueError, TypeError):
+                    tool_args = {}
 
-            api_messages.append({
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": tool_call.id,
-                        "type": "function",
-                        "function": {
-                            "name": function_name,
-                            "arguments": tool_call.function.arguments
-                        }
+                if spec.risk != "safe":
+                    summary = spec.summarize(tool_args)
+                    cid = create_pending(function_name, tool_args, auth_context.user_id, summary, spec.risk)
+                    flow(f"⚠ confirmation required: {function_name} ({spec.risk})")
+                    return {
+                        "response": f"⚠ {summary}. This needs your confirmation before I proceed.",
+                        "success": True,
+                        "has_vision": False,
+                        "requires_confirmation": True,
+                        "confirmation": {"id": cid, "risk": spec.risk, "action_summary": summary},
                     }
-                ]
-            })
-            api_messages.append({
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": tool_result
-            })
 
-            final_response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=api_messages,
-                temperature=0,
-                timeout=30
-            )
+                data = await spec.handler(MCLServiceClient(), auth_context, tool_args)
+                api_messages.append({
+                    "role": "assistant", "content": None,
+                    "tool_calls": [{"id": tool_call.id, "type": "function",
+                                    "function": {"name": function_name, "arguments": tool_call.function.arguments}}],
+                })
+                api_messages.append({
+                    "role": "tool", "tool_call_id": tool_call.id,
+                    "content": json.dumps(data, ensure_ascii=False),
+                })
+
+            logger.info("[FC] Max tool steps reached")
             return {
-                "response": final_response.choices[0].message.content,
-                "success": True,
-                "has_vision": False
+                "response": "I couldn't complete that in a few steps — could you rephrase or be more specific?",
+                "success": True, "has_vision": False,
             }
 
         except Exception as e:

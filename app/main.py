@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import exc
 
-from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, SessionRequest, SessionResponse, MarketInfo, UserMarketsResponse, AuthContext, MemorySaveRequest, MemoryInfo, MemoryListResponse, MemorySaveResponse, MemoryUpdateRequest, MemoryRecallResponse, MemoryStoreRequest
+from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, SessionRequest, SessionResponse, MarketInfo, UserMarketsResponse, AuthContext, MemorySaveRequest, MemoryInfo, MemoryListResponse, MemorySaveResponse, MemoryUpdateRequest, MemoryRecallResponse, MemoryStoreRequest, ConfirmRequest, LoginRequest
 from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, CORS_ORIGINS, AsyncSessionLocal, RAGIE_API_KEY, RAGIE_PARTITION
 from app.core.database import Feedback, Base
 from app.core.dependencies import get_chat_service, get_speech_service
@@ -148,7 +148,13 @@ def _build_chat_response(result: dict[str, Any], response_id: str) -> ChatRespon
         error_message = result.get("error", "Unknown error occurred")
         logger.error(f"[CHAT API] Error: {error_message}")
         raise HTTPException(status_code=500, detail=error_message)
-    return ChatResponse(response=result["response"], response_id=response_id, sources=[])
+    return ChatResponse(
+        response=result["response"],
+        response_id=response_id,
+        sources=[],
+        requires_confirmation=result.get("requires_confirmation", False),
+        confirmation=result.get("confirmation"),
+    )
 
 
 @app.post("/api/chat")
@@ -175,6 +181,18 @@ async def chat(
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 
+@app.post("/api/chat/confirm")
+async def confirm_action(
+    body: ConfirmRequest,
+    chat_service: ChatService = Depends(get_chat_service),
+) -> ChatResponse:
+    response_id = generate_response_id()
+    result = await chat_service.execute_confirmed_action(
+        body.confirmation_id, body.decision, body.auth_context
+    )
+    return _build_chat_response(result, response_id)
+
+
 @app.get("/api/ragie/image")
 async def ragie_image(document_id: str, chunk_id: str):
     if not RAGIE_API_KEY:
@@ -199,6 +217,18 @@ async def ragie_image(document_id: str, chunk_id: str):
 
 # --- Feedback Endpoint ---
 
+async def _session_from_token(access_token: str) -> SessionResponse:
+    info = await MCLServiceClient().get_user_info(access_token)
+    return SessionResponse(
+        access_token=access_token,
+        user_id=info.get("id", ""),
+        company_id=info.get("companyId", ""),
+        company_name=info.get("companyName", ""),
+        full_name=info.get("fullName", ""),
+        email=info.get("email", ""),
+    )
+
+
 @app.post("/api/auth/session", response_model=SessionResponse)
 async def resolve_session(body: SessionRequest):
     """Establish a session from a token shared by the MCL app.
@@ -211,21 +241,30 @@ async def resolve_session(body: SessionRequest):
     if not body.access_token:
         raise HTTPException(status_code=400, detail="access_token is required")
     try:
-        client = MCLServiceClient()
-        info = await client.get_user_info(body.access_token)
-        return SessionResponse(
-            access_token=body.access_token,
-            user_id=info.get("id", ""),
-            company_id=info.get("companyId", ""),
-            company_name=info.get("companyName", ""),
-            full_name=info.get("fullName", ""),
-            email=info.get("email", ""),
-        )
+        return await _session_from_token(body.access_token)
     except httpx.HTTPStatusError as e:
         logger.error(f"[SESSION] UserInfo failed: {e.response.status_code}")
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     except Exception as e:
         logger.error(f"[SESSION] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/auth/login", response_model=SessionResponse)
+async def login(body: LoginRequest):
+    """TEMPORARY test login: exchange MCL username/password for a session. Remove once the
+    MCL app hands off the session via the launch URL (see MCL_APP_INTEGRATION docs)."""
+    try:
+        token = await MCLServiceClient().login(body.user_name, body.password)
+        if not token:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        return await _session_from_token(token)
+    except httpx.HTTPStatusError:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[LOGIN] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

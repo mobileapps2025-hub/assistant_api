@@ -69,6 +69,10 @@ LABELED = [
     {"messages": [U("What departments does my company have?")], "expected": "PERSONAL", "note": "company tool"},
     {"messages": [U("What questions are configured in our checklists?")], "expected": "PERSONAL", "note": "company tool"},
     {"messages": [U("Which markets belong to each department?")], "expected": "PERSONAL", "note": "company tool"},
+    # Write actions (need a tool) → PERSONAL
+    {"messages": [U("Create a task to clean the freezer by Friday")], "expected": "PERSONAL", "note": "write action"},
+    {"messages": [U("Delete task 12345")], "expected": "PERSONAL", "note": "write action"},
+    {"messages": [U("Add a note to my task 12345 saying it's blocked")], "expected": "PERSONAL", "note": "write action"},
 
     # Follow-ups that need conversation context
     {"messages": [U("How do I create a checklist?"), A("Use the Checklist Wizard."), U("and how do I delete one?")],
