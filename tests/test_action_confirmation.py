@@ -157,7 +157,7 @@ def test_approve_runs_the_handler():
     with patch("app.services.chat_service.MCLServiceClient", return_value=fake_client):
         out = _run(svc.execute_confirmed_action(cid, "approve", _auth()))
     fake_client.delete_task.assert_awaited_once_with("t", "c", "9")
-    assert out["response"].startswith("✓ Done")
+    assert out["response"] == "✓ Delete task 9"     # ✓ + the model-authored summary, no English "Done:"
 
 
 def test_approve_with_expired_or_wrong_user_does_nothing():

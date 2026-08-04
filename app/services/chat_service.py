@@ -15,7 +15,8 @@ from app.instructions import get_system_prompt, set_request_date
 from app.routing import classify_route, detect_language
 from app.retrieval import run as run_retrieval, retrieve, build_vision_query
 from app.enforcement import check_tool_call, enforce_answer
-from app.enforcement.pending import create_pending, take_pending
+from app.enforcement.pending import create_pending, peek_pending, take_pending
+from app.core.localize import localize
 
 logger = get_logger(__name__)
 
@@ -70,12 +71,13 @@ def _no_user_message_response() -> Dict[str, Any]:
     return {"response": "No user message found.", "success": False, "has_vision": False}
 
 
-def _needs_session_response() -> Dict[str, Any]:
+def _needs_session_response(language: str = "English") -> Dict[str, Any]:
     return {
-        "response": (
+        "response": localize(
             "To answer questions about your own MCL data (your profile, "
             "markets, checklists or tasks) I need your MCL session. "
-            "Please open the assistant from the MCL app, or connect a token first."
+            "Please open the assistant from the MCL app, or connect a token first.",
+            language,
         ),
         "success": True,
         "has_vision": False,
@@ -165,10 +167,11 @@ class ChatService:
     async def execute_confirmed_action(
         self, confirmation_id: str, decision: str, auth_context: Optional[AuthContext]
     ) -> Dict[str, Any]:
-        if decision != "approve":
-            return {"response": "Okay — cancelled. No changes were made.", "success": True, "has_vision": False}
-
         user_id = auth_context.user_id if auth_context else None
+        if decision != "approve":
+            lang = (peek_pending(confirmation_id, user_id) or {}).get("language", "English")
+            return {"response": localize("Okay — cancelled. No changes were made.", lang), "success": True, "has_vision": False}
+
         pending = take_pending(confirmation_id, user_id)
         if not pending:
             return {
@@ -176,17 +179,19 @@ class ChatService:
                 "success": True, "has_vision": False,
             }
 
+        lang = pending.get("language", "English")
         spec = get_spec(pending["tool"])
         if spec is None or spec.handler is None or not check_tool_call(pending["tool"], auth_context).allowed:
-            return {"response": "I'm not able to perform that action.", "success": True, "has_vision": False}
+            return {"response": localize("I'm not able to perform that action.", lang), "success": True, "has_vision": False}
 
         flow(f"✅ confirmed → executing {pending['tool']}")
         try:
             await spec.handler(MCLServiceClient(), auth_context, pending["args"])
-            return {"response": f"✓ Done: {pending['summary']}.", "success": True, "has_vision": False}
+            # pending['summary'] is the model-authored confirmation, already in the user's language.
+            return {"response": f"✓ {pending['summary']}", "success": True, "has_vision": False}
         except Exception as e:
             logger.error(f"[ACTION] confirmed execution failed: {e}")
-            return {"response": "The action failed to complete. Please try again.", "success": True, "has_vision": False}
+            return {"response": localize("The action failed to complete. Please try again.", lang), "success": True, "has_vision": False}
 
     async def _dispatch_route(
         self,
@@ -224,7 +229,7 @@ class ChatService:
         flow("👤 PERSONAL (user's own data)")
         if not _is_authenticated(auth_context):
             flow("⛔ no MCL session → ask to connect")
-            return _needs_session_response()
+            return _needs_session_response(language)
         tool_result = await self._handle_function_calling(
             messages, latest_user_message, auth_context, memory_context, language, device_context
         )
@@ -388,11 +393,11 @@ class ChatService:
                     tool_args = {}
 
                 if spec.risk != "safe":
-                    summary = spec.summarize(tool_args)
-                    cid = create_pending(function_name, tool_args, auth_context.user_id, summary, spec.risk)
+                    summary = spec.summarize(tool_args)   # model-authored, in the user's language
+                    cid = create_pending(function_name, tool_args, auth_context.user_id, summary, spec.risk, language)
                     flow(f"⚠ confirmation required: {function_name} ({spec.risk})")
                     return {
-                        "response": f"⚠ {summary}. This needs your confirmation before I proceed.",
+                        "response": f"⚠ {summary}",
                         "success": True,
                         "has_vision": False,
                         "requires_confirmation": True,
@@ -421,9 +426,10 @@ class ChatService:
             # This is a personal-data query; don't degrade to a RAG
             # "no information found" — return a clear, on-topic message.
             return {
-                "response": (
+                "response": localize(
                     "I couldn't retrieve your information from MCL right now. "
-                    "Please try again in a moment."
+                    "Please try again in a moment.",
+                    language,
                 ),
                 "success": True,
                 "has_vision": False,
