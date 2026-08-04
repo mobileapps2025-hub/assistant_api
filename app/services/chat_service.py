@@ -1,5 +1,7 @@
 import json
+from datetime import datetime
 from typing import List, Dict, Any, Optional
+from zoneinfo import ZoneInfo
 from app.services.vision_service import VisionService
 from app.services.image_validator import ImageValidatorService
 from app.core.config import client, ENABLE_MCL_IMAGE_VALIDATION
@@ -9,7 +11,7 @@ from app.models import AuthContext, Device
 from app.tools import MCL_USER_TOOLS, get_spec
 from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
-from app.instructions import get_system_prompt
+from app.instructions import get_system_prompt, set_request_date
 from app.routing import classify_route, detect_language
 from app.retrieval import run as run_retrieval, retrieve, build_vision_query
 from app.enforcement import check_tool_call, enforce_answer
@@ -80,6 +82,20 @@ def _needs_session_response() -> Dict[str, Any]:
     }
 
 
+def _format_today(timezone: Optional[str]) -> Optional[str]:
+    """Today's date in the user's browser timezone, e.g. "Wednesday, 2026-08-04".
+
+    Returns None on a missing or unrecognised zone so the prompt falls back to the server date.
+    """
+    if not timezone:
+        return None
+    try:
+        return datetime.now(ZoneInfo(timezone)).strftime("%A, %Y-%m-%d")
+    except Exception:
+        logger.warning(f"[DATE] unrecognised timezone '{timezone}' — using server date")
+        return None
+
+
 def _format_device(device: Optional[Device]) -> str:
     if not device:
         return ""
@@ -112,11 +128,13 @@ class ChatService:
         session_id: Optional[str] = None,
         auth_context: Optional[AuthContext] = None,
         device: Optional[Device] = None,
+        timezone: Optional[str] = None,
     ) -> Dict[str, Any]:
         latest_user_message = _latest_user_message(messages)
         if not latest_user_message:
             return _no_user_message_response()
 
+        set_request_date(_format_today(timezone))
         device_context = _format_device(device)
         flow(f"📥 /api/chat · {_preview(latest_user_message)}")
         recall_query = _model_content(latest_user_message)

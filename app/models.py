@@ -88,6 +88,7 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = None
     auth_context: Optional[AuthContext] = None
     device: Optional[Device] = None
+    timezone: Optional[str] = None      # IANA zone from the browser, e.g. "Europe/Berlin"
 
 
 class FeedbackRequest(BaseModel):

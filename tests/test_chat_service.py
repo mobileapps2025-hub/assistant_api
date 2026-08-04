@@ -1,7 +1,8 @@
+import re
 import types
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.services.chat_service import ChatService, _format_device
+from app.services.chat_service import ChatService, _format_device, _format_today
 from app.models import Device
 
 
@@ -11,6 +12,17 @@ def test_format_device_combines_present_fields():
     assert _format_device(Device(form_factor="tablet")) == "tablet"
     assert _format_device(None) == ""
     assert _format_device(Device()) == ""
+
+
+def test_format_today_formats_valid_zone():
+    out = _format_today("Europe/Berlin")
+    assert re.match(r"^[A-Z][a-z]+day, \d{4}-\d{2}-\d{2}$", out)
+
+
+def test_format_today_returns_none_for_missing_or_bad_zone():
+    assert _format_today(None) is None
+    assert _format_today("") is None
+    assert _format_today("Not/AZone") is None
 
 
 def make_service(mock_vision_service, mock_image_validator):

@@ -172,6 +172,7 @@ async def chat(
             session_id=body.session_id,
             auth_context=body.auth_context,
             device=body.device,
+            timezone=body.timezone,
         )
         return _build_chat_response(result, response_id)
     except HTTPException:
