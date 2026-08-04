@@ -316,12 +316,14 @@ class ChatService:
         device_context: str = "",
     ) -> Optional[Dict[str, Any]]:
         """
-        Run GPT function-calling for an authenticated, personal-data query.
+        Run the GPT tool loop for an authenticated, personal-data or action request.
 
-        Called only after the intent has been classified as PERSONAL, so a tool
-        call is forced (tool_choice="required") — the model must fetch fresh data
-        instead of answering from conversation history. Returns a graceful
-        message on error; returns None only in the defensive no-tool-call case.
+        Called after the intent is PERSONAL. The model drives (tool_choice="auto"): it
+        fetches fresh data for lookups, or — for a change — gathers missing details from the
+        user first (returning its question as the reply) and only calls the write tool once
+        ready, which pauses for confirmation. Returns a graceful message on error; returns
+        None only when the model neither calls a tool nor says anything (defensive fall-through
+        to RAG, e.g. a misroute).
         """
         user_query = latest_user_message.get("content", "")
         if isinstance(user_query, list):
@@ -336,16 +338,17 @@ class ChatService:
         api_messages.extend({"role": m.get("role"), "content": _model_content(m)} for m in messages)
 
         try:
-            # Multi-step loop: run read tools inline and feed results back so the model can
-            # chain (e.g. resolve a task name -> id, then act). First step forces a tool
-            # (PERSONAL must fetch fresh data); after that the model may call another tool or
-            # answer. A write/destructive tool pauses the loop for confirmation.
+            # Multi-step agent loop: the model drives — it fetches (reads), asks the user for
+            # missing details before a change, or calls another tool to chain (resolve a task
+            # name -> id, then act). tool_choice="auto" lets it reply with a question instead of
+            # acting; the instruction file keeps reads honest ("a data question means a fresh
+            # lookup"). A write/destructive tool pauses the loop for confirmation.
             for step in range(MAX_TOOL_STEPS):
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=api_messages,
                     tools=MCL_USER_TOOLS,
-                    tool_choice="required" if step == 0 else "auto",
+                    tool_choice="auto",
                     parallel_tool_calls=False,
                     temperature=0,
                     timeout=30,
@@ -353,10 +356,16 @@ class ChatService:
                 choice = response.choices[0]
 
                 if not choice.message.tool_calls:
-                    if step == 0:
-                        logger.info("[FC] No tool calls despite required — falling through to RAG")
-                        return None
-                    return {"response": choice.message.content or "", "success": True, "has_vision": False}
+                    content = (choice.message.content or "").strip()
+                    if content:
+                        # The model asked the user for details, answered a mid-flow question,
+                        # or handled a general question — return it as the reply.
+                        return {"response": content, "success": True, "has_vision": False}
+                    # Neither a tool call nor any text — a rare stuck state. Fall through to the
+                    # model-driven RAG path (language-aware) rather than emit a canned line that
+                    # would always be English regardless of the user's language.
+                    logger.info("[FC] No tool call and no content — falling through to RAG")
+                    return None
 
                 tool_call = choice.message.tool_calls[0]
                 function_name = tool_call.function.name

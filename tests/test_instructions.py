@@ -16,7 +16,7 @@ from app.tools import MCL_USER_TOOLS
 CORE_MARKER = "MCL Support Specialist"
 MODE_MARKERS = {
     "chat": "Casual conversation",
-    "tools": "live MCL lookup",
+    "tools": "Personal data & actions",
     "rag": "SOURCE-BASED TRUTH",
     "vision": "Screenshot help",
 }

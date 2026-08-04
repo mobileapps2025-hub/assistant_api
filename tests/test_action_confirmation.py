@@ -43,6 +43,40 @@ def _tool_response(name, args_json):
     return resp
 
 
+def _text_response(text):
+    resp = MagicMock()
+    resp.choices[0].message.tool_calls = None
+    resp.choices[0].message.content = text
+    return resp
+
+
+def test_fc_asks_for_missing_detail_instead_of_assuming():
+    """A vague create request: the model asks for the name (no tool call) and that question is
+    returned to the user — it must not fall through to RAG or invent a task."""
+    svc = ChatService(None, None)
+    llm = MagicMock()
+    llm.chat.completions.create.side_effect = [_text_response("Sure — what should the task be called?")]
+    with patch("app.services.chat_service.client", llm):
+        out = _run(svc._handle_function_calling(
+            [{"role": "user", "content": "create a task"}],
+            {"content": "create a task"}, _auth()))
+    assert out is not None                                   # did NOT fall through to RAG
+    assert out["response"] == "Sure — what should the task be called?"
+    assert "requires_confirmation" not in out               # nothing staged yet
+
+
+def test_fc_empty_step0_falls_through_to_rag():
+    """No tool call and nothing said on step 0 stays a RAG fall-through (misroute safety net)."""
+    svc = ChatService(None, None)
+    llm = MagicMock()
+    llm.chat.completions.create.side_effect = [_text_response("")]
+    with patch("app.services.chat_service.client", llm):
+        out = _run(svc._handle_function_calling(
+            [{"role": "user", "content": "how do checklists work"}],
+            {"content": "how do checklists work"}, _auth()))
+    assert out is None
+
+
 def test_fc_loop_reads_then_pauses_on_write():
     """Referencing a task by name: the loop runs the read tool inline, then chains to the
     write tool and pauses for confirmation (instead of stopping after the read)."""
