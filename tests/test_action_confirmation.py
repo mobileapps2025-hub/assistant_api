@@ -86,7 +86,7 @@ def test_fc_loop_reads_then_pauses_on_write():
     llm = MagicMock()
     llm.chat.completions.create.side_effect = [
         _tool_response("get_task_todos", "{}"),
-        _tool_response("add_task_note", '{"todo_id":"9","note":"urgent"}'),
+        _tool_response("add_task_note", '{"todo_id":"9","note":"urgent","confirmation":"Add the note \\"urgent\\" to the task \\"Freeze meat\\"."}'),
     ]
     with patch("app.services.chat_service.client", llm), \
          patch("app.services.chat_service.MCLServiceClient", return_value=fake_client):
@@ -95,7 +95,22 @@ def test_fc_loop_reads_then_pauses_on_write():
             {"content": "add a note to task Freeze meat"}, _auth()))
     fake_client.get_task_todos.assert_awaited_once()          # the read ran inline
     assert out["requires_confirmation"] is True               # then paused on the write
-    assert out["confirmation"]["action_summary"] == "Add a note to task 9"
+    assert out["confirmation"]["action_summary"] == 'Add the note "urgent" to the task "Freeze meat".'
+
+
+def test_confirmation_summary_is_the_model_authored_string():
+    # The card text is whatever the model wrote in `confirmation` — in the user's language, no
+    # per-tool code, no raw id.
+    for name in ("add_task", "edit_task", "add_task_note", "delete_task"):
+        summary = tools.get_spec(name).summarize({"todo_id": "f9e05e53-guid", "confirmation": "Lösche die Aufgabe „QA“."})
+        assert summary == "Lösche die Aufgabe „QA“."
+        assert "f9e05e53" not in summary
+
+
+def test_confirmation_falls_back_generically_when_model_omits_it():
+    # Defensive only (the field is required). Falls back to the tool description, never a crash.
+    summary = tools.get_spec("delete_task").summarize({"todo_id": "g"})
+    assert summary and "g" != summary  # some human text, not the raw id
 
 
 def test_write_tools_are_write_risk_and_need_confirmation():
