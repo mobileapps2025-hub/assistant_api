@@ -54,8 +54,17 @@ def enforce_image_refs(answer: str, allowed_urls: Iterable[str]) -> Tuple[str, L
     return sanitized, removed
 
 
+def _tidy_whitespace(text: str) -> str:
+    # Stripping a citation/image mid-sentence leaves an orphaned space ("events .") or a double
+    # space. Fix space-before-punctuation and collapsed runs. Safe for EN/DE/ES (no space before
+    # punctuation); ponytail: revisit if French typography (thin space before ; : ! ?) is added.
+    text = re.sub(r"[ \t]+([.,;:!?])", r"\1", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
 def enforce_answer(answer: str, *, allowed_sources: Iterable[str], allowed_image_urls: Iterable[str]) -> str:
     answer, fabricated = enforce_citations(answer, allowed_sources)
     answer, removed = enforce_image_refs(answer, allowed_image_urls)
     flow(f"🛡 enforce: removed {len(fabricated)} bad citation(s), {len(removed)} bad image(s)")
-    return re.sub(r"\n{3,}", "\n\n", answer).strip()
+    return _tidy_whitespace(answer)
