@@ -98,6 +98,26 @@ def test_fc_loop_reads_then_pauses_on_write():
     assert out["confirmation"]["action_summary"] == 'Add the note "urgent" to the task "Freeze meat".'
 
 
+def test_tool_failure_feeds_back_and_recovers_instead_of_aborting():
+    """A tool raising (e.g. an upstream 500) must not kill the flow: the error is fed back and
+    the model gets another step to recover, rather than returning the generic failure message."""
+    svc = ChatService(None, None)
+    fake_client = SimpleNamespace(get_task_users=AsyncMock(side_effect=RuntimeError("500 Internal Server Error")))
+    llm = MagicMock()
+    llm.chat.completions.create.side_effect = [
+        _tool_response("get_task_users", "{}"),                       # step 0: calls the broken tool
+        _text_response("I couldn't get the assignee list — want it assigned to you?"),  # step 1: recovers
+    ]
+    with patch("app.services.chat_service.client", llm), \
+         patch("app.services.chat_service.MCLServiceClient", return_value=fake_client):
+        out = _run(svc._handle_function_calling(
+            [{"role": "user", "content": "assign it to someone"}],
+            {"content": "assign it to someone"}, _auth()))
+    fake_client.get_task_users.assert_awaited_once()
+    assert out["response"] == "I couldn't get the assignee list — want it assigned to you?"
+    assert llm.chat.completions.create.call_count == 2               # it took a recovery step, didn't abort
+
+
 def test_confirmation_summary_is_the_model_authored_string():
     # The card text is whatever the model wrote in `confirmation` — in the user's language, no
     # per-tool code, no raw id.

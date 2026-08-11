@@ -193,7 +193,9 @@ class MCLServiceClient:
     async def get_open_task_count(
         self, access_token: str, user_id: str
     ) -> int:
-        """Number of open tasks assigned to the user."""
+        """Raw upstream open-task count. DEPRECATED / diagnostics only — it doesn't track
+        create/delete and disagrees with Task/ToDos, so the get_open_task_count *tool* derives
+        the number from Task/ToDos instead (see app/tools.py _open_task_count)."""
         result = await self._get(
             "/v8/GetOpenTaskNumber",
             access_token,

@@ -85,8 +85,26 @@ async def _user_checklists(mcl, auth, args=None) -> Any:
     return await mcl.get_checklists_by_date(auth.access_token, auth.user_id, date_from, date_to)
 
 
+# Completion flags Task/ToDos might carry. If none is present we treat the item as open, so the
+# count always equals the list we display. Verify the real field name against a live token.
+_COMPLETION_KEYS = ("completed", "isCompleted", "isDone", "done", "closed", "tdo_completed")
+
+
+def _is_open(todo: Any) -> bool:
+    if not isinstance(todo, dict):
+        return True
+    for key in _COMPLETION_KEYS:
+        if key in todo:
+            return not bool(todo[key])
+    return True
+
+
 async def _open_task_count(mcl, auth, args=None) -> Any:
-    return await mcl.get_open_task_count(auth.access_token, auth.user_id)
+    # Single source of truth: derive the count from the same Task/ToDos list the user sees, so the
+    # number can never contradict the list (the upstream GetOpenTaskNumber didn't track create/delete).
+    todos = await mcl.get_task_todos(auth.access_token, auth.company_id, auth.user_id)
+    todos = todos if isinstance(todos, list) else []
+    return {"open_task_count": sum(1 for t in todos if _is_open(t))}
 
 
 async def _company_questions(mcl, auth, args=None) -> Any:

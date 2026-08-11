@@ -404,7 +404,18 @@ class ChatService:
                         "confirmation": {"id": cid, "risk": spec.risk, "action_summary": summary},
                     }
 
-                data = await spec.handler(MCLServiceClient(), auth_context, tool_args)
+                # A single tool failing (e.g. an upstream 500) must not abort the whole flow —
+                # feed the error back as the tool result so the model can recover (retry another
+                # way, proceed without that data, or tell the user) instead of dying.
+                try:
+                    data = await spec.handler(MCLServiceClient(), auth_context, tool_args)
+                    tool_content = json.dumps(data, ensure_ascii=False)
+                except Exception as tool_err:
+                    logger.error(f"[FC] tool '{function_name}' failed: {tool_err}")
+                    flow(f"⚠ tool {function_name} failed — feeding error back to the model")
+                    tool_content = json.dumps(
+                        {"error": f"The '{function_name}' tool failed (service error) and returned no data."}
+                    )
                 api_messages.append({
                     "role": "assistant", "content": None,
                     "tool_calls": [{"id": tool_call.id, "type": "function",
@@ -412,7 +423,7 @@ class ChatService:
                 })
                 api_messages.append({
                     "role": "tool", "tool_call_id": tool_call.id,
-                    "content": json.dumps(data, ensure_ascii=False),
+                    "content": tool_content,
                 })
 
             logger.info("[FC] Max tool steps reached")

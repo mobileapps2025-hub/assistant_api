@@ -40,5 +40,19 @@ def test_checklists_handler_honors_supplied_args():
 
 
 def test_no_arg_handler_tolerates_args_dict():
-    mcl = SimpleNamespace(get_open_task_count=AsyncMock(return_value=3))
-    assert _run(tools._open_task_count(mcl, _auth(), {"ignored": 1})) == 3
+    # count is derived from the Task/ToDos list, so it always matches what the user sees
+    mcl = SimpleNamespace(get_task_todos=AsyncMock(return_value=[{"tdo_id": "1"}, {"tdo_id": "2"}, {"tdo_id": "3"}]))
+    assert _run(tools._open_task_count(mcl, _auth(), {"ignored": 1})) == {"open_task_count": 3}
+
+
+def test_open_task_count_excludes_completed_when_flagged():
+    mcl = SimpleNamespace(get_task_todos=AsyncMock(return_value=[
+        {"tdo_id": "1"}, {"tdo_id": "2", "completed": True}, {"tdo_id": "3", "completed": False},
+    ]))
+    assert _run(tools._open_task_count(mcl, _auth(), None)) == {"open_task_count": 2}
+
+
+def test_open_task_count_matches_list_length_without_status_field():
+    todos = [{"tdo_id": str(i)} for i in range(5)]
+    mcl = SimpleNamespace(get_task_todos=AsyncMock(return_value=todos))
+    assert _run(tools._open_task_count(mcl, _auth(), None))["open_task_count"] == len(todos)
