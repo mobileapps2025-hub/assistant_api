@@ -3,6 +3,7 @@ import types
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from app.services.chat_service import ChatService, _format_device, _format_today
+from app.enforcement import pending
 from app.models import Device
 
 
@@ -198,6 +199,32 @@ class TestHandleAgentRequest:
         mock_retrieve.assert_called_once_with("MCL sync")
         assert "[Source: sync_guide.md]" in result["response"]
         assert "fake.md" not in result["response"]
+
+    @pytest.mark.asyncio
+    async def test_write_confirmation_stores_conversation_context(
+        self, mock_vision_service, mock_image_validator
+    ):
+        pending._PENDING.clear()
+        service = make_service(mock_vision_service, mock_image_validator)
+        auth = types.SimpleNamespace(access_token="t", user_id="u1", company_id="c", email="e@x.com")
+        messages = [
+            {"role": "user", "content": "Show me my tasks"},
+            {"role": "assistant", "content": "1. New task\n2. New default task"},
+            {"role": "user", "content": "Delete New task"},
+        ]
+        with patch("app.services.chat_service.client") as mock_client:
+            mock_client.chat.completions.create.return_value = _tool_response(
+                "delete_task",
+                '{"todo_id":"9","confirmation":"Delete the task \\"New task\\"."}',
+            )
+            result = await service._handle_agent_request(
+                messages, messages[-1], "s1", auth, "", "English", ""
+            )
+
+        cid = result["confirmation"]["id"]
+        stored = pending.peek_pending(cid, "u1")
+        assert stored["messages"][-3:] == messages
+        assert result["requires_confirmation"] is True
 
 
 # ---------------------------------------------------------------------------

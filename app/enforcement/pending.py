@@ -7,7 +7,7 @@ stored; the approve call re-supplies auth and we match on user_id.
 """
 import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 TTL_SECONDS = 300
 
@@ -20,13 +20,21 @@ def _prune() -> None:
         del _PENDING[cid]
 
 
-def create_pending(tool: str, args: Dict[str, Any], user_id: Optional[str], summary: str,
-                   risk: str, language: str = "English") -> str:
+def create_pending(
+    tool: str,
+    args: Dict[str, Any],
+    user_id: Optional[str],
+    summary: str,
+    risk: str,
+    language: str = "English",
+    messages: Optional[List[Dict[str, Any]]] = None,
+) -> str:
     _prune()
     cid = f"cfm_{uuid.uuid4().hex[:8]}"
     _PENDING[cid] = {
         "tool": tool, "args": args, "user_id": user_id, "summary": summary,
-        "risk": risk, "language": language, "created_at": time.time(),
+        "risk": risk, "language": language, "messages": messages or [],
+        "created_at": time.time(),
     }
     return cid
 

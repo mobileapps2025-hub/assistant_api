@@ -8,7 +8,7 @@ from app.core.config import client, ENABLE_MCL_IMAGE_VALIDATION
 from app.core.logging import get_logger
 from app.core.flow import flow
 from app.models import AuthContext, Device
-from app.tools import MCL_USER_TOOLS, get_spec
+from app.tools import MCL_USER_TOOLS, get_spec, exposed_specs
 from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
 from app.instructions import get_system_prompt, set_request_date
@@ -48,6 +48,23 @@ KNOWLEDGE_TOOL = {
         "strict": True,
     },
 }
+
+POST_ACTION_MODEL = "gpt-4o"
+POST_ACTION_TOOL_STEPS = 3
+
+_POST_ACTION_SYSTEM_PROMPT = """You are MarieClaire after a user approved or rejected a
+confirmed MCL action. Give the user useful closure.
+
+Rules:
+- Do not perform or suggest another write action as already done.
+- You may call SAFE READ tools only when a fresh lookup clearly improves the feedback.
+- If the action succeeded, say what changed and infer the most useful next detail from the
+  recent conversation. If the user was working from a list, refreshing or summarizing the
+  remaining relevant items is often useful. If they were not, keep it brief and offer the
+  best next step.
+- If the action failed, explain that it did not complete and give the most useful recovery
+  step. If a safe lookup can clarify whether the item still exists, use it.
+- Be concise and write in the user's language."""
 
 
 def _latest_user_message(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -169,6 +186,25 @@ def _tool_result_message(tool_call: Any, content: str) -> Dict[str, Any]:
     return {"role": "tool", "tool_call_id": tool_call.id, "content": content}
 
 
+def _safe_read_tool_schemas() -> List[Dict[str, Any]]:
+    return [
+        spec.schema()
+        for spec in exposed_specs()
+        if spec.risk == "safe" and spec.executable and spec.handler is not None
+    ]
+
+
+def _conversation_snapshot(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    snapshot = []
+    for message in messages[-8:]:
+        if message.get("role") not in ("user", "assistant"):
+            continue
+        content = _model_content(message)
+        if content:
+            snapshot.append({"role": message["role"], "content": content})
+    return snapshot
+
+
 class ChatService:
     def __init__(
         self,
@@ -245,11 +281,104 @@ class ChatService:
             record_action(
                 session_id, user_id, pending["tool"], pending["args"], pending["summary"]
             )
-            # pending['summary'] is the model-authored confirmation, already in the user's language.
-            return {"response": f"✓ {pending['summary']}", "success": True, "has_vision": False}
+            response = await self._post_action_feedback(
+                pending, "success", auth_context, session_id=session_id
+            )
+            return {"response": response, "success": True, "has_vision": False}
         except Exception as e:
             logger.error(f"[ACTION] confirmed execution failed: {e}")
-            return {"response": localize("The action failed to complete. Please try again.", lang), "success": True, "has_vision": False}
+            response = await self._post_action_feedback(
+                pending, "failed", auth_context, session_id=session_id, error=str(e)
+            )
+            return {"response": response, "success": True, "has_vision": False}
+
+    async def _post_action_feedback(
+        self,
+        pending: Dict[str, Any],
+        status: str,
+        auth_context: Optional[AuthContext],
+        *,
+        session_id: Optional[str] = None,
+        error: Optional[str] = None,
+    ) -> str:
+        """Generate context-aware feedback after an approved action resolves.
+
+        The feedback agent can only call safe read tools. If the confirmation came from an
+        older path without stored conversation context, keep the previous concise response.
+        """
+        lang = pending.get("language", "English")
+        summary = pending.get("summary", "")
+        messages = pending.get("messages") or []
+        fallback = (
+            f"✓ {summary}" if status == "success"
+            else localize("The action failed to complete. Please try again.", lang)
+        )
+        if not messages:
+            return fallback
+
+        safe_tools = _safe_read_tool_schemas() if _is_authenticated(auth_context) else []
+        action_context = recall_action_context(
+            session_id, auth_context.user_id if auth_context else None
+        )
+        event = {
+            "status": status,
+            "tool": pending.get("tool"),
+            "summary": summary,
+            "args": pending.get("args") or {},
+            "error": error,
+        }
+        api_messages = [
+            {"role": "system", "content": get_system_prompt("agent", language=lang, tools_catalog=safe_tools)},
+            {"role": "system", "content": _POST_ACTION_SYSTEM_PROMPT},
+        ]
+        if action_context:
+            api_messages.append({"role": "system", "content": action_context})
+        api_messages.extend(messages)
+        api_messages.append({
+            "role": "user",
+            "content": "# ACTION RESULT\n" + json.dumps(event, ensure_ascii=False),
+        })
+
+        try:
+            for _ in range(POST_ACTION_TOOL_STEPS):
+                response = client.chat.completions.create(
+                    model=POST_ACTION_MODEL,
+                    messages=api_messages,
+                    tools=safe_tools,
+                    tool_choice="auto" if safe_tools else "none",
+                    parallel_tool_calls=False,
+                    temperature=0,
+                    timeout=30,
+                )
+                choice = response.choices[0]
+                if not choice.message.tool_calls:
+                    content = (choice.message.content or "").strip()
+                    return content or fallback
+
+                tool_call = choice.message.tool_calls[0]
+                function_name = tool_call.function.name
+                spec = get_spec(function_name)
+                if spec is None or spec.handler is None or spec.risk != "safe":
+                    tool_content = json.dumps({"error": f"The '{function_name}' read tool is not available."})
+                else:
+                    try:
+                        tool_args = json.loads(tool_call.function.arguments or "{}")
+                    except (ValueError, TypeError):
+                        tool_args = {}
+                    try:
+                        data = await spec.handler(MCLServiceClient(), auth_context, tool_args)
+                        tool_content = json.dumps(data, ensure_ascii=False)
+                    except Exception as tool_err:
+                        logger.error(f"[POST_ACTION] read tool '{function_name}' failed: {tool_err}")
+                        tool_content = json.dumps(
+                            {"error": f"The '{function_name}' read tool failed and returned no data."}
+                        )
+                api_messages.append(_tool_call_message(tool_call))
+                api_messages.append(_tool_result_message(tool_call, tool_content))
+            return fallback
+        except Exception as post_err:
+            logger.error(f"[POST_ACTION] feedback generation failed: {post_err}")
+            return fallback
 
     async def _dispatch_route(
         self,
@@ -402,7 +531,10 @@ class ChatService:
 
                 if spec.risk != "safe":
                     summary = spec.summarize(tool_args)
-                    cid = create_pending(function_name, tool_args, auth_context.user_id, summary, spec.risk, language)
+                    cid = create_pending(
+                        function_name, tool_args, auth_context.user_id, summary, spec.risk,
+                        language, messages=_conversation_snapshot(messages)
+                    )
                     flow(f"⚠ confirmation required: {function_name} ({spec.risk})")
                     return {
                         "response": f"⚠ {summary}",

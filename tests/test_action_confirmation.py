@@ -152,10 +152,15 @@ def test_add_task_handler_builds_todo_body_dropping_nulls():
 
 
 def test_pending_store_roundtrip_and_user_scoping():
-    cid = pending.create_pending("delete_task", {"todo_id": "9"}, "u1", "Delete task 9", "destructive")
+    messages = [{"role": "user", "content": "delete task 9"}]
+    cid = pending.create_pending(
+        "delete_task", {"todo_id": "9"}, "u1", "Delete task 9", "destructive",
+        messages=messages,
+    )
     assert pending.take_pending(cid, "u2") is None          # wrong user
     got = pending.take_pending(cid, "u1")
     assert got["args"] == {"todo_id": "9"}
+    assert got["messages"] == messages
     assert pending.take_pending(cid, "u1") is None           # one-shot
 
 
@@ -202,6 +207,54 @@ def test_approve_records_recent_action_context_with_task_defaults():
     assert "due_date=none" in context
     assert "assigned_user=current user" in context
     assert "task_type=standard MCL task type" in context
+
+
+def test_approve_uses_post_action_feedback_when_context_is_available():
+    svc = ChatService(None, None)
+    messages = [
+        {"role": "user", "content": "Show me my tasks"},
+        {"role": "assistant", "content": "1. New task\n2. New default task"},
+        {"role": "user", "content": "Delete New task"},
+    ]
+    cid = pending.create_pending(
+        "delete_task", {"todo_id": "9", "confirmation": 'Delete the task "New task".'},
+        "u1", 'Delete the task "New task".', "destructive", messages=messages,
+    )
+    fake_client = SimpleNamespace(
+        delete_task=AsyncMock(return_value=None),
+        get_task_todos=AsyncMock(return_value=[{"tdo_description": "New default task"}]),
+    )
+    llm = MagicMock()
+    llm.chat.completions.create.side_effect = [
+        _tool_response("get_task_todos", "{}"),
+        _text_response('Deleted "New task". Your remaining task is: New default task.'),
+    ]
+    with patch("app.services.chat_service.MCLServiceClient", return_value=fake_client), \
+         patch("app.services.chat_service.client", llm):
+        out = _run(svc.execute_confirmed_action(cid, "approve", _auth(), session_id="s1"))
+
+    fake_client.delete_task.assert_awaited_once_with("t", "c", "9")
+    fake_client.get_task_todos.assert_awaited_once()
+    assert out["response"] == 'Deleted "New task". Your remaining task is: New default task.'
+
+
+def test_failed_action_uses_post_action_feedback_when_context_is_available():
+    svc = ChatService(None, None)
+    messages = [{"role": "user", "content": "Delete New task"}]
+    cid = pending.create_pending(
+        "delete_task", {"todo_id": "9", "confirmation": 'Delete the task "New task".'},
+        "u1", 'Delete the task "New task".', "destructive", messages=messages,
+    )
+    fake_client = SimpleNamespace(delete_task=AsyncMock(side_effect=RuntimeError("404 not found")))
+    llm = MagicMock()
+    llm.chat.completions.create.return_value = _text_response(
+        'I could not delete "New task". It may already be gone, so I can refresh your task list.'
+    )
+    with patch("app.services.chat_service.MCLServiceClient", return_value=fake_client), \
+         patch("app.services.chat_service.client", llm):
+        out = _run(svc.execute_confirmed_action(cid, "approve", _auth(), session_id="s1"))
+
+    assert "already be gone" in out["response"]
 
 
 def test_approve_with_expired_or_wrong_user_does_nothing():
