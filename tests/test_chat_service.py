@@ -1,3 +1,4 @@
+import json
 import re
 import types
 import pytest
@@ -225,6 +226,60 @@ class TestHandleAgentRequest:
         stored = pending.peek_pending(cid, "u1")
         assert stored["messages"][-3:] == messages
         assert result["requires_confirmation"] is True
+
+    @pytest.mark.asyncio
+    async def test_multi_write_request_stages_full_action_plan(
+        self, mock_vision_service, mock_image_validator
+    ):
+        pending._PENDING.clear()
+        service = make_service(mock_vision_service, mock_image_validator)
+        auth = types.SimpleNamespace(access_token="t", user_id="u1", company_id="c", email="e@x.com")
+        messages = [
+            {"role": "user", "content": "Show me my tasks"},
+            {"role": "assistant", "content": "1. First\n2. New default task\n3. This is a demo Task"},
+            {"role": "user", "content": "Delete the last 2 tasks"},
+        ]
+        plan_args = {
+            "summary": 'Delete 2 tasks: "New default task" and "This is a demo Task".',
+            "steps": [
+                {
+                    "tool": "delete_task",
+                    "summary": 'Delete the task "New default task".',
+                    "todo_id": "2",
+                    "description": None,
+                    "due_date": None,
+                    "market_id": None,
+                    "assigned_user_id": None,
+                    "note": None,
+                },
+                {
+                    "tool": "delete_task",
+                    "summary": 'Delete the task "This is a demo Task".',
+                    "todo_id": "3",
+                    "description": None,
+                    "due_date": None,
+                    "market_id": None,
+                    "assigned_user_id": None,
+                    "note": None,
+                },
+            ],
+        }
+        with patch("app.services.chat_service.client") as mock_client:
+            mock_client.chat.completions.create.return_value = _tool_response(
+                "confirm_mcl_action_plan",
+                json.dumps(plan_args),
+            )
+            result = await service._handle_agent_request(
+                messages, messages[-1], "s1", auth, "", "English", ""
+            )
+
+        cid = result["confirmation"]["id"]
+        stored = pending.peek_pending(cid, "u1")
+        assert stored["tool"] == "confirm_mcl_action_plan"
+        assert len(stored["args"]["steps"]) == 2
+        assert stored["args"]["steps"][0]["args"]["todo_id"] == "2"
+        assert stored["args"]["steps"][1]["args"]["todo_id"] == "3"
+        assert "Delete 2 tasks" in result["confirmation"]["action_summary"]
 
 
 # ---------------------------------------------------------------------------

@@ -23,6 +23,7 @@ logger = get_logger(__name__)
 
 MAX_TOOL_STEPS = 5   # bound the read->act tool loop per request
 KNOWLEDGE_TOOL_NAME = "search_mcl_documentation"
+ACTION_PLAN_TOOL_NAME = "confirm_mcl_action_plan"
 
 KNOWLEDGE_TOOL = {
     "type": "function",
@@ -49,6 +50,66 @@ KNOWLEDGE_TOOL = {
     },
 }
 
+_PLAN_STEP_FIELDS = (
+    "todo_id", "description", "due_date", "market_id", "assigned_user_id", "note"
+)
+
+ACTION_PLAN_TOOL = {
+    "type": "function",
+    "function": {
+        "name": ACTION_PLAN_TOOL_NAME,
+        "description": (
+            "Stage a single confirmation for multiple MCL write/destructive actions. "
+            "Use this instead of calling an individual write tool when the user asks for "
+            "more than one change, such as deleting the last 2 tasks. The user must approve "
+            "the full plan before any step executes."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "string",
+                    "description": (
+                        "A concise user-language summary listing every action in the plan."
+                    ),
+                },
+                "steps": {
+                    "type": "array",
+                    "description": "Ordered write/destructive actions to execute after approval.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "tool": {
+                                "type": "string",
+                                "enum": ["add_task", "edit_task", "add_task_note", "delete_task"],
+                                "description": "The MCL write/destructive tool for this step.",
+                            },
+                            "summary": {
+                                "type": "string",
+                                "description": "A clear user-language sentence for this step.",
+                            },
+                            "todo_id": {"type": ["string", "null"]},
+                            "description": {"type": ["string", "null"]},
+                            "due_date": {"type": ["string", "null"]},
+                            "market_id": {"type": ["string", "null"]},
+                            "assigned_user_id": {"type": ["string", "null"]},
+                            "note": {"type": ["string", "null"]},
+                        },
+                        "required": [
+                            "tool", "summary", "todo_id", "description", "due_date",
+                            "market_id", "assigned_user_id", "note",
+                        ],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["summary", "steps"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
+}
+
 POST_ACTION_MODEL = "gpt-4o"
 POST_ACTION_TOOL_STEPS = 3
 
@@ -64,6 +125,7 @@ Rules:
   best next step.
 - If the action failed, explain that it did not complete and give the most useful recovery
   step. If a safe lookup can clarify whether the item still exists, use it.
+- If a multi-step plan partially failed, clearly say which steps succeeded and which failed.
 - Be concise and write in the user's language."""
 
 
@@ -194,6 +256,84 @@ def _safe_read_tool_schemas() -> List[Dict[str, Any]]:
     ]
 
 
+def _write_tool_schemas() -> List[Dict[str, Any]]:
+    return [
+        spec.schema()
+        for spec in exposed_specs()
+        if spec.risk != "safe" and spec.executable and spec.handler is not None
+    ]
+
+
+def _plan_step_args(step: Dict[str, Any]) -> Dict[str, Any]:
+    args = {field: step.get(field) for field in _PLAN_STEP_FIELDS if step.get(field) is not None}
+    args["confirmation"] = step.get("summary") or ""
+    return args
+
+
+def _missing_required_args(spec: Any, args: Dict[str, Any]) -> List[str]:
+    missing = []
+    for key in spec.parameters.get("required", []):
+        if key == "confirmation":
+            continue
+        schema = spec.parameters.get("properties", {}).get(key, {})
+        nullable = isinstance(schema.get("type"), list) and "null" in schema["type"]
+        if not nullable and args.get(key) in (None, ""):
+            missing.append(key)
+    return missing
+
+
+def _normalize_action_plan(raw_args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    steps = raw_args.get("steps")
+    if not isinstance(steps, list) or len(steps) < 2:
+        return None
+
+    normalized_steps = []
+    highest_risk = "write"
+    for index, step in enumerate(steps, start=1):
+        if not isinstance(step, dict):
+            return None
+        tool_name = step.get("tool")
+        spec = get_spec(tool_name)
+        if spec is None or spec.handler is None or spec.risk == "safe":
+            return None
+        args = _plan_step_args(step)
+        if _missing_required_args(spec, args):
+            return None
+        if spec.risk == "destructive":
+            highest_risk = "destructive"
+        normalized_steps.append({
+            "tool": tool_name,
+            "args": args,
+            "summary": step.get("summary") or spec.summarize(args),
+            "index": index,
+            "risk": spec.risk,
+        })
+
+    summary = (raw_args.get("summary") or "").strip()
+    if not summary:
+        summary = "Approve this multi-step MCL action plan:\n" + "\n".join(
+            f"{step['index']}. {step['summary']}" for step in normalized_steps
+        )
+    return {"steps": normalized_steps, "risk": highest_risk, "summary": summary}
+
+
+def _fallback_action_response(pending: Dict[str, Any], status: str, language: str) -> str:
+    summary = pending.get("summary", "")
+    results = (pending.get("args") or {}).get("results") or []
+    if results:
+        lines = []
+        for result in results:
+            mark = "✓" if result.get("status") == "success" else "⚠"
+            line = f"{mark} {result.get('summary') or result.get('tool')}"
+            if result.get("status") != "success" and result.get("error"):
+                line += f" ({result['error']})"
+            lines.append(line)
+        return "\n".join(lines)
+    if status == "success":
+        return f"✓ {summary}"
+    return localize("The action failed to complete. Please try again.", language)
+
+
 def _conversation_snapshot(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     snapshot = []
     for message in messages[-8:]:
@@ -271,6 +411,9 @@ class ChatService:
             }
 
         lang = pending.get("language", "English")
+        if pending["tool"] == ACTION_PLAN_TOOL_NAME:
+            return await self._execute_confirmed_plan(pending, auth_context, session_id=session_id)
+
         spec = get_spec(pending["tool"])
         if spec is None or spec.handler is None or not check_tool_call(pending["tool"], auth_context).allowed:
             return {"response": localize("I'm not able to perform that action.", lang), "success": True, "has_vision": False}
@@ -292,6 +435,60 @@ class ChatService:
             )
             return {"response": response, "success": True, "has_vision": False}
 
+    async def _execute_confirmed_plan(
+        self,
+        pending: Dict[str, Any],
+        auth_context: Optional[AuthContext],
+        *,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        lang = pending.get("language", "English")
+        user_id = auth_context.user_id if auth_context else None
+        if not _is_authenticated(auth_context):
+            return _needs_session_response(lang)
+
+        steps = (pending.get("args") or {}).get("steps") or []
+        if not steps:
+            return {"response": localize("I'm not able to perform that action.", lang), "success": True, "has_vision": False}
+
+        flow(f"✅ confirmed → executing {len(steps)} planned action(s)")
+        mcl = MCLServiceClient()
+        results = []
+        for step in steps:
+            tool_name = step.get("tool")
+            spec = get_spec(tool_name)
+            summary = step.get("summary") or tool_name
+            args = step.get("args") or {}
+            if spec is None or spec.handler is None or spec.risk == "safe":
+                results.append({"tool": tool_name, "summary": summary, "status": "failed", "error": "tool unavailable"})
+                continue
+            if not check_tool_call(tool_name, auth_context).allowed:
+                results.append({"tool": tool_name, "summary": summary, "status": "failed", "error": "tool blocked"})
+                continue
+            try:
+                await spec.handler(mcl, auth_context, args)
+                record_action(session_id, user_id, tool_name, args, summary)
+                results.append({"tool": tool_name, "summary": summary, "status": "success"})
+            except Exception as step_err:
+                logger.error(f"[ACTION_PLAN] step '{tool_name}' failed: {step_err}")
+                results.append({
+                    "tool": tool_name,
+                    "summary": summary,
+                    "status": "failed",
+                    "error": str(step_err),
+                })
+
+        succeeded = sum(1 for result in results if result["status"] == "success")
+        status = "success" if succeeded == len(results) else "failed" if succeeded == 0 else "partial_failed"
+        pending_with_results = {
+            **pending,
+            "args": {**(pending.get("args") or {}), "results": results},
+        }
+        response = await self._post_action_feedback(
+            pending_with_results, status, auth_context, session_id=session_id
+        )
+        return {"response": response, "success": True, "has_vision": False}
+
     async def _post_action_feedback(
         self,
         pending: Dict[str, Any],
@@ -309,10 +506,7 @@ class ChatService:
         lang = pending.get("language", "English")
         summary = pending.get("summary", "")
         messages = pending.get("messages") or []
-        fallback = (
-            f"✓ {summary}" if status == "success"
-            else localize("The action failed to complete. Please try again.", lang)
-        )
+        fallback = _fallback_action_response(pending, status, lang)
         if not messages:
             return fallback
 
@@ -425,7 +619,7 @@ class ChatService:
         """
         flow("🤖 AGENT → manager loop")
         mcl_tools = MCL_USER_TOOLS if _is_authenticated(auth_context) else []
-        agent_tools = [KNOWLEDGE_TOOL, *mcl_tools]
+        agent_tools = [KNOWLEDGE_TOOL, ACTION_PLAN_TOOL, *mcl_tools]
         action_context = recall_action_context(
             session_id, auth_context.user_id if auth_context else None
         )
@@ -511,6 +705,42 @@ class ChatService:
                     api_messages.append(_tool_call_message(tool_call))
                     api_messages.append(_tool_result_message(tool_call, tool_content))
                     continue
+
+                if function_name == ACTION_PLAN_TOOL_NAME:
+                    if not _is_authenticated(auth_context):
+                        return _needs_session_response(language)
+                    plan = _normalize_action_plan(tool_args)
+                    if not plan:
+                        return {
+                            "response": localize(
+                                "I need a clear multi-step action plan before I can ask for approval. "
+                                "Could you rephrase or specify the exact items?",
+                                language,
+                            ),
+                            "success": True,
+                            "has_vision": False,
+                        }
+                    cid = create_pending(
+                        ACTION_PLAN_TOOL_NAME,
+                        {"steps": plan["steps"]},
+                        auth_context.user_id,
+                        plan["summary"],
+                        plan["risk"],
+                        language,
+                        messages=_conversation_snapshot(messages),
+                    )
+                    flow(f"⚠ confirmation required: {ACTION_PLAN_TOOL_NAME} ({plan['risk']})")
+                    return {
+                        "response": f"⚠ {plan['summary']}",
+                        "success": True,
+                        "has_vision": False,
+                        "requires_confirmation": True,
+                        "confirmation": {
+                            "id": cid,
+                            "risk": plan["risk"],
+                            "action_summary": plan["summary"],
+                        },
+                    }
 
                 if not _is_authenticated(auth_context):
                     return _needs_session_response(language)

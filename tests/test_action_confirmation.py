@@ -238,6 +238,59 @@ def test_approve_uses_post_action_feedback_when_context_is_available():
     assert out["response"] == 'Deleted "New task". Your remaining task is: New default task.'
 
 
+def test_approve_executes_multi_action_plan_in_order():
+    svc = ChatService(None, None)
+    messages = [
+        {"role": "user", "content": "Show me my tasks"},
+        {"role": "assistant", "content": "1. First\n2. New default task\n3. This is a demo Task"},
+        {"role": "user", "content": "Delete the last 2 tasks"},
+    ]
+    steps = [
+        {
+            "tool": "delete_task",
+            "args": {"todo_id": "2", "confirmation": 'Delete the task "New default task".'},
+            "summary": 'Delete the task "New default task".',
+            "index": 1,
+            "risk": "destructive",
+        },
+        {
+            "tool": "delete_task",
+            "args": {"todo_id": "3", "confirmation": 'Delete the task "This is a demo Task".'},
+            "summary": 'Delete the task "This is a demo Task".',
+            "index": 2,
+            "risk": "destructive",
+        },
+    ]
+    cid = pending.create_pending(
+        "confirm_mcl_action_plan",
+        {"steps": steps},
+        "u1",
+        'Delete 2 tasks: "New default task" and "This is a demo Task".',
+        "destructive",
+        messages=messages,
+    )
+    fake_client = SimpleNamespace(
+        delete_task=AsyncMock(return_value=None),
+        get_task_todos=AsyncMock(return_value=[{"tdo_description": "First"}]),
+    )
+    llm = MagicMock()
+    llm.chat.completions.create.side_effect = [
+        _tool_response("get_task_todos", "{}"),
+        _text_response('Deleted both tasks. Your remaining task is: First.'),
+    ]
+    with patch("app.services.chat_service.MCLServiceClient", return_value=fake_client), \
+         patch("app.services.chat_service.client", llm):
+        out = _run(svc.execute_confirmed_action(cid, "approve", _auth(), session_id="s1"))
+
+    assert fake_client.delete_task.await_count == 2
+    fake_client.delete_task.assert_any_await("t", "c", "2")
+    fake_client.delete_task.assert_any_await("t", "c", "3")
+    assert out["response"] == "Deleted both tasks. Your remaining task is: First."
+    context = actions.recall_action_context("s1", "u1")
+    assert "New default task" in context
+    assert "This is a demo Task" in context
+
+
 def test_failed_action_uses_post_action_feedback_when_context_is_available():
     svc = ChatService(None, None)
     messages = [{"role": "user", "content": "Delete New task"}]

@@ -26,6 +26,10 @@ MCL documentation, or use live MCL tools.
 - For live user data, answer only from tool results.
 - For write/destructive actions, call the matching tool only after required details are known.
   The system will pause for confirmation before executing the change.
+- If the user asks for multiple changes in one request, first break the request into explicit
+  steps. Resolve any needed IDs with safe read tools, then call `confirm_mcl_action_plan`
+  with every step. Do not call only the first write tool. The confirmation summary must list
+  all items that will be changed.
 - Use the tool descriptions as the source of truth for defaults and capabilities.
 
 ## Recent actions
