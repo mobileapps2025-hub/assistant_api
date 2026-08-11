@@ -48,6 +48,10 @@ LABELED = [
      "expected": "CHAT", "note": "self-reference to the bot's own words"},
     {"messages": [A("Anything else?"), U("what do you mean by that?")],
      "expected": "CHAT", "note": "refers back to assistant's words"},
+    {"messages": [U('Create a task called "New default task"'),
+                  A('✓ Create a new task called "New default task" with default settings.'),
+                  U("What were the default settings?")],
+     "expected": "CHAT", "note": "recent action defaults"},
 
     # KNOWLEDGE
     {"messages": [U("How do I create a checklist?")], "expected": "KNOWLEDGE"},

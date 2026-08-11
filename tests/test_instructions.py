@@ -93,6 +93,14 @@ def test_real_registry_tools_all_appear():
         assert tool["function"]["name"] in prompt
 
 
+def test_add_task_defaults_are_visible_to_prompted_models():
+    prompt = get_system_prompt("tools", tools_catalog=MCL_USER_TOOLS)
+    assert "Defaults when omitted" in prompt
+    assert "no due date" in prompt
+    assert "standard MCL task type" in prompt
+    assert "assignment to the current user" in prompt
+
+
 @pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision"])
 def test_current_date_slot_always_present(mode):
     # Always on — the agent must never be left without a "today".

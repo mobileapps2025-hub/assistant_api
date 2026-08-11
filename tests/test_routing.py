@@ -123,6 +123,21 @@ def test_tool_catalog_and_capability_rule_reach_system_prompt():
     assert "ASSISTANT" in system_prompt                    # capability-vs-product rule present
 
 
+def test_recent_action_questions_rule_reaches_system_prompt():
+    messages = [
+        {"role": "user", "content": 'Create a task called "New default task"'},
+        {"role": "assistant", "content": '✓ Create a new task called "New default task" with default settings.'},
+        {"role": "user", "content": "What were the default settings?"},
+    ]
+    with patch("app.routing.router.client") as mock_client:
+        mock_client.chat.completions.create.return_value = _response(_decision_json("CHAT"))
+        classify_route(messages)
+        system_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    assert "Recent-action rule" in system_prompt
+    assert "values/settings/defaults" in system_prompt
+    assert "not MCL documentation" in system_prompt
+
+
 def test_system_prompt_has_default_tools_summary_without_catalog():
     with patch("app.routing.router.client") as mock_client:
         mock_client.chat.completions.create.return_value = _response(_decision_json("CHAT"))

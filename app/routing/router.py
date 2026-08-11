@@ -33,6 +33,7 @@ KNOWLEDGE — a GENERAL question about how the MCL app works, answerable from do
 CHAT — small talk AND anything about the ASSISTANT HERSELF: greetings, thanks, testing; who she is; what she can do or fetch for you ("what can you help with", "what kind of data can you get me", "can you delete a task?"); or a message that refers back to her own words ("what do you mean by 'my data'?").
 
 Decisive rule: if the message is about what the ASSISTANT can do, her scope, or her own prior words, choose CHAT — even when it mentions MCL data or features. KNOWLEDGE is only for questions about the MCL product itself.
+Recent-action rule: if the user asks what the ASSISTANT just did, what values/settings/defaults she used, what she assumed, why she asked something, or why she answered a certain way, choose CHAT. These are questions about the assistant's own behavior or recent action context, not MCL documentation.
 Pick the single best route for the latest message."""
 
 _DEFAULT_TOOLS_SUMMARY = "the user's profile, their markets, their checklists, and their open task count"

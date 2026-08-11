@@ -269,7 +269,9 @@ TOOL_REGISTRY: List[ToolSpec] = [
     # --- LIVE write (needs confirmation via the danger gate) ---
     _write("add_task",
            "Create a new MCL task. Requires a description; optionally a due date, a target market, "
-           "or an assigned user.",
+           "or an assigned user. Defaults when omitted: no due date, no target market, the standard "
+           "MCL task type, and assignment to the current user when neither a market nor another "
+           "assignee is provided.",
            _add_task, risk="write",
            parameters=_params({
                "description": {"type": "string", "description": "What the task is"},
