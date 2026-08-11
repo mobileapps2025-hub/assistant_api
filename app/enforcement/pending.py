@@ -7,7 +7,7 @@ stored; the approve call re-supplies auth and we match on user_id.
 """
 import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 TTL_SECONDS = 300
 
@@ -20,21 +20,41 @@ def _prune() -> None:
         del _PENDING[cid]
 
 
-def create_pending(tool: str, args: Dict[str, Any], user_id: Optional[str], summary: str, risk: str) -> str:
+def create_pending(
+    tool: str,
+    args: Dict[str, Any],
+    user_id: Optional[str],
+    summary: str,
+    risk: str,
+    language: str = "English",
+    messages: Optional[List[Dict[str, Any]]] = None,
+) -> str:
     _prune()
     cid = f"cfm_{uuid.uuid4().hex[:8]}"
     _PENDING[cid] = {
-        "tool": tool, "args": args, "user_id": user_id,
-        "summary": summary, "risk": risk, "created_at": time.time(),
+        "tool": tool, "args": args, "user_id": user_id, "summary": summary,
+        "risk": risk, "language": language, "messages": messages or [],
+        "created_at": time.time(),
     }
     return cid
+
+
+def _valid(pending: Optional[Dict[str, Any]], user_id: Optional[str]) -> bool:
+    return bool(pending and pending["user_id"] == user_id)
+
+
+def peek_pending(confirmation_id: str, user_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Return the pending action without removing it (e.g. to read its language on reject)."""
+    _prune()
+    pending = _PENDING.get(confirmation_id)
+    return pending if _valid(pending, user_id) else None
 
 
 def take_pending(confirmation_id: str, user_id: Optional[str]) -> Optional[Dict[str, Any]]:
     """Return and remove the pending action if it exists, hasn't expired, and belongs to the user."""
     _prune()
     pending = _PENDING.get(confirmation_id)
-    if not pending or pending["user_id"] != user_id:
+    if not _valid(pending, user_id):
         return None
     del _PENDING[confirmation_id]
     return pending

@@ -42,3 +42,9 @@ dist/
 mcl_vector_store/
 mcl_image_cache.json
 test_cache.json
+
+# --- Runtime memory (Layer 3) ---
+# Per-user durable memory + pending chat transcripts written by the app at runtime.
+# Contains user data/PII — must never be committed. Keep the dir via .gitkeep.
+app/memories/
+!app/memories/.gitkeep

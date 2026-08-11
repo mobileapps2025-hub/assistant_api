@@ -14,14 +14,27 @@ This module is Layer 1 and stays decoupled from Layer 5: it never imports the to
 registry. The caller passes the live tool catalog in via ``tools_catalog`` so the prompt
 always reflects the real toolset without duplicating it here.
 """
+import contextvars
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, List, Literal, Optional
 
-Mode = Literal["chat", "tools", "rag", "vision"]
+Mode = Literal["chat", "tools", "rag", "vision", "agent"]
 
 _INSTRUCTIONS_DIR = Path(__file__).parent
-_VALID_MODES = ("chat", "tools", "rag", "vision")
+_VALID_MODES = ("chat", "tools", "rag", "vision", "agent")
+
+# The user's "today", resolved per request from their browser timezone and set once by the
+# caller (see set_request_date). Read by every prompt so relative dates ("tomorrow") ground
+# correctly. Falls back to the server date when the caller sets nothing.
+_request_date: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "request_date", default=None
+)
+
+
+def set_request_date(formatted_date: Optional[str]) -> None:
+    _request_date.set(formatted_date or None)
 
 
 @lru_cache(maxsize=None)
@@ -61,9 +74,10 @@ def _language_directive(language: str) -> str:
     lang = language.strip().upper()
     return (
         "# LANGUAGE\n"
-        f"The user is writing in **{lang}**. You **MUST** write your entire answer in "
-        f'**{lang}**. Canonical MCL terms (e.g. "Dashboard", "Checklist", "Task") may '
-        "stay in English."
+        f"Write your entire answer in **{lang}** — the language of the user's current message. "
+        f"Do this even if earlier messages, the conversation so far, your own previous replies, "
+        f"or the retrieved documentation were in another language: match **{lang}**, never the "
+        f'history. Canonical MCL terms (e.g. "Dashboard", "Checklist", "Task") may stay in English.'
     )
 
 
@@ -79,6 +93,15 @@ def _memory_block(memory: str) -> str:
     return f"# MEMORY CONTEXT\n{memory.strip()}"
 
 
+def _current_date_directive(current_date: Optional[str] = None) -> str:
+    today = current_date or _request_date.get() or date.today().strftime("%A, %Y-%m-%d")
+    return (
+        "# CURRENT DATE\n"
+        f"Today is **{today}**. Resolve every relative date (\"today\", \"tomorrow\", "
+        "\"next Friday\") against this. Never treat any other date as today."
+    )
+
+
 def get_system_prompt(
     mode: Mode,
     *,
@@ -86,6 +109,7 @@ def get_system_prompt(
     device: Optional[str] = None,
     memory: Optional[str] = None,
     tools_catalog: Optional[List[Any]] = None,
+    current_date: Optional[str] = None,
 ) -> str:
     """Compose the full system prompt for a given consumer mode.
 
@@ -108,7 +132,7 @@ def get_system_prompt(
             f"Unknown instruction mode '{mode}'. Valid modes: {', '.join(_VALID_MODES)}."
         )
 
-    sections = [_load("core"), _load(mode)]
+    sections = [_load("core"), _load(mode), _current_date_directive(current_date)]
     if tools_catalog:
         sections.append(_tools_block(tools_catalog))
     if language:

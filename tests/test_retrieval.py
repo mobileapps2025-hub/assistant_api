@@ -112,8 +112,21 @@ def test_retrieve_error_returns_empty():
     fake = MagicMock()
     fake.retrievals.retrieve.side_effect = RuntimeError("boom")
     with patch("app.retrieval.retriever.RAGIE_API_KEY", "key"), \
+         patch("app.retrieval.retriever.RETRY_BACKOFF_S", 0), \
          patch("app.retrieval.retriever._ragie", return_value=fake):
         assert retriever.retrieve("q") == []
+
+
+def test_retrieve_recovers_after_transient_error():
+    fake = MagicMock()
+    good = MagicMock()
+    good.scored_chunks = [_chunk("recovered")]
+    fake.retrievals.retrieve.side_effect = [RuntimeError("SSL EOF"), good]  # fail once, then ok
+    with patch("app.retrieval.retriever.RAGIE_API_KEY", "key"), \
+         patch("app.retrieval.retriever.RETRY_BACKOFF_S", 0), \
+         patch("app.retrieval.retriever._ragie", return_value=fake):
+        chunks = retriever.retrieve("q")
+    assert len(chunks) == 1 and chunks[0].text == "recovered"
 
 
 # --- answerer ---

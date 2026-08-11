@@ -39,7 +39,11 @@ class ToolSpec:
     )
 
     def summarize(self, args: Dict[str, Any]) -> str:
-        return self.summary(args) if self.summary else self.description
+        # Write tools carry a model-authored `confirmation` string (clear, in the user's
+        # language) — that's what the confirmation card shows. No per-tool code needed.
+        if self.summary:
+            return self.summary(args)
+        return args.get("confirmation") or self.description
 
     def schema(self) -> Dict[str, Any]:
         return {
@@ -81,8 +85,26 @@ async def _user_checklists(mcl, auth, args=None) -> Any:
     return await mcl.get_checklists_by_date(auth.access_token, auth.user_id, date_from, date_to)
 
 
+# Completion flags Task/ToDos might carry. If none is present we treat the item as open, so the
+# count always equals the list we display. Verify the real field name against a live token.
+_COMPLETION_KEYS = ("completed", "isCompleted", "isDone", "done", "closed", "tdo_completed")
+
+
+def _is_open(todo: Any) -> bool:
+    if not isinstance(todo, dict):
+        return True
+    for key in _COMPLETION_KEYS:
+        if key in todo:
+            return not bool(todo[key])
+    return True
+
+
 async def _open_task_count(mcl, auth, args=None) -> Any:
-    return await mcl.get_open_task_count(auth.access_token, auth.user_id)
+    # Single source of truth: derive the count from the same Task/ToDos list the user sees, so the
+    # number can never contradict the list (the upstream GetOpenTaskNumber didn't track create/delete).
+    todos = await mcl.get_task_todos(auth.access_token, auth.company_id, auth.user_id)
+    todos = todos if isinstance(todos, list) else []
+    return {"open_task_count": sum(1 for t in todos if _is_open(t))}
 
 
 async def _company_questions(mcl, auth, args=None) -> Any:
@@ -172,7 +194,7 @@ _DATE_RANGE_PARAMS = _params(
 )
 
 
-def _write(name, description, handler, risk, parameters, summary, group="checklist") -> ToolSpec:
+def _write(name, description, handler, risk, parameters, summary=None, group="checklist") -> ToolSpec:
     return ToolSpec(name=name, description=description, group=group, type="write",
                     status="working", risk=risk, exposed=True, executable=True,
                     handler=handler, summary=summary, parameters=parameters)
@@ -181,6 +203,15 @@ def _write(name, description, handler, risk, parameters, summary, group="checkli
 def _catalog(name, group, type_, status="working") -> ToolSpec:
     """A registered-but-gated endpoint (no schema-quality description or handler yet)."""
     return ToolSpec(name=name, description=f"[{group}/{type_}] {name} — not yet enabled", group=group, type=type_, status=status)
+
+
+# Every write tool carries this: the model writes the exact, user-language sentence the
+# confirmation card shows. One field for all actions — new actions need no summary code.
+_CONFIRMATION_PARAM = {
+    "type": "string",
+    "description": "A short, clear sentence IN THE USER'S LANGUAGE describing exactly what you "
+                   "will do, shown to the user to approve — e.g. 'Delete the task \"QA Fridge Check\".'",
+}
 
 
 TOOL_REGISTRY: List[ToolSpec] = [
@@ -238,15 +269,18 @@ TOOL_REGISTRY: List[ToolSpec] = [
     # --- LIVE write (needs confirmation via the danger gate) ---
     _write("add_task",
            "Create a new MCL task. Requires a description; optionally a due date, a target market, "
-           "or an assigned user.",
+           "or an assigned user. Defaults when omitted: no due date, no target market, the standard "
+           "MCL task type, and assignment to the current user when neither a market nor another "
+           "assignee is provided.",
            _add_task, risk="write",
            parameters=_params({
                "description": {"type": "string", "description": "What the task is"},
                "due_date": {"type": ["string", "null"], "description": "ISO due datetime, or null"},
                "market_id": {"type": ["string", "null"], "description": "Target market id, or null"},
                "assigned_user_id": {"type": ["string", "null"], "description": "User id to assign, or null"},
-           }, required=["description", "due_date", "market_id", "assigned_user_id"]),
-           summary=lambda a: f"Create task: {a.get('description')}", group="taskapp"),
+               "confirmation": _CONFIRMATION_PARAM,
+           }, required=["description", "due_date", "market_id", "assigned_user_id", "confirmation"]),
+           group="taskapp"),
     _write("edit_task",
            "Edit one of the user's tasks — change its description and/or due date.",
            _edit_task, risk="write",
@@ -254,23 +288,27 @@ TOOL_REGISTRY: List[ToolSpec] = [
                "todo_id": {"type": "string", "description": "The id of the task to edit"},
                "description": {"type": ["string", "null"], "description": "New description, or null to leave unchanged"},
                "due_date": {"type": ["string", "null"], "description": "New ISO due datetime, or null to leave unchanged"},
-           }, required=["todo_id", "description", "due_date"]),
-           summary=lambda a: f"Edit task {a.get('todo_id')}", group="taskapp"),
+               "confirmation": _CONFIRMATION_PARAM,
+           }, required=["todo_id", "description", "due_date", "confirmation"]),
+           group="taskapp"),
     _write("add_task_note",
            "Add a note/comment to one of the user's tasks.",
            _add_task_note, risk="write",
            parameters=_params({
                "todo_id": {"type": "string", "description": "The id of the task"},
                "note": {"type": "string", "description": "The note text to add"},
-           }, required=["todo_id", "note"]),
-           summary=lambda a: f"Add a note to task {a.get('todo_id')}", group="taskapp"),
+               "confirmation": _CONFIRMATION_PARAM,
+           }, required=["todo_id", "note", "confirmation"]),
+           group="taskapp"),
     _write("delete_task",
            "Delete one of the user's tasks by its id. This is destructive and cannot be undone — "
            "only call it when the user clearly wants a specific task deleted.",
            _delete_task, risk="destructive",
-           parameters=_params({"todo_id": {"type": "string", "description": "The id of the task to delete"}},
-                              required=["todo_id"]),
-           summary=lambda a: f"Delete task {a.get('todo_id')}", group="taskapp"),
+           parameters=_params({
+               "todo_id": {"type": "string", "description": "The id of the task to delete"},
+               "confirmation": _CONFIRMATION_PARAM,
+           }, required=["todo_id", "confirmation"]),
+           group="taskapp"),
 
     # --- REGISTERED but GATED (broken / need arguments — wired when fixed) ---
     _catalog("get_company_checklists", "checklist", "read", status="unverified"),

@@ -6,17 +6,20 @@ CORE identity, add exactly the right mode addendum, and inject the optional dyna
 """
 import pytest
 
+from datetime import date
+
 from app import instructions
-from app.instructions import builder, get_system_prompt
+from app.instructions import builder, get_system_prompt, set_request_date
 from app.tools import MCL_USER_TOOLS
 
 # Stable substrings that identify each composed section.
 CORE_MARKER = "MCL Support Specialist"
 MODE_MARKERS = {
     "chat": "Casual conversation",
-    "tools": "live MCL lookup",
+    "tools": "Personal data & actions",
     "rag": "SOURCE-BASED TRUTH",
     "vision": "Screenshot help",
+    "agent": "Manager agent",
 }
 # Unique to the *injected* tool catalog block (the mode files only mention the header in
 # prose, so we key off the block's descriptive sentence, not the header).
@@ -27,12 +30,12 @@ SAMPLE_CATALOG = [
 ]
 
 
-@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision"])
+@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision", "agent"])
 def test_core_identity_present_in_every_mode(mode):
     assert CORE_MARKER in get_system_prompt(mode)
 
 
-@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision"])
+@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision", "agent"])
 def test_mode_includes_only_its_own_addendum(mode):
     prompt = get_system_prompt(mode)
     assert MODE_MARKERS[mode] in prompt
@@ -89,6 +92,48 @@ def test_real_registry_tools_all_appear():
     prompt = get_system_prompt("tools", tools_catalog=MCL_USER_TOOLS)
     for tool in MCL_USER_TOOLS:
         assert tool["function"]["name"] in prompt
+
+
+def test_add_task_defaults_are_visible_to_prompted_models():
+    prompt = get_system_prompt("tools", tools_catalog=MCL_USER_TOOLS)
+    assert "Defaults when omitted" in prompt
+    assert "no due date" in prompt
+    assert "standard MCL task type" in prompt
+    assert "assignment to the current user" in prompt
+
+
+@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision", "agent"])
+def test_current_date_slot_always_present(mode):
+    # Always on — the agent must never be left without a "today".
+    assert "# CURRENT DATE" in get_system_prompt(mode)
+
+
+def test_current_date_uses_explicit_override():
+    prompt = get_system_prompt("chat", current_date="Wednesday, 2026-08-04")
+    assert "Today is **Wednesday, 2026-08-04**" in prompt
+
+
+def test_current_date_reads_request_contextvar():
+    set_request_date("Monday, 2030-01-01")
+    try:
+        assert "Today is **Monday, 2030-01-01**" in get_system_prompt("rag")
+    finally:
+        set_request_date(None)
+
+
+def test_explicit_current_date_beats_contextvar():
+    set_request_date("Monday, 2030-01-01")
+    try:
+        prompt = get_system_prompt("chat", current_date="Wednesday, 2026-08-04")
+        assert "2026-08-04" in prompt and "2030-01-01" not in prompt
+    finally:
+        set_request_date(None)
+
+
+def test_current_date_falls_back_to_server_date_when_unset():
+    set_request_date(None)
+    today = date.today().strftime("%A, %Y-%m-%d")
+    assert f"Today is **{today}**" in get_system_prompt("chat")
 
 
 def test_unknown_mode_raises_value_error():

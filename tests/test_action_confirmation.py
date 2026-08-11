@@ -7,6 +7,7 @@ import pytest
 
 from app import tools
 from app.enforcement import check_tool_call
+from app.enforcement import actions
 from app.enforcement import pending
 from app.services.chat_service import ChatService
 
@@ -22,8 +23,10 @@ def _run(coro):
 @pytest.fixture(autouse=True)
 def _clear_pending():
     pending._PENDING.clear()
+    actions._ACTIONS.clear()
     yield
     pending._PENDING.clear()
+    actions._ACTIONS.clear()
 
 
 def test_delete_task_is_destructive_and_executable():
@@ -43,6 +46,40 @@ def _tool_response(name, args_json):
     return resp
 
 
+def _text_response(text):
+    resp = MagicMock()
+    resp.choices[0].message.tool_calls = None
+    resp.choices[0].message.content = text
+    return resp
+
+
+def test_fc_asks_for_missing_detail_instead_of_assuming():
+    """A vague create request: the model asks for the name (no tool call) and that question is
+    returned to the user — it must not fall through to RAG or invent a task."""
+    svc = ChatService(None, None)
+    llm = MagicMock()
+    llm.chat.completions.create.side_effect = [_text_response("Sure — what should the task be called?")]
+    with patch("app.services.chat_service.client", llm):
+        out = _run(svc._handle_function_calling(
+            [{"role": "user", "content": "create a task"}],
+            {"content": "create a task"}, _auth()))
+    assert out is not None                                   # did NOT fall through to RAG
+    assert out["response"] == "Sure — what should the task be called?"
+    assert "requires_confirmation" not in out               # nothing staged yet
+
+
+def test_fc_empty_step0_falls_through_to_rag():
+    """No tool call and nothing said on step 0 stays a RAG fall-through (misroute safety net)."""
+    svc = ChatService(None, None)
+    llm = MagicMock()
+    llm.chat.completions.create.side_effect = [_text_response("")]
+    with patch("app.services.chat_service.client", llm):
+        out = _run(svc._handle_function_calling(
+            [{"role": "user", "content": "how do checklists work"}],
+            {"content": "how do checklists work"}, _auth()))
+    assert out is None
+
+
 def test_fc_loop_reads_then_pauses_on_write():
     """Referencing a task by name: the loop runs the read tool inline, then chains to the
     write tool and pauses for confirmation (instead of stopping after the read)."""
@@ -52,7 +89,7 @@ def test_fc_loop_reads_then_pauses_on_write():
     llm = MagicMock()
     llm.chat.completions.create.side_effect = [
         _tool_response("get_task_todos", "{}"),
-        _tool_response("add_task_note", '{"todo_id":"9","note":"urgent"}'),
+        _tool_response("add_task_note", '{"todo_id":"9","note":"urgent","confirmation":"Add the note \\"urgent\\" to the task \\"Freeze meat\\"."}'),
     ]
     with patch("app.services.chat_service.client", llm), \
          patch("app.services.chat_service.MCLServiceClient", return_value=fake_client):
@@ -61,7 +98,42 @@ def test_fc_loop_reads_then_pauses_on_write():
             {"content": "add a note to task Freeze meat"}, _auth()))
     fake_client.get_task_todos.assert_awaited_once()          # the read ran inline
     assert out["requires_confirmation"] is True               # then paused on the write
-    assert out["confirmation"]["action_summary"] == "Add a note to task 9"
+    assert out["confirmation"]["action_summary"] == 'Add the note "urgent" to the task "Freeze meat".'
+
+
+def test_tool_failure_feeds_back_and_recovers_instead_of_aborting():
+    """A tool raising (e.g. an upstream 500) must not kill the flow: the error is fed back and
+    the model gets another step to recover, rather than returning the generic failure message."""
+    svc = ChatService(None, None)
+    fake_client = SimpleNamespace(get_task_users=AsyncMock(side_effect=RuntimeError("500 Internal Server Error")))
+    llm = MagicMock()
+    llm.chat.completions.create.side_effect = [
+        _tool_response("get_task_users", "{}"),                       # step 0: calls the broken tool
+        _text_response("I couldn't get the assignee list — want it assigned to you?"),  # step 1: recovers
+    ]
+    with patch("app.services.chat_service.client", llm), \
+         patch("app.services.chat_service.MCLServiceClient", return_value=fake_client):
+        out = _run(svc._handle_function_calling(
+            [{"role": "user", "content": "assign it to someone"}],
+            {"content": "assign it to someone"}, _auth()))
+    fake_client.get_task_users.assert_awaited_once()
+    assert out["response"] == "I couldn't get the assignee list — want it assigned to you?"
+    assert llm.chat.completions.create.call_count == 2               # it took a recovery step, didn't abort
+
+
+def test_confirmation_summary_is_the_model_authored_string():
+    # The card text is whatever the model wrote in `confirmation` — in the user's language, no
+    # per-tool code, no raw id.
+    for name in ("add_task", "edit_task", "add_task_note", "delete_task"):
+        summary = tools.get_spec(name).summarize({"todo_id": "f9e05e53-guid", "confirmation": "Lösche die Aufgabe „QA“."})
+        assert summary == "Lösche die Aufgabe „QA“."
+        assert "f9e05e53" not in summary
+
+
+def test_confirmation_falls_back_generically_when_model_omits_it():
+    # Defensive only (the field is required). Falls back to the tool description, never a crash.
+    summary = tools.get_spec("delete_task").summarize({"todo_id": "g"})
+    assert summary and "g" != summary  # some human text, not the raw id
 
 
 def test_write_tools_are_write_risk_and_need_confirmation():
@@ -80,10 +152,15 @@ def test_add_task_handler_builds_todo_body_dropping_nulls():
 
 
 def test_pending_store_roundtrip_and_user_scoping():
-    cid = pending.create_pending("delete_task", {"todo_id": "9"}, "u1", "Delete task 9", "destructive")
+    messages = [{"role": "user", "content": "delete task 9"}]
+    cid = pending.create_pending(
+        "delete_task", {"todo_id": "9"}, "u1", "Delete task 9", "destructive",
+        messages=messages,
+    )
     assert pending.take_pending(cid, "u2") is None          # wrong user
     got = pending.take_pending(cid, "u1")
     assert got["args"] == {"todo_id": "9"}
+    assert got["messages"] == messages
     assert pending.take_pending(cid, "u1") is None           # one-shot
 
 
@@ -108,7 +185,129 @@ def test_approve_runs_the_handler():
     with patch("app.services.chat_service.MCLServiceClient", return_value=fake_client):
         out = _run(svc.execute_confirmed_action(cid, "approve", _auth()))
     fake_client.delete_task.assert_awaited_once_with("t", "c", "9")
-    assert out["response"].startswith("✓ Done")
+    assert out["response"] == "✓ Delete task 9"     # ✓ + the model-authored summary, no English "Done:"
+
+
+def test_approve_records_recent_action_context_with_task_defaults():
+    svc = ChatService(None, None)
+    args = {
+        "description": "New default task",
+        "due_date": None,
+        "market_id": None,
+        "assigned_user_id": None,
+        "confirmation": 'Create the task "New default task".',
+    }
+    cid = pending.create_pending("add_task", args, "u1", 'Create the task "New default task".', "write")
+    fake_client = SimpleNamespace(add_task=AsyncMock(return_value=None))
+    with patch("app.services.chat_service.MCLServiceClient", return_value=fake_client):
+        _run(svc.execute_confirmed_action(cid, "approve", _auth(), session_id="s1"))
+
+    context = actions.recall_action_context("s1", "u1")
+    assert "New default task" in context
+    assert "due_date=none" in context
+    assert "assigned_user=current user" in context
+    assert "task_type=standard MCL task type" in context
+
+
+def test_approve_uses_post_action_feedback_when_context_is_available():
+    svc = ChatService(None, None)
+    messages = [
+        {"role": "user", "content": "Show me my tasks"},
+        {"role": "assistant", "content": "1. New task\n2. New default task"},
+        {"role": "user", "content": "Delete New task"},
+    ]
+    cid = pending.create_pending(
+        "delete_task", {"todo_id": "9", "confirmation": 'Delete the task "New task".'},
+        "u1", 'Delete the task "New task".', "destructive", messages=messages,
+    )
+    fake_client = SimpleNamespace(
+        delete_task=AsyncMock(return_value=None),
+        get_task_todos=AsyncMock(return_value=[{"tdo_description": "New default task"}]),
+    )
+    llm = MagicMock()
+    llm.chat.completions.create.side_effect = [
+        _tool_response("get_task_todos", "{}"),
+        _text_response('Deleted "New task". Your remaining task is: New default task.'),
+    ]
+    with patch("app.services.chat_service.MCLServiceClient", return_value=fake_client), \
+         patch("app.services.chat_service.client", llm):
+        out = _run(svc.execute_confirmed_action(cid, "approve", _auth(), session_id="s1"))
+
+    fake_client.delete_task.assert_awaited_once_with("t", "c", "9")
+    fake_client.get_task_todos.assert_awaited_once()
+    assert out["response"] == 'Deleted "New task". Your remaining task is: New default task.'
+
+
+def test_approve_executes_multi_action_plan_in_order():
+    svc = ChatService(None, None)
+    messages = [
+        {"role": "user", "content": "Show me my tasks"},
+        {"role": "assistant", "content": "1. First\n2. New default task\n3. This is a demo Task"},
+        {"role": "user", "content": "Delete the last 2 tasks"},
+    ]
+    steps = [
+        {
+            "tool": "delete_task",
+            "args": {"todo_id": "2", "confirmation": 'Delete the task "New default task".'},
+            "summary": 'Delete the task "New default task".',
+            "index": 1,
+            "risk": "destructive",
+        },
+        {
+            "tool": "delete_task",
+            "args": {"todo_id": "3", "confirmation": 'Delete the task "This is a demo Task".'},
+            "summary": 'Delete the task "This is a demo Task".',
+            "index": 2,
+            "risk": "destructive",
+        },
+    ]
+    cid = pending.create_pending(
+        "confirm_mcl_action_plan",
+        {"steps": steps},
+        "u1",
+        'Delete 2 tasks: "New default task" and "This is a demo Task".',
+        "destructive",
+        messages=messages,
+    )
+    fake_client = SimpleNamespace(
+        delete_task=AsyncMock(return_value=None),
+        get_task_todos=AsyncMock(return_value=[{"tdo_description": "First"}]),
+    )
+    llm = MagicMock()
+    llm.chat.completions.create.side_effect = [
+        _tool_response("get_task_todos", "{}"),
+        _text_response('Deleted both tasks. Your remaining task is: First.'),
+    ]
+    with patch("app.services.chat_service.MCLServiceClient", return_value=fake_client), \
+         patch("app.services.chat_service.client", llm):
+        out = _run(svc.execute_confirmed_action(cid, "approve", _auth(), session_id="s1"))
+
+    assert fake_client.delete_task.await_count == 2
+    fake_client.delete_task.assert_any_await("t", "c", "2")
+    fake_client.delete_task.assert_any_await("t", "c", "3")
+    assert out["response"] == "Deleted both tasks. Your remaining task is: First."
+    context = actions.recall_action_context("s1", "u1")
+    assert "New default task" in context
+    assert "This is a demo Task" in context
+
+
+def test_failed_action_uses_post_action_feedback_when_context_is_available():
+    svc = ChatService(None, None)
+    messages = [{"role": "user", "content": "Delete New task"}]
+    cid = pending.create_pending(
+        "delete_task", {"todo_id": "9", "confirmation": 'Delete the task "New task".'},
+        "u1", 'Delete the task "New task".', "destructive", messages=messages,
+    )
+    fake_client = SimpleNamespace(delete_task=AsyncMock(side_effect=RuntimeError("404 not found")))
+    llm = MagicMock()
+    llm.chat.completions.create.return_value = _text_response(
+        'I could not delete "New task". It may already be gone, so I can refresh your task list.'
+    )
+    with patch("app.services.chat_service.MCLServiceClient", return_value=fake_client), \
+         patch("app.services.chat_service.client", llm):
+        out = _run(svc.execute_confirmed_action(cid, "approve", _auth(), session_id="s1"))
+
+    assert "already be gone" in out["response"]
 
 
 def test_approve_with_expired_or_wrong_user_does_nothing():

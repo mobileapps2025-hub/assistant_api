@@ -172,6 +172,7 @@ async def chat(
             session_id=body.session_id,
             auth_context=body.auth_context,
             device=body.device,
+            timezone=body.timezone,
         )
         return _build_chat_response(result, response_id)
     except HTTPException:
@@ -188,7 +189,7 @@ async def confirm_action(
 ) -> ChatResponse:
     response_id = generate_response_id()
     result = await chat_service.execute_confirmed_action(
-        body.confirmation_id, body.decision, body.auth_context
+        body.confirmation_id, body.decision, body.auth_context, body.session_id
     )
     return _build_chat_response(result, response_id)
 

@@ -46,6 +46,14 @@ def test_allowed_image_kept_unverified_stripped():
     assert removed == ["http://evil/x.png"]
 
 
+def test_stripped_citation_leaves_no_orphan_space():
+    answer = "These are one-time events [Source: nope.pdf]. Next [Source: gone.pdf] step here."
+    out = enforce_answer(answer, allowed_sources=set(), allowed_image_urls=set())
+    assert "events." in out                 # no " ." before the period
+    assert "  " not in out                  # no double space where the mid-sentence citation was
+    assert "Source" not in out
+
+
 def test_enforce_answer_combines_both():
     allowed_url = "http://host/api/ragie/image?document_id=D&chunk_id=C"
     answer = (
