@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from zoneinfo import ZoneInfo
 from app.services.vision_service import VisionService
 from app.services.image_validator import ImageValidatorService
@@ -13,14 +13,41 @@ from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
 from app.instructions import get_system_prompt, set_request_date
 from app.routing import classify_route, detect_language
-from app.retrieval import run as run_retrieval, retrieve, build_vision_query
+from app.retrieval import run as run_retrieval, retrieve, build_vision_query, contextualize
 from app.enforcement import check_tool_call, enforce_answer
+from app.enforcement.actions import recall_action_context, record_action
 from app.enforcement.pending import create_pending, peek_pending, take_pending
 from app.core.localize import localize
 
 logger = get_logger(__name__)
 
 MAX_TOOL_STEPS = 5   # bound the read->act tool loop per request
+KNOWLEDGE_TOOL_NAME = "search_mcl_documentation"
+
+KNOWLEDGE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": KNOWLEDGE_TOOL_NAME,
+        "description": (
+            "Search the MCL documentation for general product how-to, troubleshooting, "
+            "screen, feature, platform, sync, Dashboard, Mobile App, or Checklist Wizard "
+            "questions. Do not use for questions about the assistant's own behavior, "
+            "recent actions, available tools, or defaults already described by tool schemas."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "A standalone English documentation search query.",
+                }
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
+}
 
 
 def _latest_user_message(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -115,6 +142,33 @@ def _recall_memory(auth_context: Optional[AuthContext], query: str = "") -> str:
         return ""
 
 
+def _knowledge_context(chunks: List[Any]) -> str:
+    if not chunks:
+        return ""
+    return "\n".join(
+        f"[Source: {getattr(c, 'document_name', 'unknown')}]: {c.text}" for c in chunks
+    )
+
+
+def _tool_call_message(tool_call: Any) -> Dict[str, Any]:
+    return {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [{
+            "id": tool_call.id,
+            "type": "function",
+            "function": {
+                "name": tool_call.function.name,
+                "arguments": tool_call.function.arguments,
+            },
+        }],
+    }
+
+
+def _tool_result_message(tool_call: Any, content: str) -> Dict[str, Any]:
+    return {"role": "tool", "tool_call_id": tool_call.id, "content": content}
+
+
 class ChatService:
     def __init__(
         self,
@@ -152,10 +206,10 @@ class ChatService:
 
         decision = classify_route(messages, tools_catalog=MCL_USER_TOOLS)
         logger.info(
-            f"[ROUTE] route={decision.route} authed={_is_authenticated(auth_context)} "
+            f"[PREFLIGHT] label={decision.route} authed={_is_authenticated(auth_context)} "
             f"reason={decision.reason[:80]}"
         )
-        flow(f"🧭 router → {decision.route}  ({decision.reason[:50]})")
+        flow(f"🧭 preflight → {decision.route}  ({decision.reason[:50]})")
 
         result = await self._dispatch_route(
             decision.route, messages, latest_user_message, session_id, auth_context,
@@ -165,7 +219,8 @@ class ChatService:
         return result
 
     async def execute_confirmed_action(
-        self, confirmation_id: str, decision: str, auth_context: Optional[AuthContext]
+        self, confirmation_id: str, decision: str, auth_context: Optional[AuthContext],
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         user_id = auth_context.user_id if auth_context else None
         if decision != "approve":
@@ -187,6 +242,9 @@ class ChatService:
         flow(f"✅ confirmed → executing {pending['tool']}")
         try:
             await spec.handler(MCLServiceClient(), auth_context, pending["args"])
+            record_action(
+                session_id, user_id, pending["tool"], pending["args"], pending["summary"]
+            )
             # pending['summary'] is the model-authored confirmation, already in the user's language.
             return {"response": f"✓ {pending['summary']}", "success": True, "has_vision": False}
         except Exception as e:
@@ -204,17 +262,186 @@ class ChatService:
         language: str,
         device_context: str,
     ) -> Dict[str, Any]:
-        if route == "PERSONAL":
-            return await self._handle_personal_request(
-                messages, latest_user_message, session_id, auth_context,
-                memory_context, language, device_context
+        if route == "PERSONAL" and not _is_authenticated(auth_context):
+            flow("⛔ no MCL session → ask to connect")
+            return _needs_session_response(language)
+
+        if _image_urls(latest_user_message) and route != "PERSONAL":
+            return await self._handle_text_request(
+                messages, latest_user_message, session_id=session_id,
+                memory_context=memory_context, language=language, device_context=device_context
             )
-        if route == "CHAT":
-            return await self._handle_chat(messages, memory_context, language, device_context)
-        return await self._handle_text_request(
-            messages, latest_user_message, session_id=session_id,
-            memory_context=memory_context, language=language, device_context=device_context
+
+        return await self._handle_agent_request(
+            messages, latest_user_message, session_id, auth_context,
+            memory_context, language, device_context
         )
+
+    async def _handle_agent_request(
+        self,
+        messages: List[Dict[str, Any]],
+        latest_user_message: Dict[str, Any],
+        session_id: Optional[str],
+        auth_context: Optional[AuthContext],
+        memory_context: str,
+        language: str,
+        device_context: str,
+    ) -> Dict[str, Any]:
+        """Manager agent: answer directly, search docs, or use live MCL tools.
+
+        This is the hybrid architecture: preflight still gives observability and an auth
+        pre-check, but normal text turns are not locked into a single downstream path.
+        The capable model can call the documentation search tool and authenticated MCL
+        tools in one bounded loop.
+        """
+        flow("🤖 AGENT → manager loop")
+        mcl_tools = MCL_USER_TOOLS if _is_authenticated(auth_context) else []
+        agent_tools = [KNOWLEDGE_TOOL, *mcl_tools]
+        action_context = recall_action_context(
+            session_id, auth_context.user_id if auth_context else None
+        )
+
+        system_prompt = get_system_prompt(
+            "agent",
+            language=language or None,
+            device=device_context or None,
+            tools_catalog=mcl_tools or None,
+            memory=memory_context or None,
+        )
+
+        api_messages = [{"role": "system", "content": system_prompt}]
+        if action_context:
+            api_messages.append({"role": "system", "content": action_context})
+        api_messages.extend(
+            {"role": m.get("role", "user"), "content": _model_content(m)} for m in messages
+        )
+
+        allowed_sources: Set[str] = set()
+        used_knowledge = False
+
+        try:
+            for step in range(MAX_TOOL_STEPS):
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=api_messages,
+                    tools=agent_tools,
+                    tool_choice="auto",
+                    parallel_tool_calls=False,
+                    temperature=0,
+                    timeout=45,
+                )
+                choice = response.choices[0]
+
+                if not choice.message.tool_calls:
+                    content = (choice.message.content or "").strip()
+                    if used_knowledge:
+                        content = enforce_answer(
+                            content,
+                            allowed_sources=allowed_sources,
+                            allowed_image_urls=set(),
+                        )
+                    if content:
+                        return {"response": content, "success": True, "has_vision": False}
+                    return {
+                        "response": localize(
+                            "I couldn't complete that in a few steps — could you rephrase or be more specific?",
+                            language,
+                        ),
+                        "success": True,
+                        "has_vision": False,
+                    }
+
+                tool_call = choice.message.tool_calls[0]
+                function_name = tool_call.function.name
+                flow(f"🔧 agent tool requested: {function_name}")
+
+                try:
+                    tool_args = json.loads(tool_call.function.arguments or "{}")
+                except (ValueError, TypeError):
+                    tool_args = {}
+
+                if function_name == KNOWLEDGE_TOOL_NAME:
+                    query = str(tool_args.get("query") or "").strip()
+                    contextualized = contextualize(query, messages) if query else ""
+                    chunks = retrieve(contextualized) if contextualized else []
+                    used_knowledge = True
+                    allowed_sources.update(
+                        getattr(c, "document_name", "") for c in chunks if getattr(c, "document_name", "")
+                    )
+                    tool_content = json.dumps({
+                        "query": contextualized,
+                        "found": bool(chunks),
+                        "sources": sorted(allowed_sources),
+                        "context": _knowledge_context(chunks),
+                        "instruction": (
+                            "Answer documentation facts only from this context and cite each "
+                            "documentation claim with [Source: filename]. If found is false, "
+                            "say you do not have details on that specific topic yet."
+                        ),
+                    }, ensure_ascii=False)
+                    api_messages.append(_tool_call_message(tool_call))
+                    api_messages.append(_tool_result_message(tool_call, tool_content))
+                    continue
+
+                if not _is_authenticated(auth_context):
+                    return _needs_session_response(language)
+
+                if not check_tool_call(function_name, auth_context).allowed:
+                    flow("🛡 enforcement: tool BLOCKED (deny-by-default)")
+                    return {"response": "I'm not able to do that.", "success": True, "has_vision": False}
+                flow("🛡 enforcement: tool allowed")
+
+                spec = get_spec(function_name)
+                if spec is None or spec.handler is None:
+                    tool_content = json.dumps(
+                        {"error": f"The '{function_name}' tool is not available."}
+                    )
+                    api_messages.append(_tool_call_message(tool_call))
+                    api_messages.append(_tool_result_message(tool_call, tool_content))
+                    continue
+
+                if spec.risk != "safe":
+                    summary = spec.summarize(tool_args)
+                    cid = create_pending(function_name, tool_args, auth_context.user_id, summary, spec.risk, language)
+                    flow(f"⚠ confirmation required: {function_name} ({spec.risk})")
+                    return {
+                        "response": f"⚠ {summary}",
+                        "success": True,
+                        "has_vision": False,
+                        "requires_confirmation": True,
+                        "confirmation": {"id": cid, "risk": spec.risk, "action_summary": summary},
+                    }
+
+                try:
+                    data = await spec.handler(MCLServiceClient(), auth_context, tool_args)
+                    tool_content = json.dumps(data, ensure_ascii=False)
+                except Exception as tool_err:
+                    logger.error(f"[AGENT] tool '{function_name}' failed: {tool_err}")
+                    flow(f"⚠ tool {function_name} failed — feeding error back to the model")
+                    tool_content = json.dumps(
+                        {"error": f"The '{function_name}' tool failed (service error) and returned no data."}
+                    )
+                api_messages.append(_tool_call_message(tool_call))
+                api_messages.append(_tool_result_message(tool_call, tool_content))
+
+            return {
+                "response": localize(
+                    "I couldn't complete that in a few steps — could you rephrase or be more specific?",
+                    language,
+                ),
+                "success": True,
+                "has_vision": False,
+            }
+        except Exception as e:
+            logger.error(f"[AGENT] Manager loop error: {e}")
+            return {
+                "response": localize(
+                    "I ran into an issue while handling that. Please try again in a moment.",
+                    language,
+                ),
+                "success": True,
+                "has_vision": False,
+            }
 
     async def _handle_personal_request(
         self,
@@ -367,7 +594,7 @@ class ChatService:
                         # or handled a general question — return it as the reply.
                         return {"response": content, "success": True, "has_vision": False}
                     # Neither a tool call nor any text — a rare stuck state. Fall through to the
-                    # model-driven RAG path (language-aware) rather than emit a canned line that
+                    # legacy language-aware RAG fallback rather than emit a canned line that
                     # would always be English regardless of the user's language.
                     logger.info("[FC] No tool call and no content — falling through to RAG")
                     return None

@@ -1,9 +1,9 @@
-"""Real-LLM routing accuracy + determinism eval (run on demand, not in CI).
+"""Real-LLM preflight-label accuracy + determinism eval (run on demand, not in CI).
 
     cd assistant_api && python tests/routing_eval.py
 
-Hits the live model via classify_route. Each misroute we decide is wrong becomes a new
-labeled case here. Determinism: temp 0 means the same input must return the same route.
+Hits the live model via classify_route. Each wrong label becomes a new labeled case here.
+Determinism: temp 0 means the same input must return the same label.
 """
 import sys
 from collections import Counter
@@ -97,9 +97,9 @@ DETERMINISM_SUBSET = [
 
 
 def run_accuracy():
-    print("=== Routing accuracy ===")
+    print("=== Preflight label accuracy ===")
     passed = 0
-    misroutes = []
+    wrong_labels = []
     for case in LABELED:
         decision = route(case["messages"])
         ok = decision.route == case["expected"]
@@ -109,11 +109,11 @@ def run_accuracy():
         mark = "ok " if ok else "MISS"
         print(f"  {mark}  {case['expected']:9} got {decision.route:9} | {latest[:48]}{note}")
         if not ok:
-            misroutes.append((latest, case["expected"], decision.route, decision.reason))
+            wrong_labels.append((latest, case["expected"], decision.route, decision.reason))
     print(f"\nAccuracy: {passed}/{len(LABELED)} = {100*passed/len(LABELED):.0f}%")
-    if misroutes:
-        print("\nMisroutes:")
-        for latest, exp, got, reason in misroutes:
+    if wrong_labels:
+        print("\nWrong labels:")
+        for latest, exp, got, reason in wrong_labels:
             print(f"  - '{latest}' expected {exp}, got {got} — reason: {reason[:80]}")
     return passed, len(LABELED)
 

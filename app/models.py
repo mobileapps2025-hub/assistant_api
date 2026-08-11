@@ -138,6 +138,7 @@ class ChatResponse(BaseModel):
 class ConfirmRequest(BaseModel):
     confirmation_id: str
     decision: str            # approve | reject
+    session_id: Optional[str] = None
     auth_context: Optional[AuthContext] = None
 
 

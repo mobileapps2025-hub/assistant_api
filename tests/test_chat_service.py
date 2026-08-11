@@ -30,12 +30,30 @@ def make_service(mock_vision_service, mock_image_validator):
     return ChatService(mock_vision_service, mock_image_validator)
 
 
+def _tool_response(name, args_json):
+    tc = MagicMock()
+    tc.id = "call_1"
+    tc.function.name = name
+    tc.function.arguments = args_json
+    resp = MagicMock()
+    resp.choices[0].message.tool_calls = [tc]
+    resp.choices[0].message.content = None
+    return resp
+
+
+def _text_response(text):
+    resp = MagicMock()
+    resp.choices[0].message.tool_calls = None
+    resp.choices[0].message.content = text
+    return resp
+
+
 # ---------------------------------------------------------------------------
-# process_chat_request routing
+# process_chat_request preflight + dispatch
 # ---------------------------------------------------------------------------
 
 class TestProcessChatRequestRouting:
-    """Verify vision vs. text routing based on message content."""
+    """Verify preflight labels still preserve image handling and manager dispatch."""
 
     @pytest.mark.asyncio
     async def test_image_message_goes_through_router_not_forked(
@@ -60,7 +78,7 @@ class TestProcessChatRequestRouting:
             mock_route.return_value.reason = "screen help"
             result = await service.process_chat_request(messages)
 
-        mock_route.assert_called_once()  # the image went THROUGH the router, not around it
+        mock_route.assert_called_once()  # the image went THROUGH preflight, not around it
         service._handle_text_request.assert_called_once()
         assert result["has_vision"] is True
 
@@ -71,7 +89,10 @@ class TestProcessChatRequestRouting:
         service = make_service(mock_vision_service, mock_image_validator)
         service._handle_vision_request = AsyncMock()
         service._handle_text_request = AsyncMock(
-            return_value={"response": "text answer", "success": True, "has_vision": False}
+            return_value={"response": "old text answer", "success": True, "has_vision": False}
+        )
+        service._handle_agent_request = AsyncMock(
+            return_value={"response": "manager answer", "success": True, "has_vision": False}
         )
 
         messages = [{"role": "user", "content": "How do I sync?"}]
@@ -80,8 +101,10 @@ class TestProcessChatRequestRouting:
             mock_route.return_value.reason = "general how-to"
             result = await service.process_chat_request(messages)
 
-        service._handle_text_request.assert_called_once()
+        service._handle_agent_request.assert_called_once()
+        service._handle_text_request.assert_not_called()
         service._handle_vision_request.assert_not_called()
+        assert result["response"] == "manager answer"
         assert result["has_vision"] is False
 
     @pytest.mark.asyncio
@@ -96,7 +119,7 @@ class TestProcessChatRequestRouting:
 
 
 # ---------------------------------------------------------------------------
-# _handle_text_request (KNOWLEDGE path → Ragie retrieval, mocked)
+# _handle_text_request (legacy/image knowledge handler → Ragie retrieval, mocked)
 # ---------------------------------------------------------------------------
 
 class TestHandleTextRequest:
@@ -132,7 +155,53 @@ class TestHandleTextRequest:
 
 
 # ---------------------------------------------------------------------------
-# KNOWLEDGE + image → _answer_over_image (Decision 12 — Layer 1 + retrieval)
+# _handle_agent_request (manager path → docs tool / direct answer / MCL tools)
+# ---------------------------------------------------------------------------
+
+class TestHandleAgentRequest:
+    @pytest.mark.asyncio
+    async def test_direct_recent_action_answer_does_not_search_docs(
+        self, mock_vision_service, mock_image_validator
+    ):
+        service = make_service(mock_vision_service, mock_image_validator)
+        messages = [{"role": "user", "content": "What were the default settings?"}]
+        with patch("app.services.chat_service.client") as mock_client, \
+             patch("app.services.chat_service.retrieve") as mock_retrieve:
+            mock_client.chat.completions.create.return_value = _text_response(
+                "I used no due date, no market, the standard task type, and assigned it to you."
+            )
+            result = await service._handle_agent_request(
+                messages, messages[0], "s1", None, "", "English", ""
+            )
+
+        mock_retrieve.assert_not_called()
+        assert result["response"].startswith("I used no due date")
+
+    @pytest.mark.asyncio
+    async def test_knowledge_tool_searches_docs_and_enforces_sources(
+        self, mock_vision_service, mock_image_validator
+    ):
+        service = make_service(mock_vision_service, mock_image_validator)
+        messages = [{"role": "user", "content": "How do I sync?"}]
+        chunk = types.SimpleNamespace(document_name="sync_guide.md", text="Tap Sync.")
+        with patch("app.services.chat_service.contextualize", return_value="MCL sync"), \
+             patch("app.services.chat_service.retrieve", return_value=[chunk]) as mock_retrieve, \
+             patch("app.services.chat_service.client") as mock_client:
+            mock_client.chat.completions.create.side_effect = [
+                _tool_response("search_mcl_documentation", '{"query":"MCL sync"}'),
+                _text_response("Tap Sync [Source: sync_guide.md]. Ignore this [Source: fake.md]."),
+            ]
+            result = await service._handle_agent_request(
+                messages, messages[0], "s1", None, "", "English", ""
+            )
+
+        mock_retrieve.assert_called_once_with("MCL sync")
+        assert "[Source: sync_guide.md]" in result["response"]
+        assert "fake.md" not in result["response"]
+
+
+# ---------------------------------------------------------------------------
+# KNOWLEDGE-labeled image → _answer_over_image (Decision 12 — Layer 1 + retrieval)
 # ---------------------------------------------------------------------------
 
 class TestAnswerOverImage:

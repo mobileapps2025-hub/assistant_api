@@ -7,6 +7,7 @@ import pytest
 
 from app import tools
 from app.enforcement import check_tool_call
+from app.enforcement import actions
 from app.enforcement import pending
 from app.services.chat_service import ChatService
 
@@ -22,8 +23,10 @@ def _run(coro):
 @pytest.fixture(autouse=True)
 def _clear_pending():
     pending._PENDING.clear()
+    actions._ACTIONS.clear()
     yield
     pending._PENDING.clear()
+    actions._ACTIONS.clear()
 
 
 def test_delete_task_is_destructive_and_executable():
@@ -178,6 +181,27 @@ def test_approve_runs_the_handler():
         out = _run(svc.execute_confirmed_action(cid, "approve", _auth()))
     fake_client.delete_task.assert_awaited_once_with("t", "c", "9")
     assert out["response"] == "✓ Delete task 9"     # ✓ + the model-authored summary, no English "Done:"
+
+
+def test_approve_records_recent_action_context_with_task_defaults():
+    svc = ChatService(None, None)
+    args = {
+        "description": "New default task",
+        "due_date": None,
+        "market_id": None,
+        "assigned_user_id": None,
+        "confirmation": 'Create the task "New default task".',
+    }
+    cid = pending.create_pending("add_task", args, "u1", 'Create the task "New default task".', "write")
+    fake_client = SimpleNamespace(add_task=AsyncMock(return_value=None))
+    with patch("app.services.chat_service.MCLServiceClient", return_value=fake_client):
+        _run(svc.execute_confirmed_action(cid, "approve", _auth(), session_id="s1"))
+
+    context = actions.recall_action_context("s1", "u1")
+    assert "New default task" in context
+    assert "due_date=none" in context
+    assert "assigned_user=current user" in context
+    assert "task_type=standard MCL task type" in context
 
 
 def test_approve_with_expired_or_wrong_user_does_nothing():

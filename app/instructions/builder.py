@@ -20,10 +20,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, List, Literal, Optional
 
-Mode = Literal["chat", "tools", "rag", "vision"]
+Mode = Literal["chat", "tools", "rag", "vision", "agent"]
 
 _INSTRUCTIONS_DIR = Path(__file__).parent
-_VALID_MODES = ("chat", "tools", "rag", "vision")
+_VALID_MODES = ("chat", "tools", "rag", "vision", "agent")
 
 # The user's "today", resolved per request from their browser timezone and set once by the
 # caller (see set_request_date). Read by every prompt so relative dates ("tomorrow") ground

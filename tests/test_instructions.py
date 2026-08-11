@@ -19,6 +19,7 @@ MODE_MARKERS = {
     "tools": "Personal data & actions",
     "rag": "SOURCE-BASED TRUTH",
     "vision": "Screenshot help",
+    "agent": "Manager agent",
 }
 # Unique to the *injected* tool catalog block (the mode files only mention the header in
 # prose, so we key off the block's descriptive sentence, not the header).
@@ -29,12 +30,12 @@ SAMPLE_CATALOG = [
 ]
 
 
-@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision"])
+@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision", "agent"])
 def test_core_identity_present_in_every_mode(mode):
     assert CORE_MARKER in get_system_prompt(mode)
 
 
-@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision"])
+@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision", "agent"])
 def test_mode_includes_only_its_own_addendum(mode):
     prompt = get_system_prompt(mode)
     assert MODE_MARKERS[mode] in prompt
@@ -101,7 +102,7 @@ def test_add_task_defaults_are_visible_to_prompted_models():
     assert "assignment to the current user" in prompt
 
 
-@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision"])
+@pytest.mark.parametrize("mode", ["chat", "tools", "rag", "vision", "agent"])
 def test_current_date_slot_always_present(mode):
     # Always on — the agent must never be left without a "today".
     assert "# CURRENT DATE" in get_system_prompt(mode)

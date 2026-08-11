@@ -1,8 +1,8 @@
-"""Unit tests for Layer 2 — the Router/Classifier (app/routing).
+"""Unit tests for Layer 2 — the preflight classifier (app/routing).
 
 The OpenAI call is mocked: these verify the module's plumbing — structured-output parsing,
-history assembly, the no-call short-circuits, and the error/parse fallback to KNOWLEDGE.
-Real-LLM routing accuracy + determinism live in tests/routing_eval.py (run on demand).
+history assembly, the no-call short-circuits, and the error/parse fallback to the KNOWLEDGE
+label. Real-LLM label accuracy + determinism live in tests/routing_eval.py (run on demand).
 """
 import json
 from unittest.mock import MagicMock, patch
@@ -24,7 +24,7 @@ def _decision_json(route: str, reason: str = "r") -> str:
 
 
 @pytest.mark.parametrize("route", ["CHAT", "KNOWLEDGE", "PERSONAL"])
-def test_returns_route_from_structured_output(route):
+def test_returns_label_from_structured_output(route):
     with patch("app.routing.router.client") as mock_client:
         mock_client.chat.completions.create.return_value = _response(_decision_json(route))
         decision = classify_route([{"role": "user", "content": "anything"}])
@@ -121,6 +121,8 @@ def test_tool_catalog_and_capability_rule_reach_system_prompt():
         system_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
     assert "get_open_task_count" in system_prompt          # real capabilities injected
     assert "ASSISTANT" in system_prompt                    # capability-vs-product rule present
+    assert "preflight-classify" in system_prompt
+    assert "not choose the final answer strategy" in system_prompt
 
 
 def test_recent_action_questions_rule_reaches_system_prompt():
