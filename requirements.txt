@@ -53,5 +53,6 @@ python-multipart==0.0.9
 # Scheduling
 apscheduler
 
-# Retrieval (Ragie)
-ragie>=2.0.0
+# Retrieval — in-house KB index (embeddings via openai; numpy above).
+# pymupdf is only needed to (re)build the index with ingest_kb.py.
+pymupdf

@@ -1,0 +1,102 @@
+[
+ {
+  "id": "visual-guide-tasks-mcl-app_p1_c1",
+  "document_name": "Visual Guide Tasks MCL APP.pdf",
+  "text": "The following MCL Visual Guide is based on MCL App UI, the following is not repeatable\nthrough MCL Web UI.\nMain Navigation (Markets)→ …\nLEVEL 1 – MENU NAVIGATION PAGE\n[Screen Title]: Markets Overview\n[Parent Screen]: None\n[Child Screen]: Tasks Overview\nDescription:\nAfter logging into the MCL App, users are directed to the Markets screen.\nUsers can access Markets to complete checklist/tasks or move onto different functions of\nthe app via icons highlighted in the red box.\n⟦img:visual-guide-tasks-mcl-app_p1_i1⟧"
+ },
+ {
+  "id": "visual-guide-tasks-mcl-app_p2_c1",
+  "document_name": "Visual Guide Tasks MCL APP.pdf",
+  "text": "Bottom Navigation Bar\nThe bottom menu provides quick access to core app functions:\nIcon\nFunction\nChecklist Icon\n(List)\nOpens the store overview (selecting a store will open checklist\noverview)\nBook Icon\nAccess checklist reports on the device\nClock Icon\nAccess tasks overview on the device\nUser Icon\nOpens app configuration\nVisible Interface Elements\nMarket List\n•\nDisplays all accessible markets (e.g., Market 1, Market 2, Schulungsmarkt, etc.)\n•\nEach row represents one store\n•\nTapping a market opens its checklist overview\nFunction\nThe Markets screen is the central entry point of the mobile app.\nUsers select a market to begin executing checklists.\n→ Next Navigation Step\nSelect the clock icon to open the tasks overview.\nLEVEL 2 – Markets Overview-> Tasks Overview"
+ },
+ {
+  "id": "visual-guide-tasks-mcl-app_p3_c1",
+  "document_name": "Visual Guide Tasks MCL APP.pdf",
+  "text": "[Screen Title]: Tasks Overview\n[Parent Screen]: Markets Overview\n[Child Screen]: Searching or Creating new tasks\nDescription\nThe Tasks screen serves as the central task management area within the app.\nFrom this screen, users can:\n•\nView created tasks\n•\nSearch for existing tasks\n•\nCreate new tasks\nVisible Interface Elements\n⟦img:visual-guide-tasks-mcl-app_p3_i1⟧"
+ },
+ {
+  "id": "visual-guide-tasks-mcl-app_p4_c1",
+  "document_name": "Visual Guide Tasks MCL APP.pdf",
+  "text": "Element\nDescription\nFilter Icon (Top Left)\nOpens task search and filtering options\nPlus Icon (Top Right)\nOpens the Create Task screen\nTask List Area\nDisplays stored tasks\nBottom Navigation Bar Provides access to other app modules\nFunction\nThis screen acts as the entry point for all task-related actions within the mobile app.\n→ Next Navigation Options\n•\nTap the Filter icon to search tasks\n•\nTap the Plus icon to create a new task\nLEVEL 3A– SEARCH TASKS\n[Screen Title]: Tasks (Search View)\n[Parent Screen]: Tasks Overview\n[Child Screen]: Filtered Task Overview"
+ },
+ {
+  "id": "visual-guide-tasks-mcl-app_p5_c1",
+  "document_name": "Visual Guide Tasks MCL APP.pdf",
+  "text": "Description\nThe Task Search screen allows users to filter and locate tasks based on defined criteria.\nUsers can narrow results using:\n•\nDate range\n•\nTask Timing (Due / Created / Started): Determines which task date is used for the\nselected date range — the due date, the start date, or the creation date.\n•\nMarket\n•\nAssigned user\n•\nStatus\n⟦img:visual-guide-tasks-mcl-app_p5_i1⟧"
+ },
+ {
+  "id": "visual-guide-tasks-mcl-app_p6_c1",
+  "document_name": "Visual Guide Tasks MCL APP.pdf",
+  "text": "Visible Interface Elements\nElement\nDescription\nFrom Date Selector\nStart date for filtering\nTo Date Selector\nEnd date for filtering\nDue / Create / Start\nDefines which date type is filtered\nMarket Field\nFilter tasks by specific market\nAssigned To Field\nFilter by responsible user\nStatus Field\nFilter by task status\nSearch Button\nExecutes the task search\nFunction\nAllows structured filtering to locate specific tasks across markets and users.\n→ Next Navigation Step\nCreating new tasks\nLEVEL 3B – CREATE TASK\n[Screen Title]: Task creation\n[Parent Screen]: Tasks Overview\n[Child Screen]: Task Overview"
+ },
+ {
+  "id": "visual-guide-tasks-mcl-app_p7_c1",
+  "document_name": "Visual Guide Tasks MCL APP.pdf",
+  "text": "Description\nThe Create Task screen allows users to manually generate a new task within the app.\nTasks need to be assigned to a market and optionally to a user. Not selecting a user\nredirects the task to default user (user who is assigned to these tasks as default).\nVisible Interface Elements\nElement\nDescription\nMarket\nSelect the store the task belongs to\n⟦img:visual-guide-tasks-mcl-app_p7_i1⟧"
+ },
+ {
+  "id": "visual-guide-tasks-mcl-app_p8_c1",
+  "document_name": "Visual Guide Tasks MCL APP.pdf",
+  "text": "Element\nDescription\nAssigned To\nSelect responsible user (optional)\nStart Date\nDefine when the task becomes active (optional)\nDue Date\nDefine deadline for completion (optional)\nTask Description Field\nEnter task details (text or voice input supported)\nMandatory if there is no photo\nPhoto/Comment Toggle\nUser must attach photo or comment when working on the\ntask\nPhoto Upload Area\nCapture or attach photo evidence\nMandatory is there is no task description\nAdd Button\nSaves and creates the task\nLEVEL 3C – Task Closing\n[Screen Title]: Task Closing\n[Parent Screen]: Tasks Overview\n[Child Screen]: Task Overview\nTask Closing\nTasks can be marked as completed directly within the app. There are two ways to close a\ntask:"
+ },
+ {
+  "id": "visual-guide-tasks-mcl-app_p9_c1",
+  "document_name": "Visual Guide Tasks MCL APP.pdf",
+  "text": "1. Swipe to Close\nUsers can quickly complete a task by swiping the task entry in the task list.\nThis action immediately marks the task as completed.\nThis method can only be used for tasks that do not require additional documentation as\nphoto or comment submission.\n⟦img:visual-guide-tasks-mcl-app_p9_i1⟧"
+ },
+ {
+  "id": "visual-guide-tasks-mcl-app_p10_c1",
+  "document_name": "Visual Guide Tasks MCL APP.pdf",
+  "text": "2. Close with Notes\nIf additional context is required, users can open the task and add notes before closing it.\nThis is the only option to close a task when photo and comment are mandatory.\nThis allows the user to document:\n•\nActions taken\n•\nObservations\n•\nSupporting information\nPhotos can also be attached if evidence of completion is required.\nNotes can also be used to leave a note to document the current state and taken action\nregarding the task, not only to complete a task.\n⟦img:visual-guide-tasks-mcl-app_p10_i1⟧\n⟦img:visual-guide-tasks-mcl-app_p10_i2⟧"
+ },
+ {
+  "id": "visual-guide-tasks-mcl-app_p11_c1",
+  "document_name": "Visual Guide Tasks MCL APP.pdf",
+  "text": "Behavior\n•\nTasks may be assigned to:\no A specific user\no A market (if no individual is selected)\n•\nTasks assigned to “All” or without a responsible person follow store-level\nassignment rules (if configured).\n•\nCreated tasks will appear in task lists and synchronize with the web dashboard.\nFunction\nEnables users to manually document corrective actions or follow-up items directly within\nthe app."
+ },
+ {
+  "id": "mcl-visual-guide-tasks_p1_c1",
+  "document_name": "MCL Visual Guide Tasks.pdf",
+  "text": "The following MCL Visual Guide is based on MCL Web UI, the following is not repeatable\nthrough MCL APP UI.\nMain Menu → Task Overview (Web interface)→ To Do List/New Task (Web interface)\nLEVEL 1 – MENU NAVIGATION PAGE\n[Screen Title]: Main Navigation Menu\n[Parent Screen]: None\n[Child Screen]: Task Overview\nDescription:\nWhen users log in, they are taken directly to the MCL Dashboard. From the navigation\npanel on the right (highlighted in the red box), they can access all management and\nanalysis modules of the MCL system.\nUsers with a smaller screen, will only see the MCL Dashboard without Navigation menu\nwhich can be accessed clicking the hamburger icon (three horizontal lines) in the top-left\ncorner of the screen.\n⟦img:mcl-visual-guide-tasks_p1_i1⟧"
+ },
+ {
+  "id": "mcl-visual-guide-tasks_p2_c1",
+  "document_name": "MCL Visual Guide Tasks.pdf",
+  "text": "Depending on the user’s role, certain dashboard elements and menu sections may be\npartially available or completely restricted.\nVisible Elements (Left Panel):\n1. Dashboard – Displays overall store performances statistics and charts.\n2. Company – Manage company-level information (global conﬁguration) and create\ntags.\n⟦img:mcl-visual-guide-tasks_p2_i1⟧\n⟦img:mcl-visual-guide-tasks_p2_i2⟧"
+ },
+ {
+  "id": "mcl-visual-guide-tasks_p3_c1",
+  "document_name": "MCL Visual Guide Tasks.pdf",
+  "text": "3. Markets – Manage stores (create, delete, edit) and their departments, and connect\nstore tags to stores.\n4. Departments – Manage store departments that appear in checklists.\n5. Security – Manage users, access permissions and roles.\n6. Questions – View, create, or manage questions used in checklists.\n7. Checklists – Open the checklist management to create or manage checklists.\n8. Reports – Access ad hoc checklist reports (pdf) and generate canned reports (Excel)\n9. Data Analysis – Analyze checklist results and compare checklist ratings across\nmarkets, departments, and users.\n10. Tasks – View, edit, and assign tasks.\n11. Photo Management – Browse and manage uploaded checklist photos.\nHeader Icons (Top Right):\n\nNotiﬁcation Bell – Currently, no functionality.\n\nHelp (“?”) – Opens user documentation or quick help.\n\nLock Icon – Used to enter lockscreen mode.\nFunction:\nThis menu is the root navigation point of MCL Web.\nEach item opens a dedicated conﬁguration area.\nFor this process ﬂow, the next step will focus on Checklists.\n→ Next Navigation Step:\nSelect “Tasks” from the menu page to open the Tasks Overview.\nLEVEL 2 – TASKS SUB-MENU\n[Screen Title]: Tasks\n[Parent Screen]: Main Navigation Menu\n[Child Screen]: To Do List / New Task"
+ },
+ {
+  "id": "mcl-visual-guide-tasks_p4_c1",
+  "document_name": "MCL Visual Guide Tasks.pdf",
+  "text": "Description:\nSelecting Tasks expands two sub-options:\n1. To Do List – View, ﬁlter, edit, complete, or delete tasks.\n2. New Task – Create a new task.\nVisible Interface Elements:\n\nTo Do List\n\nNew Task\nFunction:\nUsers choose whether they want to manage existing tasks or create a new one.\n→ Next Navigation Step:\nSelect To Do List to view/manage tasks or New Task to create one.\nLEVEL 3A – TO DO LIST\n[Screen Title]: Tasks – To Do List\n[Parent Screen]: Tasks Sub-Menu\n[Child Screen]: None\n⟦img:mcl-visual-guide-tasks_p4_i1⟧"
+ },
+ {
+  "id": "mcl-visual-guide-tasks_p5_c1",
+  "document_name": "MCL Visual Guide Tasks.pdf",
+  "text": "Description:\nThis screen displays all tasks linked to the selected market and provides ﬁltering tools, task\nediting, task completion/deletion.\nA) Filter Buttons (Top)\nFilters:\n\nMarket Selector → Only tasks from that market are shown\n\nStatus Buttons (3 Blocks):\nBlock\nMeaning\nButton Actions\nStatus: All Tasks\nShows all tasks system-wide for the\nselected market\nOpen / Completed /\nMissed\nStatus: Tasks from\nme\nTasks created by the logged-in user\nOpen / Completed /\nMissed\nStatus: Tasks for\nme\nTasks assigned to the logged-in user\nOpen / Completed /\nMissed\nDelete Tasks Button:\nBulk delete tasks selected via checkboxes in the table.\n⟦img:mcl-visual-guide-tasks_p5_i1⟧"
+ },
+ {
+  "id": "mcl-visual-guide-tasks_p6_c1",
+  "document_name": "MCL Visual Guide Tasks.pdf",
+  "text": "B) Task Table (Main Section)\nBelow is a table explaining each column in the screenshot.\nColumn\nMeaning / Function\nTask\nTask ID + name (clicking does not open it).\nPhotograph\nIcon appears if a photo is attached to the task.\nClicking does open attached photo in a pop up.\nPDF\nIcon appears if a PDF is attached.\nClicking does open attached PDF in another browser window.\nEdit Task (Pencil\nIcon)\nOpens the task for editing.\nChecklist\nShows in which checklist the task was generated in (empty cell =\nstand alone task).\nStart Date\nStarting date for when task will start.\nDue Date\nDeadline for completing the task.\nDate Created\nWhen the task was originally created.\nStatus\nNot started / In progress / Completed.\nAssigned by\nPerson who created/assigned the task.\nAssigned to\nUser responsible for completing the task.\nNotes\nEye icon = view existing notes; “+” icon = add note; complete task\nwithin note.\nDelete\nTrash icon = delete task.\nCheckboxes\nUsed for bulk deletion via Delete tasks button."
+ },
+ {
+  "id": "mcl-visual-guide-tasks_p7_c1",
+  "document_name": "MCL Visual Guide Tasks.pdf",
+  "text": "C) Function:\nFrom the To Do List users can:\n\nReview all tasks\n\nFilter tasks by market, creator, assignee, checklist, start date, due date, creation\ndate, and status.\n\nEdit task descriptions, users, attachments, and start/due dates\n\nAdd notes/ complete tasks\n\nDelete tasks individually or in bulk\nLEVEL 3B – NEW TASK\n[Screen Title]: New Task\n[Parent Screen]: Tasks Sub-Menu\n[Child Screen]: None\n⟦img:mcl-visual-guide-tasks_p7_i1⟧"
+ },
+ {
+  "id": "mcl-visual-guide-tasks_p8_c1",
+  "document_name": "MCL Visual Guide Tasks.pdf",
+  "text": "Description:\nThis screen allows users to create new tasks manually, assign them to markets and users,\nand add required details or attachments.\nA) Task Information Section\nFields:\n\nMarket (required)\n\nDescription (required)\n\nStart/Due Date\n\nPhoto/comment required checkbox\nButtons:\n\nMarkets → shows list of markets the task assignees are in\n\nUsers → shows list of users the task is assigned to.\nB) Photo / Attachment Section\nUsers can add:\n\nPhoto attachments (optional and only 1 can be attached)\n\nPDF attachments (optional and only 1 can be attached)\n⟦img:mcl-visual-guide-tasks_p8_i1⟧"
+ },
+ {
+  "id": "mcl-visual-guide-tasks_p9_c1",
+  "document_name": "MCL Visual Guide Tasks.pdf",
+  "text": "These will appear in the task record and in the mobile app.\nC) User Assignment Section\nOnce you select a store, a  list of all users appears with:\n\nCheckbox\n\nName\n\nRole\nUsers selected here will receive the task.\nButtons (Top-Right):\n\nSend – saves and distributes the task\n\nGo Back – returns to the task list without saving\nFunction:\nThe New Task screen is used for:\n\nCreating store-speciﬁc tasks\n\nAssigning corrective actions after checklist ﬁndings\n\nSetting deadlines\n\nProviding additional documentation (photos/PDFs)\n\nDistributing tasks to multiple users at once\n\nCreate newsletters for all stores."
+ }
+]

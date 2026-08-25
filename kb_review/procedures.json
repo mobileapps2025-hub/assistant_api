@@ -1,0 +1,210 @@
+{
+ "visual-guide-tasks-mcl-app_access-tasks-overview": {
+  "procedure_id": "visual-guide-tasks-mcl-app_access-tasks-overview",
+  "title": "Access Tasks Overview",
+  "document": "Visual Guide Tasks MCL APP.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Select the clock icon to open the tasks overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-tasks-mcl-app_search-tasks": {
+  "procedure_id": "visual-guide-tasks-mcl-app_search-tasks",
+  "title": "Search Tasks",
+  "document": "Visual Guide Tasks MCL APP.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Tap the Filter icon to search tasks",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-tasks-mcl-app_task-closing": {
+  "procedure_id": "visual-guide-tasks-mcl-app_task-closing",
+  "title": "Closing a Task in the App",
+  "document": "Visual Guide Tasks MCL APP.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Open the task you want to close.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the option to mark the task as completed.",
+    "image_ids": []
+   },
+   {
+    "text": "Confirm the task closure.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-tasks-mcl-app_swipe-to-close": {
+  "procedure_id": "visual-guide-tasks-mcl-app_swipe-to-close",
+  "title": "Swipe to Close a Task",
+  "document": "Visual Guide Tasks MCL APP.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Swipe the task entry in the task list.",
+    "image_ids": [
+     "visual-guide-tasks-mcl-app_p9_i1"
+    ]
+   },
+   {
+    "text": "The task is immediately marked as completed.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-tasks-mcl-app_close-with-notes": {
+  "procedure_id": "visual-guide-tasks-mcl-app_close-with-notes",
+  "title": "Close a Task with Notes",
+  "document": "Visual Guide Tasks MCL APP.pdf",
+  "page": 10,
+  "steps": [
+   {
+    "text": "Open the task.",
+    "image_ids": []
+   },
+   {
+    "text": "Add notes to the task.",
+    "image_ids": [
+     "visual-guide-tasks-mcl-app_p10_i1"
+    ]
+   },
+   {
+    "text": "Attach photos if evidence of completion is required.",
+    "image_ids": [
+     "visual-guide-tasks-mcl-app_p10_i2"
+    ]
+   },
+   {
+    "text": "Document actions taken, observations, and supporting information.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-tasks_manage-tasks": {
+  "procedure_id": "mcl-visual-guide-tasks_manage-tasks",
+  "title": "Manage Tasks",
+  "document": "MCL Visual Guide Tasks.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Select 'Tasks' from the menu page to open the Tasks Overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-tasks_selecting-tasks": {
+  "procedure_id": "mcl-visual-guide-tasks_selecting-tasks",
+  "title": "Selecting Tasks",
+  "document": "MCL Visual Guide Tasks.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Select To Do List to view/manage tasks.",
+    "image_ids": [
+     "mcl-visual-guide-tasks_p4_i1"
+    ]
+   },
+   {
+    "text": "Select New Task to create a new task.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-tasks_filter-tasks": {
+  "procedure_id": "mcl-visual-guide-tasks_filter-tasks",
+  "title": "Filter Tasks in the Market",
+  "document": "MCL Visual Guide Tasks.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Select the Market Selector to show only tasks from that market.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose the Status Buttons to filter tasks by their status.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the Delete Tasks Button to bulk delete tasks selected via checkboxes in the table.",
+    "image_ids": [
+     "mcl-visual-guide-tasks_p5_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-tasks_delete-tasks": {
+  "procedure_id": "mcl-visual-guide-tasks_delete-tasks",
+  "title": "Delete Selected Tasks",
+  "document": "MCL Visual Guide Tasks.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Select the checkboxes for the tasks you want to delete.",
+    "image_ids": []
+   },
+   {
+    "text": "Click the Delete Tasks Button to bulk delete the selected tasks.",
+    "image_ids": [
+     "mcl-visual-guide-tasks_p5_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-tasks_create-new-task": {
+  "procedure_id": "mcl-visual-guide-tasks_create-new-task",
+  "title": "Create a New Task",
+  "document": "MCL Visual Guide Tasks.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Open the task creation screen.",
+    "image_ids": [
+     "mcl-visual-guide-tasks_p8_i1"
+    ]
+   },
+   {
+    "text": "Fill in the required fields: Market and Description.",
+    "image_ids": []
+   },
+   {
+    "text": "Optionally, set the Start/Due Date.",
+    "image_ids": []
+   },
+   {
+    "text": "Check the Photo/comment required checkbox if needed.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the Markets button to view the list of markets.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the Users button to view the list of users.",
+    "image_ids": []
+   },
+   {
+    "text": "Add optional photo or PDF attachments if desired.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ }
+}

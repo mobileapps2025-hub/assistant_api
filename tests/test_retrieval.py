@@ -1,27 +1,44 @@
-"""Unit tests for Layer 5 — Ragie retrieval (app/retrieval).
+"""Unit tests for Layer 5 — in-house KB retrieval (app/retrieval).
 
-Ragie and OpenAI are mocked here; real retrieval/answer quality is covered by the spike eval
+OpenAI is mocked here; real retrieval/answer quality is covered by the spike eval
 (assistant_api/spikes). These verify pipeline plumbing: contextualize fast-path vs. LLM
-rewrite, retriever key/error handling, answer context-building + image embedding, the
-no-context fallback, and that the pipeline threads the contextualized query through.
+rewrite, retriever index/error handling + top-k ranking, answer context-building + image
+embedding, the no-context fallback, and that the pipeline threads the contextualized
+query through.
 """
 import types
 from unittest.mock import MagicMock, patch
+
+import numpy as np
 
 from app import retrieval
 from app.retrieval import answerer, contextualizer, retriever
 from app.retrieval.contextualizer import build_vision_query
 from app.retrieval.pipeline import _history_text
+from app.retrieval.retriever import Unit
 
 
-def _chunk(text, document_name="doc.pdf", document_id="d1", chunk_id="c1", image=False):
-    return types.SimpleNamespace(
-        text=text,
-        document_name=document_name,
-        document_id=document_id,
-        id=chunk_id,
-        links={"self_image": object()} if image else {},
+def _chunk(text, document_name="doc.pdf", chunk_id="c1", image=False):
+    images = [{"id": chunk_id, "path": f"kb/{chunk_id}.png", "alt": f"alt {chunk_id}"}] if image else []
+    return Unit(kind="text", id=chunk_id, document_name=document_name, text=text, images=images)
+
+
+def _procedure(proc_id="create_task", document_name="tasks.pdf"):
+    return Unit(
+        kind="procedure", id=proc_id, document_name=document_name, title="Create a task",
+        text="Procedure: Create a task\n1. Open Tasks.\n2. Tap +.",
+        steps=[
+            {"text": "Open Tasks.", "images": [{"id": "i1", "path": "kb/i1.png", "alt": "Tasks menu"}]},
+            {"text": "Tap +.", "images": []},
+        ],
+        images=[{"id": "i1", "path": "kb/i1.png", "alt": "Tasks menu"}],
     )
+
+
+def _image_unit(image_id="dash", document_name="dash.pdf"):
+    return Unit(kind="image", id=image_id, document_name=document_name,
+                text="The MCL dashboard home screen with status cards.",
+                images=[{"id": image_id, "path": f"kb/{image_id}.png", "alt": "Dashboard home"}])
 
 
 def _response(content):
@@ -94,39 +111,49 @@ def test_contextualize_llm_error_falls_back_to_original():
 
 # --- retriever ---
 
-def test_retrieve_without_key_returns_empty():
-    with patch("app.retrieval.retriever.RAGIE_API_KEY", ""):
+def _unit(vector):
+    v = np.asarray(vector, dtype=np.float32)
+    return v / np.linalg.norm(v)
+
+
+def _fake_index():
+    chunks = [_chunk("about tasks", chunk_id="a"), _chunk("about markets", chunk_id="b"),
+              _chunk("about sync", chunk_id="c")]
+    embeddings = np.stack([_unit([1, 0, 0]), _unit([0, 1, 0]), _unit([0, 0, 1])])
+    return chunks, embeddings
+
+
+def _embedding_response(vector):
+    response = MagicMock()
+    response.data = [MagicMock(embedding=list(vector))]
+    return response
+
+
+def test_retrieve_without_index_returns_empty():
+    with patch("app.retrieval.retriever._load_index", return_value=None):
         assert retriever.retrieve("anything") == []
 
 
-def test_retrieve_returns_scored_chunks():
-    fake = MagicMock()
-    fake.retrievals.retrieve.return_value.scored_chunks = [_chunk("hi")]
-    with patch("app.retrieval.retriever.RAGIE_API_KEY", "key"), \
-         patch("app.retrieval.retriever._ragie", return_value=fake):
-        chunks = retriever.retrieve("q")
-    assert len(chunks) == 1 and chunks[0].text == "hi"
+def test_retrieve_ranks_by_cosine_similarity():
+    with patch("app.retrieval.retriever._load_index", return_value=_fake_index()), \
+         patch("app.retrieval.retriever.client") as mock_client:
+        mock_client.embeddings.create.return_value = _embedding_response([0.1, 0.9, 0.05])
+        chunks = retriever.retrieve("markets question", top_k=2)
+    assert [c.id for c in chunks] == ["b", "a"]   # closest first
 
 
-def test_retrieve_error_returns_empty():
-    fake = MagicMock()
-    fake.retrievals.retrieve.side_effect = RuntimeError("boom")
-    with patch("app.retrieval.retriever.RAGIE_API_KEY", "key"), \
-         patch("app.retrieval.retriever.RETRY_BACKOFF_S", 0), \
-         patch("app.retrieval.retriever._ragie", return_value=fake):
+def test_retrieve_respects_top_k():
+    with patch("app.retrieval.retriever._load_index", return_value=_fake_index()), \
+         patch("app.retrieval.retriever.client") as mock_client:
+        mock_client.embeddings.create.return_value = _embedding_response([1, 1, 1])
+        assert len(retriever.retrieve("q", top_k=1)) == 1
+
+
+def test_retrieve_embedding_error_returns_empty():
+    with patch("app.retrieval.retriever._load_index", return_value=_fake_index()), \
+         patch("app.retrieval.retriever.client") as mock_client:
+        mock_client.embeddings.create.side_effect = RuntimeError("api down")
         assert retriever.retrieve("q") == []
-
-
-def test_retrieve_recovers_after_transient_error():
-    fake = MagicMock()
-    good = MagicMock()
-    good.scored_chunks = [_chunk("recovered")]
-    fake.retrievals.retrieve.side_effect = [RuntimeError("SSL EOF"), good]  # fail once, then ok
-    with patch("app.retrieval.retriever.RAGIE_API_KEY", "key"), \
-         patch("app.retrieval.retriever.RETRY_BACKOFF_S", 0), \
-         patch("app.retrieval.retriever._ragie", return_value=fake):
-        chunks = retriever.retrieve("q")
-    assert len(chunks) == 1 and chunks[0].text == "recovered"
 
 
 # --- answerer ---
@@ -154,15 +181,43 @@ def test_answer_builds_context_and_returns_sources():
     assert "To create a checklist, tap +." in user_prompt
 
 
-def test_answer_embeds_image_proxy_url_for_image_chunks():
-    chunks = [_chunk("photo screen", document_name="photo.pdf", document_id="D", chunk_id="C", image=True)]
+def test_prompt_exposes_procedure_steps_with_markers_and_no_urls():
+    with patch("app.retrieval.answerer.client") as mock_client:
+        mock_client.chat.completions.create.return_value = _response("ok")
+        answerer.answer("how to create a task", [_procedure(), _image_unit()])
+        user_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
+    assert "# PROCEDURES" in user_prompt
+    assert "1. Open Tasks.  {{step:create_task.1}}" in user_prompt   # step with a screenshot gets a marker
+    assert "2. Tap +." in user_prompt and "{{step:create_task.2}}" not in user_prompt  # no image → no marker
+    assert "{{image:dash}}" in user_prompt                          # standalone screenshot listed by marker
+    assert "/images/" not in user_prompt                            # the model never sees a URL
+
+
+def test_render_markers_places_step_images_deterministically():
+    with patch("app.retrieval.answerer.API_PUBLIC_URL", "http://host"):
+        out, urls = answerer.render_markers(
+            "1. Abre Tareas. {{step:create_task.1}}\n2. Pulsa +. {{step:create_task.2}}", [_procedure()])
+    assert "![Tasks menu](http://host/images/kb/i1.png)" in out
+    assert urls == ["http://host/images/kb/i1.png"]
+    assert "{{" not in out                                          # unknown/empty markers stripped
+
+
+def test_render_markers_resolves_standalone_and_strips_invented():
+    with patch("app.retrieval.answerer.API_PUBLIC_URL", "http://host"):
+        out, urls = answerer.render_markers(
+            "Here it is: {{image:dash}} and {{image:made_up}} {{step:nope.9}}", [_image_unit()])
+    assert "![Dashboard home](http://host/images/kb/dash.png)" in out
+    assert "made_up" not in out and "nope" not in out
+    assert urls == ["http://host/images/kb/dash.png"]
+
+
+def test_answer_keeps_rendered_images_through_enforcement():
     with patch("app.retrieval.answerer.client") as mock_client, \
          patch("app.retrieval.answerer.API_PUBLIC_URL", "http://host"):
-        mock_client.chat.completions.create.return_value = _response("see it")
-        answerer.answer("photo", chunks)
-        user_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
-    assert "# AVAILABLE VISUAL AIDS" in user_prompt
-    assert "http://host/api/ragie/image?document_id=D&chunk_id=C" in user_prompt
+        mock_client.chat.completions.create.return_value = _response(
+            "1. Open Tasks. {{step:create_task.1}} [Source: tasks.pdf]")
+        result = answerer.answer("how", [_procedure()])
+    assert "![Tasks menu](http://host/images/kb/i1.png)" in result["answer"]   # not stripped as unverified
 
 
 def test_answer_no_visual_block_when_no_images():
