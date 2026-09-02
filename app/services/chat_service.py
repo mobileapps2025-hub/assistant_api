@@ -11,9 +11,13 @@ from app.models import AuthContext, Device
 from app.tools import MCL_USER_TOOLS, get_spec, exposed_specs
 from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
+from app.services.gap_service import record_gap
 from app.instructions import get_system_prompt, set_request_date
 from app.routing import classify_route, detect_language
-from app.retrieval import run as run_retrieval, retrieve, build_vision_query, contextualize
+from app.retrieval import (
+    run as run_retrieval, retrieve, build_vision_query, contextualize,
+    build_context_sections, render_markers,
+)
 from app.enforcement import check_tool_call, enforce_answer
 from app.enforcement.actions import recall_action_context, record_action
 from app.enforcement.pending import create_pending, peek_pending, take_pending
@@ -24,6 +28,7 @@ logger = get_logger(__name__)
 MAX_TOOL_STEPS = 5   # bound the read->act tool loop per request
 KNOWLEDGE_TOOL_NAME = "search_mcl_documentation"
 ACTION_PLAN_TOOL_NAME = "confirm_mcl_action_plan"
+MISSING_INFO_TOOL_NAME = "report_missing_information"
 
 KNOWLEDGE_TOOL = {
     "type": "function",
@@ -44,6 +49,36 @@ KNOWLEDGE_TOOL = {
                 }
             },
             "required": ["query"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
+}
+
+MISSING_INFO_TOOL = {
+    "type": "function",
+    "function": {
+        "name": MISSING_INFO_TOOL_NAME,
+        "description": (
+            "Report that the MCL documentation you searched does not contain enough information "
+            "to answer the user's product question. Call this instead of guessing, right before "
+            "telling the user you do not have those details yet. Only for genuine documentation "
+            "gaps about how MCL behaves — never for small talk, for questions outside MCL, for "
+            "questions about the user's own records, or for a question you should simply ask the "
+            "user to clarify."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": (
+                        "The user's question as a standalone English sentence, with the "
+                        "conversation's context filled in (never a bare 'and how do I do that?')."
+                    ),
+                }
+            },
+            "required": ["question"],
             "additionalProperties": False,
         },
         "strict": True,
@@ -222,11 +257,7 @@ def _recall_memory(auth_context: Optional[AuthContext], query: str = "") -> str:
 
 
 def _knowledge_context(chunks: List[Any]) -> str:
-    if not chunks:
-        return ""
-    return "\n".join(
-        f"[Source: {getattr(c, 'document_name', 'unknown')}]: {c.text}" for c in chunks
-    )
+    return build_context_sections(chunks) if chunks else ""
 
 
 def _tool_call_message(tool_call: Any) -> Dict[str, Any]:
@@ -619,7 +650,7 @@ class ChatService:
         """
         flow("🤖 AGENT → manager loop")
         mcl_tools = MCL_USER_TOOLS if _is_authenticated(auth_context) else []
-        agent_tools = [KNOWLEDGE_TOOL, ACTION_PLAN_TOOL, *mcl_tools]
+        agent_tools = [KNOWLEDGE_TOOL, MISSING_INFO_TOOL, ACTION_PLAN_TOOL, *mcl_tools]
         action_context = recall_action_context(
             session_id, auth_context.user_id if auth_context else None
         )
@@ -640,7 +671,9 @@ class ChatService:
         )
 
         allowed_sources: Set[str] = set()
+        retrieved_units: List[Any] = []
         used_knowledge = False
+        contextualized_gap = ""
 
         try:
             for step in range(MAX_TOOL_STEPS):
@@ -658,10 +691,12 @@ class ChatService:
                 if not choice.message.tool_calls:
                     content = (choice.message.content or "").strip()
                     if used_knowledge:
+                        content, image_urls = render_markers(content, retrieved_units)
+                        flow(f"🖼 rendered {len(image_urls)} screenshot(s)")
                         content = enforce_answer(
                             content,
                             allowed_sources=allowed_sources,
-                            allowed_image_urls=set(),
+                            allowed_image_urls=set(image_urls),
                         )
                     if content:
                         return {"response": content, "success": True, "has_vision": False}
@@ -686,24 +721,47 @@ class ChatService:
                 if function_name == KNOWLEDGE_TOOL_NAME:
                     query = str(tool_args.get("query") or "").strip()
                     contextualized = contextualize(query, messages) if query else ""
+                    contextualized_gap = contextualized or contextualized_gap
                     chunks = retrieve(contextualized) if contextualized else []
                     used_knowledge = True
+                    retrieved_units.extend(chunks)
                     allowed_sources.update(
                         getattr(c, "document_name", "") for c in chunks if getattr(c, "document_name", "")
                     )
                     tool_content = json.dumps({
                         "query": contextualized,
+                        "answer_status": "answered" if chunks else "missing_information",
                         "found": bool(chunks),
                         "sources": sorted(allowed_sources),
                         "context": _knowledge_context(chunks),
                         "instruction": (
                             "Answer documentation facts only from this context and cite each "
-                            "documentation claim with [Source: filename]. If found is false, "
-                            "say you do not have details on that specific topic yet."
+                            "documentation claim with [Source: filename]. If this context does "
+                            f"not cover the question, call {MISSING_INFO_TOOL_NAME} and then tell "
+                            "the user you do not have those details yet — never guess."
                         ),
                     }, ensure_ascii=False)
                     api_messages.append(_tool_call_message(tool_call))
                     api_messages.append(_tool_result_message(tool_call, tool_content))
+                    continue
+
+                if function_name == MISSING_INFO_TOOL_NAME:
+                    gap_question = str(tool_args.get("question") or "").strip() or contextualized_gap
+                    recorded = await record_gap(gap_question, language)
+                    flow(f"📝 documentation gap {'recorded' if recorded else 'not recorded'}: {gap_question[:60]}")
+                    api_messages.append(_tool_call_message(tool_call))
+                    api_messages.append(_tool_result_message(tool_call, json.dumps({
+                        "recorded": recorded,
+                        "instruction": (
+                            "Now tell the user, in their language, that you did not find this in "
+                            "the available documentation and that their question has been logged "
+                            "to be reviewed and possibly included in a future update. Do not "
+                            "promise it will be answered. Do not guess an answer."
+                            if recorded else
+                            "Tell the user, in their language, that you do not have those details "
+                            "yet. Do not mention logging and do not guess an answer."
+                        ),
+                    })))
                     continue
 
                 if function_name == ACTION_PLAN_TOOL_NAME:

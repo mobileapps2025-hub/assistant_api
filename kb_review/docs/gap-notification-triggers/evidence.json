@@ -1,0 +1,72 @@
+{
+ "gap_id": "gap-notification-triggers",
+ "question": "Which events in MCL trigger a push notification or an email to a user?",
+ "language": "English",
+ "status": "partial",
+ "platform": "both",
+ "title": "MCL notifications & emails — what triggers what",
+ "summary_for_reviewer": "The report details the triggers for push notifications and emails in the MCL system, including the events that generate them and the recipients. It also highlights important user behavior regarding notifications and emails, as well as some limitations and uncertainties regarding the scheduling of notifications and potential silent failures in the system.",
+ "abstain_reason": "",
+ "evidence_files": [],
+ "uncertainties": [
+  "The exact schedule for when notifications and emails are sent needs to be confirmed with operations.",
+  "There are silent failures in the notification system that do not provide user-visible errors."
+ ],
+ "sources": [
+  {
+   "name": "api",
+   "repository": "https://dev.azure.com/workapps/x2Solutions/_git/Checklist_Service",
+   "branch": "release2025",
+   "commit_sha": "464d837d450c5a4c1a5f59a225aa439588cd7ca6",
+   "app_version": "unknown",
+   "sha_verified_by_mcl_team": false
+  },
+  {
+   "name": "web",
+   "repository": "https://dev.azure.com/workapps/x2Solutions/_git/Checklist_Web",
+   "branch": "2026",
+   "commit_sha": "d3b04ed71417e94558e6e5e583bfd4b99dee0da9",
+   "app_version": "unknown",
+   "sha_verified_by_mcl_team": false
+  },
+  {
+   "name": "app-ios",
+   "repository": "https://workapps.visualstudio.com/MCLAPP_NET/_git/MCLAPP_NET",
+   "branch": "release-ios-4.91-appstore",
+   "commit_sha": "dd79c68de2442bd2602ccc4844129b1bc0e66bda",
+   "app_version": "iOS 4.91",
+   "sha_verified_by_mcl_team": false
+  },
+  {
+   "name": "app-android",
+   "repository": "https://workapps.visualstudio.com/MCLAPP_NET/_git/MCLAPP_NET",
+   "branch": "release-android-3.063-play",
+   "commit_sha": "3be1185d5c61d459b3e4782bddd82792c9e85112",
+   "app_version": "Android 3.063 (versionCode 3263)",
+   "sha_verified_by_mcl_team": false
+  }
+ ],
+ "generated_at": "2026-08-26T17:46:24+00:00",
+ "review": {
+  "decision": "pending",
+  "reviewed_by": null,
+  "reviewed_at": null,
+  "notes": ""
+ },
+ "run": {
+  "cost_usd": 3.6301720000000004,
+  "turns": 45,
+  "wall_seconds": 272.5,
+  "permission_denials": [
+   {
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_011kCD9ZSqbrsHmTnJG2fkyF",
+    "tool_input": {
+     "command": "cd \"/c/Users/tparr/Documents/TOMAS/WORKAPPS/SpotplanAssistant/Repos/_pinned/api/CheckListService/Controllers\" && grep -n -E '^\\s*(\\[Route|\\[Http|public |private |protected )' ChekListControllerV8.cs | awk -F: '$1>1750 && $1<2950' | head -80",
+     "description": "List V8 controller members near email code"
+    }
+   }
+  ],
+  "is_error": false
+ }
+}

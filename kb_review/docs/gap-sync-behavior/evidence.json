@@ -1,0 +1,82 @@
+{
+ "gap_id": "gap-sync-behavior",
+ "question": "What exactly gets synchronized between the MCL app and the server, when does synchronization run, and what happens to work done offline if the sync fails?",
+ "language": "English",
+ "status": "partial",
+ "platform": "app-android",
+ "title": "Synchronization Overview",
+ "summary_for_reviewer": "The synchronization process is designed to ensure that local data is only deleted after successful uploads to the server. If any part of the upload fails, the local data remains intact for future attempts. However, logging out while offline will result in the loss of any unsent data. There are uncertainties regarding how the app handles re-posting run headers after failures and the status of pending runs if a checklist is deleted by an administrator.",
+ "abstain_reason": "",
+ "evidence_files": [],
+ "uncertainties": [
+  "Whether re-posting a run header after a mid-sequence failure creates a duplicate server-side or updates in place.",
+  "Whether a run left pending across a reference-data download can still be sent if its checklist was meanwhile deleted by an administrator."
+ ],
+ "sources": [
+  {
+   "name": "api",
+   "repository": "https://dev.azure.com/workapps/x2Solutions/_git/Checklist_Service",
+   "branch": "release2025",
+   "commit_sha": "464d837d450c5a4c1a5f59a225aa439588cd7ca6",
+   "app_version": "unknown",
+   "sha_verified_by_mcl_team": false
+  },
+  {
+   "name": "web",
+   "repository": "https://dev.azure.com/workapps/x2Solutions/_git/Checklist_Web",
+   "branch": "2026",
+   "commit_sha": "d3b04ed71417e94558e6e5e583bfd4b99dee0da9",
+   "app_version": "unknown",
+   "sha_verified_by_mcl_team": false
+  },
+  {
+   "name": "app-ios",
+   "repository": "https://workapps.visualstudio.com/MCLAPP_NET/_git/MCLAPP_NET",
+   "branch": "release-ios-4.91-appstore",
+   "commit_sha": "dd79c68de2442bd2602ccc4844129b1bc0e66bda",
+   "app_version": "iOS 4.91",
+   "sha_verified_by_mcl_team": false
+  },
+  {
+   "name": "app-android",
+   "repository": "https://workapps.visualstudio.com/MCLAPP_NET/_git/MCLAPP_NET",
+   "branch": "release-android-3.063-play",
+   "commit_sha": "3be1185d5c61d459b3e4782bddd82792c9e85112",
+   "app_version": "Android 3.063 (versionCode 3263)",
+   "sha_verified_by_mcl_team": false
+  }
+ ],
+ "generated_at": "2026-08-26T17:41:43+00:00",
+ "review": {
+  "decision": "pending",
+  "reviewed_by": null,
+  "reviewed_at": null,
+  "notes": ""
+ },
+ "run": {
+  "cost_usd": 2.7512645,
+  "turns": 33,
+  "wall_seconds": 203.6,
+  "permission_denials": [
+   {
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_01WvWpaDYTMoDbDFPxojuZXC",
+    "tool_input": {
+     "command": "ls -la \"C:/Users/tparr/Documents/TOMAS/WORKAPPS/SpotplanAssistant/Repos/_pinned\" 2>&1 | head -50; echo \"---PARENT---\"; ls -la \"C:/Users/tparr/Documents/TOMAS/WORKAPPS/SpotplanAssistant\" 2>&1 | head -50",
+     "description": "List pinned dir and parent"
+    }
+   },
+   {
+    "tool_name": "Grep",
+    "tool_use_id": "toolu_01B6ommokzHhzfZR2424GPcP",
+    "tool_input": {
+     "pattern": "(?i)\\bsync(hroniz|hronis|ed|ing)?\\b",
+     "path": "C:/Users/tparr/Documents/TOMAS/WORKAPPS/SpotplanAssistant",
+     "output_mode": "files_with_matches",
+     "head_limit": 60
+    }
+   }
+  ],
+  "is_error": false
+ }
+}

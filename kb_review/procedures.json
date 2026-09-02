@@ -1,0 +1,4081 @@
+{
+ "visual-guide-tasks-mcl-app_access-tasks-overview": {
+  "procedure_id": "visual-guide-tasks-mcl-app_access-tasks-overview",
+  "title": "Access Tasks Overview",
+  "document": "Visual Guide Tasks MCL APP.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Select the clock icon to open the tasks overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-tasks-mcl-app_search-tasks": {
+  "procedure_id": "visual-guide-tasks-mcl-app_search-tasks",
+  "title": "Search Tasks",
+  "document": "Visual Guide Tasks MCL APP.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Tap the Filter icon to search tasks",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-tasks-mcl-app_task-closing": {
+  "procedure_id": "visual-guide-tasks-mcl-app_task-closing",
+  "title": "Closing a Task in the App",
+  "document": "Visual Guide Tasks MCL APP.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Open the task you want to close.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the option to mark the task as completed.",
+    "image_ids": []
+   },
+   {
+    "text": "Confirm the task closure.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-tasks-mcl-app_swipe-to-close": {
+  "procedure_id": "visual-guide-tasks-mcl-app_swipe-to-close",
+  "title": "Swipe to Close a Task",
+  "document": "Visual Guide Tasks MCL APP.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Swipe the task entry in the task list.",
+    "image_ids": [
+     "visual-guide-tasks-mcl-app_p9_i1"
+    ]
+   },
+   {
+    "text": "The task is immediately marked as completed.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-tasks-mcl-app_close-with-notes": {
+  "procedure_id": "visual-guide-tasks-mcl-app_close-with-notes",
+  "title": "Close a Task with Notes",
+  "document": "Visual Guide Tasks MCL APP.pdf",
+  "page": 10,
+  "steps": [
+   {
+    "text": "Open the task.",
+    "image_ids": []
+   },
+   {
+    "text": "Add notes to the task.",
+    "image_ids": [
+     "visual-guide-tasks-mcl-app_p10_i1"
+    ]
+   },
+   {
+    "text": "Attach photos if evidence of completion is required.",
+    "image_ids": [
+     "visual-guide-tasks-mcl-app_p10_i2"
+    ]
+   },
+   {
+    "text": "Document actions taken, observations, and supporting information.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-tasks_manage-tasks": {
+  "procedure_id": "mcl-visual-guide-tasks_manage-tasks",
+  "title": "Manage Tasks",
+  "document": "MCL Visual Guide Tasks.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Select 'Tasks' from the menu page to open the Tasks Overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-tasks_selecting-tasks": {
+  "procedure_id": "mcl-visual-guide-tasks_selecting-tasks",
+  "title": "Selecting Tasks",
+  "document": "MCL Visual Guide Tasks.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Select To Do List to view/manage tasks.",
+    "image_ids": [
+     "mcl-visual-guide-tasks_p4_i1"
+    ]
+   },
+   {
+    "text": "Select New Task to create a new task.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-tasks_filter-tasks": {
+  "procedure_id": "mcl-visual-guide-tasks_filter-tasks",
+  "title": "Filter Tasks in the Market",
+  "document": "MCL Visual Guide Tasks.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Select the Market Selector to show only tasks from that market.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose the Status Buttons to filter tasks by their status.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the Delete Tasks Button to bulk delete tasks selected via checkboxes in the table.",
+    "image_ids": [
+     "mcl-visual-guide-tasks_p5_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-tasks_delete-tasks": {
+  "procedure_id": "mcl-visual-guide-tasks_delete-tasks",
+  "title": "Delete Selected Tasks",
+  "document": "MCL Visual Guide Tasks.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Select the checkboxes for the tasks you want to delete.",
+    "image_ids": []
+   },
+   {
+    "text": "Click the Delete Tasks Button to bulk delete the selected tasks.",
+    "image_ids": [
+     "mcl-visual-guide-tasks_p5_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-tasks_create-new-task": {
+  "procedure_id": "mcl-visual-guide-tasks_create-new-task",
+  "title": "Create a New Task",
+  "document": "MCL Visual Guide Tasks.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Open the task creation screen.",
+    "image_ids": [
+     "mcl-visual-guide-tasks_p8_i1"
+    ]
+   },
+   {
+    "text": "Fill in the required fields: Market and Description.",
+    "image_ids": []
+   },
+   {
+    "text": "Optionally, set the Start/Due Date.",
+    "image_ids": []
+   },
+   {
+    "text": "Check the Photo/comment required checkbox if needed.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the Markets button to view the list of markets.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the Users button to view the list of users.",
+    "image_ids": []
+   },
+   {
+    "text": "Add optional photo or PDF attachments if desired.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_create-checklists": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_create-checklists",
+  "title": "Creating Checklists with MCL Checklist Wizard",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Open the MCL Checklist Wizard.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the option to create a new checklist or edit an existing one.",
+    "image_ids": []
+   },
+   {
+    "text": "Follow the prompts to complete the checklist creation or editing process.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_create-checklist": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_create-checklist",
+  "title": "Creating a Checklist",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Click on 'Checklists' on the left side of your screen.",
+    "image_ids": [
+     "creating-checklists-en-v5-05-22-2020-compressed_p2_i2"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_set-checklist-periodicity": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_set-checklist-periodicity",
+  "title": "Set Checklist Periodicity",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Determine how often the checklist must be completed (i.e. Daily, Weekly, etc.).",
+    "image_ids": []
+   },
+   {
+    "text": "Select 'N/A' to set the checklist as available at all times.",
+    "image_ids": [
+     "creating-checklists-en-v5-05-22-2020-compressed_p4_i2"
+    ]
+   },
+   {
+    "text": "Name your checklist.",
+    "image_ids": []
+   },
+   {
+    "text": "Enter a start-and-end-date for the checklist to be active on a specific calendar period.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_select-deselect-departments": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_select-deselect-departments",
+  "title": "Select or Deselect Departments and Questions",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Allow a user to select or deselect departments and their associated questions when completing a checklist.",
+    "image_ids": []
+   },
+   {
+    "text": "Keep the section unchecked to prevent a user from altering the scope of a checklist.",
+    "image_ids": [
+     "creating-checklists-en-v5-05-22-2020-compressed_p5_i2"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_continue-to-next-section": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_continue-to-next-section",
+  "title": "Continue to Next Section",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Once all entries have been made, click 'Continue' to go to the next section.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_set-checklist-time": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_set-checklist-time",
+  "title": "Set Checklist Time Configuration",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Set start-time and end-time for checklist to be completed within that duration.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_require-signature": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_require-signature",
+  "title": "Require Electronic Signature",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Require a user to add an electronic signature when completing a checklist in the app.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_select-roles-for-checklist-access": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_select-roles-for-checklist-access",
+  "title": "Select Roles for Checklist Access",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "In the second panel, select which roles have access to this checklist.",
+    "image_ids": [
+     "creating-checklists-en-v5-05-22-2020-compressed_p6_i2"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_select-departments-for-checklists": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_select-departments-for-checklists",
+  "title": "Select Departments for Checklists",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "In the third panel, select which departments the list will cover.",
+    "image_ids": [
+     "creating-checklists-en-v5-05-22-2020-compressed_p7_i2"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_preview-checklist": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_preview-checklist",
+  "title": "Preview Your Checklist",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 10,
+  "steps": [
+   {
+    "text": "Go to the final panel to preview your checklist.",
+    "image_ids": []
+   },
+   {
+    "text": "When you are satisfied with the composition of the checklist, hit 'Complete.'",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_edit-existing-list": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_edit-existing-list",
+  "title": "Edit an Existing List",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "Click the icon to return to the Checklist Wizard.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_delete-list": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_delete-list",
+  "title": "Delete a List",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "Click the icon.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "creating-checklists-en-v5-05-22-2020-compressed_export-checklists": {
+  "procedure_id": "creating-checklists-en-v5-05-22-2020-compressed_export-checklists",
+  "title": "Export Checklists to Excel",
+  "document": "Creating Checklists EN v5 05.22.2020_compressed.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "Click the button.",
+    "image_ids": [
+     "creating-checklists-en-v5-05-22-2020-compressed_p11_i3"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_checklists-overview": {
+  "procedure_id": "mcl-visual-guide-checklist_checklists-overview",
+  "title": "Open Checklist Overview",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Select 'Checklists' from the menu page to open the Checklist Overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_create-new-checklist": {
+  "procedure_id": "mcl-visual-guide-checklist_create-new-checklist",
+  "title": "Create a New Checklist",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Click the '+' icon to open the Checklist Wizard.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_edit-existing-checklist": {
+  "procedure_id": "mcl-visual-guide-checklist_edit-existing-checklist",
+  "title": "Edit an Existing Checklist",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Click the pencil icon to open an existing checklist for editing.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_delete-checklist": {
+  "procedure_id": "mcl-visual-guide-checklist_delete-checklist",
+  "title": "Delete a Selected Checklist",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Click the trash icon to delete the selected checklist.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_export-checklist": {
+  "procedure_id": "mcl-visual-guide-checklist_export-checklist",
+  "title": "Export a Checklist to Excel",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Click the export button to export a checklist to Excel for review or offline storage.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_create-a-checklist": {
+  "procedure_id": "mcl-visual-guide-checklist_create-a-checklist",
+  "title": "Create a Checklist",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "Click the “+” icon to create a new checklist in the Checklist Wizard.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_edit-a-checklist": {
+  "procedure_id": "mcl-visual-guide-checklist_edit-a-checklist",
+  "title": "Edit a Checklist",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "Use the pencil icon to modify an existing checklist in the Checklist Wizard.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_delete-a-checklist": {
+  "procedure_id": "mcl-visual-guide-checklist_delete-a-checklist",
+  "title": "Delete a Checklist",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "Remove a checklist permanently.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_export-to-excel": {
+  "procedure_id": "mcl-visual-guide-checklist_export-to-excel",
+  "title": "Export to Excel",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "Generate a spreadsheet of a specific checklist.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_configure-checklist-wizard": {
+  "procedure_id": "mcl-visual-guide-checklist_configure-checklist-wizard",
+  "title": "Configure Checklist Wizard",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "Name the checklist (must be completed in order to continue).",
+    "image_ids": []
+   },
+   {
+    "text": "Define the periodicity (daily, weekly, monthly, quarterly, yearly, “N/A” (=always active)).",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_set-dates-and-options": {
+  "procedure_id": "mcl-visual-guide-checklist_set-dates-and-options",
+  "title": "Set Dates and Options for the Checklist",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Set start/end dates.",
+    "image_ids": []
+   },
+   {
+    "text": "Optional: Configure time windows for completion.",
+    "image_ids": []
+   },
+   {
+    "text": "Select if checklist requires a signature at the end.",
+    "image_ids": []
+   },
+   {
+    "text": "Allow department selection to determine if the app user can choose which departments to complete before starting the checklist.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_role-assignment": {
+  "procedure_id": "mcl-visual-guide-checklist_role-assignment",
+  "title": "Assign Roles for the Checklist",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Select which user roles will see or use the checklist in their MCL App.",
+    "image_ids": [
+     "mcl-visual-guide-checklist_p7_i1"
+    ]
+   },
+   {
+    "text": "Roles not selected will not have access.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_department-and-question-selection": {
+  "procedure_id": "mcl-visual-guide-checklist_department-and-question-selection",
+  "title": "Department and Question Selection",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Choose which departments the checklist applies to.",
+    "image_ids": [
+     "mcl-visual-guide-checklist_p8_i1",
+     "mcl-visual-guide-checklist_p8_i2",
+     "mcl-visual-guide-checklist_p8_i3"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_question-selection": {
+  "procedure_id": "mcl-visual-guide-checklist_question-selection",
+  "title": "Select Questions in the Question Panel",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Select specific questions within each department.",
+    "image_ids": []
+   },
+   {
+    "text": "Make sure to select departments in the Question Panel to view questions associated with that department.",
+    "image_ids": [
+     "mcl-visual-guide-checklist_p9_i1",
+     "mcl-visual-guide-checklist_p9_i2"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-checklist_preview-checklist": {
+  "procedure_id": "mcl-visual-guide-checklist_preview-checklist",
+  "title": "Preview the Checklist",
+  "document": "MCL Visual Guide Checklist.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "Click 'Complete' to finalize and publish the checklist.",
+    "image_ids": [
+     "mcl-visual-guide-checklist_p11_i2"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-company_open-company-sub-menu": {
+  "procedure_id": "mcl-visual-guide-company_open-company-sub-menu",
+  "title": "Open Company Sub-Menu",
+  "document": "MCL Visual Guide Company.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Select 'Company' from the menu page to open the Company Sub-Menu.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-company_access-company-menu": {
+  "procedure_id": "mcl-visual-guide-company_access-company-menu",
+  "title": "Access the Company Menu",
+  "document": "MCL Visual Guide Company.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Select Company Management, App Color Management, or Tags.",
+    "image_ids": [
+     "mcl-visual-guide-company_p4_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-company_view-tags": {
+  "procedure_id": "mcl-visual-guide-company_view-tags",
+  "title": "View Tags",
+  "document": "MCL Visual Guide Company.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Select the type of tags to view (Market or Checklist).",
+    "image_ids": []
+   },
+   {
+    "text": "View all tags for the selected type.",
+    "image_ids": [
+     "mcl-visual-guide-company_p9_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-company_rename-or-update-tag": {
+  "procedure_id": "mcl-visual-guide-company_rename-or-update-tag",
+  "title": "Rename or Update a Tag",
+  "document": "MCL Visual Guide Company.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Click on the pencil icon next to the tag you want to rename or update.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-company_delete-tag": {
+  "procedure_id": "mcl-visual-guide-company_delete-tag",
+  "title": "Delete a Tag",
+  "document": "MCL Visual Guide Company.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Click on the trash icon next to the tag you want to delete.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-company_assign-tag-to-category": {
+  "procedure_id": "mcl-visual-guide-company_assign-tag-to-category",
+  "title": "Assign Tag to Category",
+  "document": "MCL Visual Guide Company.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Select the tag you want to assign.",
+    "image_ids": []
+   },
+   {
+    "text": "Add the selected tag to an existing category.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-company_create-new-category": {
+  "procedure_id": "mcl-visual-guide-company_create-new-category",
+  "title": "Create a New Tag Category",
+  "document": "MCL Visual Guide Company.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Click on the option to create a new tag category.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-company_creating-a-new-tag-category": {
+  "procedure_id": "mcl-visual-guide-company_creating-a-new-tag-category",
+  "title": "Creating a New Tag Category",
+  "document": "MCL Visual Guide Company.pdf",
+  "page": 10,
+  "steps": [
+   {
+    "text": "Select the option to create a new tag category.",
+    "image_ids": [
+     "mcl-visual-guide-company_p10_i1"
+    ]
+   },
+   {
+    "text": "Enter the name for the new tag category.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-company_adding-new-tag-to-existing-category": {
+  "procedure_id": "mcl-visual-guide-company_adding-new-tag-to-existing-category",
+  "title": "Adding New Tag to Existing Category",
+  "document": "MCL Visual Guide Company.pdf",
+  "page": 10,
+  "steps": [
+   {
+    "text": "Select the existing tag category to which you want to add a new tag.",
+    "image_ids": [
+     "mcl-visual-guide-company_p10_i2"
+    ]
+   },
+   {
+    "text": "Enter the name for the new tag.",
+    "image_ids": []
+   },
+   {
+    "text": "Create two additional sub tags for the new tag.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-dashboard-entry-page_menu-navigation": {
+  "procedure_id": "mcl-visual-guide-dashboard-entry-page_menu-navigation",
+  "title": "Navigate to Security Menu",
+  "document": "MCL Visual Guide Dashboard Entry page.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Log in to the MCL Dashboard.",
+    "image_ids": []
+   },
+   {
+    "text": "Select 'Security' from the menu page.",
+    "image_ids": [
+     "mcl-visual-guide-dashboard-entry-page_p1_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-data-analysis_menu-navigation": {
+  "procedure_id": "mcl-visual-guide-data-analysis_menu-navigation",
+  "title": "Accessing the Data Analysis Overview",
+  "document": "MCL Visual Guide Data Analysis.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Log in to the MCL system.",
+    "image_ids": []
+   },
+   {
+    "text": "Access the navigation panel on the right.",
+    "image_ids": [
+     "mcl-visual-guide-data-analysis_p1_i1"
+    ]
+   },
+   {
+    "text": "If using a smaller screen, click the hamburger icon to access the full navigation menu.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-data-analysis_data-analysis-navigation": {
+  "procedure_id": "mcl-visual-guide-data-analysis_data-analysis-navigation",
+  "title": "Navigate to Data Analysis",
+  "document": "MCL Visual Guide Data Analysis.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Select 'Data Analysis' from the menu page to open the Data Analysis Overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-data-analysis_data-analysis-selection": {
+  "procedure_id": "mcl-visual-guide-data-analysis_data-analysis-selection",
+  "title": "Select Data Analysis Tool",
+  "document": "MCL Visual Guide Data Analysis.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Click on Data Analysis to expand the tools.",
+    "image_ids": [
+     "mcl-visual-guide-data-analysis_p4_i1"
+    ]
+   },
+   {
+    "text": "Choose between Result Analysis or Comparative Analysis.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-data-analysis_generate-results": {
+  "procedure_id": "mcl-visual-guide-data-analysis_generate-results",
+  "title": "Generate Results in Result Analysis",
+  "document": "MCL Visual Guide Data Analysis.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "Make sure Year, Period, Day, Options, Type of Questions, Market, and Question have the correct choices.",
+    "image_ids": []
+   },
+   {
+    "text": "Click Filter, and results will be generated and displayed.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-department_manage-departments": {
+  "procedure_id": "mcl-visual-guide-department_manage-departments",
+  "title": "Manage Departments",
+  "document": "MCL Visual Guide Department.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Select 'Departments' from the menu page to open the Departments Overview.",
+    "image_ids": []
+   },
+   {
+    "text": "Create a new department by accessing the Department Create option.",
+    "image_ids": []
+   },
+   {
+    "text": "Edit an existing department by selecting the Department Edit option.",
+    "image_ids": []
+   },
+   {
+    "text": "Delete a department by choosing the Department Delete option.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-department_create-department": {
+  "procedure_id": "mcl-visual-guide-department_create-department",
+  "title": "Create Department",
+  "document": "MCL Visual Guide Department.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Click the “+” - icon in the Departments Overview.",
+    "image_ids": [
+     "mcl-visual-guide-department_p5_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-department_edit-department": {
+  "procedure_id": "mcl-visual-guide-department_edit-department",
+  "title": "Edit an Existing Department",
+  "document": "MCL Visual Guide Department.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "Click the pencil icon next to the department.",
+    "image_ids": [
+     "mcl-visual-guide-department_p6_i1"
+    ]
+   },
+   {
+    "text": "Update the Name.",
+    "image_ids": []
+   },
+   {
+    "text": "Update the Description.",
+    "image_ids": []
+   },
+   {
+    "text": "Click Save.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-department_delete-department": {
+  "procedure_id": "mcl-visual-guide-department_delete-department",
+  "title": "Delete Department",
+  "document": "MCL Visual Guide Department.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Click the trash can icon next to the department.",
+    "image_ids": [
+     "mcl-visual-guide-department_p7_i1"
+    ]
+   },
+   {
+    "text": "Confirm the deletion when prompted.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-markets_menu-navigation": {
+  "procedure_id": "mcl-visual-guide-markets_menu-navigation",
+  "title": "Accessing the MCL Dashboard and Navigation Menu",
+  "document": "MCL Visual Guide Markets.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Log in to the MCL system.",
+    "image_ids": [
+     "mcl-visual-guide-markets_p1_i1"
+    ]
+   },
+   {
+    "text": "Access the navigation panel on the right to view all management and analysis modules.",
+    "image_ids": []
+   },
+   {
+    "text": "If using a smaller screen, click the hamburger icon in the top-left to access the navigation menu.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-markets_manage-markets": {
+  "procedure_id": "mcl-visual-guide-markets_manage-markets",
+  "title": "Manage Markets",
+  "document": "MCL Visual Guide Markets.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Select 'Markets' from the menu page to open the Markets Overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-markets_batch-upload-markets": {
+  "procedure_id": "mcl-visual-guide-markets_batch-upload-markets",
+  "title": "Batch Upload Markets",
+  "document": "MCL Visual Guide Markets.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Download the template file",
+    "image_ids": [
+     "mcl-visual-guide-markets_p5_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-markets_enter-market-data": {
+  "procedure_id": "mcl-visual-guide-markets_enter-market-data",
+  "title": "Enter Market Data and Upload",
+  "document": "MCL Visual Guide Markets.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "Enter market data (name, address, email, etc.)",
+    "image_ids": []
+   },
+   {
+    "text": "Upload the completed file",
+    "image_ids": []
+   },
+   {
+    "text": "The system processes the list and updates all markets in bulk",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-markets_select-departments-for-market": {
+  "procedure_id": "mcl-visual-guide-markets_select-departments-for-market",
+  "title": "Select Departments for This Market",
+  "document": "MCL Visual Guide Markets.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "View the list of all company departments.",
+    "image_ids": [
+     "mcl-visual-guide-markets_p7_i1"
+    ]
+   },
+   {
+    "text": "Select the departments that belong to this specific market using checkboxes.",
+    "image_ids": []
+   },
+   {
+    "text": "Ensure that only selected departments will appear in the MCL App for this store.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-photo-management_photo-management-overview": {
+  "procedure_id": "mcl-visual-guide-photo-management_photo-management-overview",
+  "title": "Open Photo Management Overview",
+  "document": "MCL Visual Guide Photo Management.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Select 'Photo Management' from the menu page.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-questions_search-questions": {
+  "procedure_id": "mcl-visual-guide-questions_search-questions",
+  "title": "Search for Questions",
+  "document": "MCL Visual Guide Questions.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Use the Search Bar to enter a keyword in the question text.",
+    "image_ids": [
+     "mcl-visual-guide-questions_p4_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-questions_create-question": {
+  "procedure_id": "mcl-visual-guide-questions_create-question",
+  "title": "Create a Question",
+  "document": "MCL Visual Guide Questions.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Click the '+' icon to create a question.",
+    "image_ids": [
+     "mcl-visual-guide-questions_p5_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-questions_edit-question": {
+  "procedure_id": "mcl-visual-guide-questions_edit-question",
+  "title": "Edit a Question",
+  "document": "MCL Visual Guide Questions.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Click the pencil icon to edit a question.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-questions_delete-question": {
+  "procedure_id": "mcl-visual-guide-questions_delete-question",
+  "title": "Delete a Question",
+  "document": "MCL Visual Guide Questions.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Click the trash icon to delete a question.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-questions_create-new-checklist-question": {
+  "procedure_id": "mcl-visual-guide-questions_create-new-checklist-question",
+  "title": "Create a New Checklist Question",
+  "document": "MCL Visual Guide Questions.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Click the “+” (plus) icon.",
+    "image_ids": []
+   },
+   {
+    "text": "Enter Question Text (required) and More Info (optional, additional text for users).",
+    "image_ids": []
+   },
+   {
+    "text": "Upload optional PDF attachment (3MB max).",
+    "image_ids": []
+   },
+   {
+    "text": "Select Question Type (Yes/No, 1–5 grading (1=best; 5=worst), free text, numeric, target/current, temperature).",
+    "image_ids": []
+   },
+   {
+    "text": "Define the logic of when comments/photos are required, whether comments and/or photos are required, and whether automatic tasks are triggered (no functionality yet).",
+    "image_ids": []
+   },
+   {
+    "text": "Define positive answer(s).",
+    "image_ids": []
+   },
+   {
+    "text": "Select Departments that can use this question (multiple selection possible).",
+    "image_ids": []
+   },
+   {
+    "text": "Click Save.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-questions_modify-existing-question": {
+  "procedure_id": "mcl-visual-guide-questions_modify-existing-question",
+  "title": "Modify an Existing Question",
+  "document": "MCL Visual Guide Questions.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Click the pencil icon next to the question.",
+    "image_ids": [
+     "mcl-visual-guide-questions_p8_i1"
+    ]
+   },
+   {
+    "text": "Edit the question text, additional information, question type, expected answer triggering photo/comment requirement, photo/comment requirements, department assignments, and defined positive answer.",
+    "image_ids": []
+   },
+   {
+    "text": "Click Save.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-reports_navigate-to-reports": {
+  "procedure_id": "mcl-visual-guide-reports_navigate-to-reports",
+  "title": "Navigate to Reports",
+  "document": "MCL Visual Guide Reports.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Select 'Reports' from the menu page to open the Reports overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-reports_choose-reporting-system": {
+  "procedure_id": "mcl-visual-guide-reports_choose-reporting-system",
+  "title": "Choose Reporting System",
+  "document": "MCL Visual Guide Reports.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Click Ad Hoc Reports or Canned Reports to open that reporting environment.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-security_navigate-to-security-menu": {
+  "procedure_id": "mcl-visual-guide-security_navigate-to-security-menu",
+  "title": "Navigate to Security Menu",
+  "document": "MCL Visual Guide Security.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Select 'Security' from the menu page to open the Security Menu.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-security_access-security-menu": {
+  "procedure_id": "mcl-visual-guide-security_access-security-menu",
+  "title": "Access the Security Menu",
+  "document": "MCL Visual Guide Security.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Open the Security menu.",
+    "image_ids": []
+   },
+   {
+    "text": "Select Users or Roles from the Security menu.",
+    "image_ids": [
+     "mcl-visual-guide-security_p4_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-security_create-user": {
+  "procedure_id": "mcl-visual-guide-security_create-user",
+  "title": "Create User",
+  "document": "MCL Visual Guide Security.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Add a new user account.",
+    "image_ids": []
+   },
+   {
+    "text": "Define login/access data.",
+    "image_ids": [
+     "mcl-visual-guide-security_p5_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-security_edit-user": {
+  "procedure_id": "mcl-visual-guide-security_edit-user",
+  "title": "Edit User",
+  "document": "MCL Visual Guide Security.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Update user details.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-security_assign-role": {
+  "procedure_id": "mcl-visual-guide-security_assign-role",
+  "title": "Assign Role",
+  "document": "MCL Visual Guide Security.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Link the user to a role.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-security_delete-user": {
+  "procedure_id": "mcl-visual-guide-security_delete-user",
+  "title": "Delete User",
+  "document": "MCL Visual Guide Security.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Delete a user which is no longer needed.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-security_edit-role-configuration": {
+  "procedure_id": "mcl-visual-guide-security_edit-role-configuration",
+  "title": "Edit Role Configuration",
+  "document": "MCL Visual Guide Security.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "View all existing role profiles.",
+    "image_ids": []
+   },
+   {
+    "text": "Adjust role permissions and access rules.",
+    "image_ids": [
+     "mcl-visual-guide-security_p8_i1"
+    ]
+   },
+   {
+    "text": "Check or uncheck the checkboxes to indicate role features.",
+    "image_ids": [
+     "mcl-visual-guide-security_p8_i2"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-visual-guide-security_save-role-changes": {
+  "procedure_id": "mcl-visual-guide-security_save-role-changes",
+  "title": "Save Role Changes",
+  "document": "MCL Visual Guide Security.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Apply permission changes for all users assigned to that role.",
+    "image_ids": [
+     "mcl-visual-guide-security_p9_i1"
+    ]
+   },
+   {
+    "text": "Check or uncheck the permissions as needed.",
+    "image_ids": [
+     "mcl-visual-guide-security_p9_i2"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-checklist-faq-revised_access-checklist-wizard": {
+  "procedure_id": "mcl-checklist-faq-revised_access-checklist-wizard",
+  "title": "Access the Checklist Wizard in MCL",
+  "document": "Mcl Checklist Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Open the Checklists tab from the main menu.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-checklist-faq-revised_create-new-checklist": {
+  "procedure_id": "mcl-checklist-faq-revised_create-new-checklist",
+  "title": "Create a New Checklist in MCL",
+  "document": "Mcl Checklist Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Click the + icon in the Checklist Wizard.",
+    "image_ids": []
+   },
+   {
+    "text": "Enter a checklist name and complete all mandatory fields.",
+    "image_ids": []
+   },
+   {
+    "text": "Set start and end dates, or choose a recurrence option (Daily, Weekly, etc.).",
+    "image_ids": []
+   },
+   {
+    "text": "Select N/A if the checklist should always be available.",
+    "image_ids": []
+   },
+   {
+    "text": "Review details, then click Save to confirm.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-checklist-faq-revised_make-checklist-always-available": {
+  "procedure_id": "mcl-checklist-faq-revised_make-checklist-always-available",
+  "title": "Make a Checklist Always Available",
+  "document": "Mcl Checklist Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Select N/A for start and end dates to keep the checklist active at all times.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-checklist-faq-revised_configure-checklist-recurrence": {
+  "procedure_id": "mcl-checklist-faq-revised_configure-checklist-recurrence",
+  "title": "Configure Checklist Recurrence or Periodicity",
+  "document": "Mcl Checklist Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Choose a recurrence option under Scheduling (Daily, Weekly, or Custom).",
+    "image_ids": []
+   },
+   {
+    "text": "Confirm that each recurrence period aligns with business needs.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-checklist-faq-revised_restrict-allow-department-selection": {
+  "procedure_id": "mcl-checklist-faq-revised_restrict-allow-department-selection",
+  "title": "Restrict or Allow Department Selection for Checklists",
+  "document": "Mcl Checklist Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Enable or disable departments depending on where the checklist should appear.",
+    "image_ids": []
+   },
+   {
+    "text": "Only departments you select will see the checklist in the MCL App.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-checklist-faq-revised_assign-roles-to-checklist": {
+  "procedure_id": "mcl-checklist-faq-revised_assign-roles-to-checklist",
+  "title": "Assign Roles to Checklist",
+  "document": "Mcl Checklist Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "During checklist setup, assign access under Roles.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-checklist-faq-revised_select-department-for-checklist-visibility": {
+  "procedure_id": "mcl-checklist-faq-revised_select-department-for-checklist-visibility",
+  "title": "Select Department for Checklist Visibility",
+  "document": "Mcl Checklist Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Department selections determine checklist visibility across stores.",
+    "image_ids": []
+   },
+   {
+    "text": "If a department is not selected, its linked stores will not see the checklist.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-checklist-faq-revised_select-and-organize-questions": {
+  "procedure_id": "mcl-checklist-faq-revised_select-and-organize-questions",
+  "title": "Select and Organize Questions",
+  "document": "Mcl Checklist Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "In the Question Selection screen, choose questions by department.",
+    "image_ids": []
+   },
+   {
+    "text": "Use the up/down arrows to reorder them.",
+    "image_ids": []
+   },
+   {
+    "text": "Department order can also be adjusted later in the mobile app.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-checklist-faq-revised_send-completed-checklist-reports": {
+  "procedure_id": "mcl-checklist-faq-revised_send-completed-checklist-reports",
+  "title": "Send Completed Checklist Reports",
+  "document": "Mcl Checklist Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Use the Email Configuration tab to set up recipients.",
+    "image_ids": []
+   },
+   {
+    "text": "Enter email addresses or link reports to roles such as Regional Manager.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-checklist-faq-revised_preview-checklist": {
+  "procedure_id": "mcl-checklist-faq-revised_preview-checklist",
+  "title": "Preview Checklist",
+  "document": "Mcl Checklist Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Click Preview to review the checklist layout.",
+    "image_ids": []
+   },
+   {
+    "text": "Once satisfied, select Complete to finalize and activate it.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-checklist-faq-revised_edit-delete-export-checklist": {
+  "procedure_id": "mcl-checklist-faq-revised_edit-delete-export-checklist",
+  "title": "Edit, Delete, or Export Checklist",
+  "document": "Mcl Checklist Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Use the icons beside your checklist name to edit, delete, or export.",
+    "image_ids": []
+   },
+   {
+    "text": "Edit – modify an existing checklist.",
+    "image_ids": []
+   },
+   {
+    "text": "Delete – remove it.",
+    "image_ids": []
+   },
+   {
+    "text": "Export – download it as an Excel file for offline use.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_create-or-edit-market": {
+  "procedure_id": "mcl-dashboard-faq-revised_create-or-edit-market",
+  "title": "Create or Edit a Market in the Dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Go to the Markets section on the dashboard.",
+    "image_ids": []
+   },
+   {
+    "text": "Click on the + icon to create a new market, or click on the Pencil Icon to edit an existing market.",
+    "image_ids": []
+   },
+   {
+    "text": "Assign departments to each market to ensure accurate data organization and transparency.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_add-or-edit-departments": {
+  "procedure_id": "mcl-dashboard-faq-revised_add-or-edit-departments",
+  "title": "Add or Edit Departments in the Dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Go to the Departments section to create or modify entries.",
+    "image_ids": []
+   },
+   {
+    "text": "Click on the + icon to add new departments.",
+    "image_ids": []
+   },
+   {
+    "text": "Define department names and link them to markets as needed.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_create-new-user": {
+  "procedure_id": "mcl-dashboard-faq-revised_create-new-user",
+  "title": "Create a New User in the System in the Dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Open the Users tab and click + to create a new profile.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_manage-user": {
+  "procedure_id": "mcl-dashboard-faq-revised_manage-user",
+  "title": "Manage a User in the System in the Dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Assign credentials, a market, and a role.",
+    "image_ids": []
+   },
+   {
+    "text": "Save the changes and check the permissions under Roles.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_assign-roles-and-permissions": {
+  "procedure_id": "mcl-dashboard-faq-revised_assign-roles-and-permissions",
+  "title": "Assign Roles and Permissions to Users in the Dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Roles are configured under the Roles menu.",
+    "image_ids": []
+   },
+   {
+    "text": "Select a role or create a role (e.g., Manager, Admin).",
+    "image_ids": []
+   },
+   {
+    "text": "Customize permissions for each role, such as editing, viewing, or managing tasks, checklists, and reports.",
+    "image_ids": []
+   },
+   {
+    "text": "Assign roles to users in their profile settings.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_create-questions-by-department": {
+  "procedure_id": "mcl-dashboard-faq-revised_create-questions-by-department",
+  "title": "Create Questions by Department",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Under Questions, create, edit, or filter questions.",
+    "image_ids": []
+   },
+   {
+    "text": "Export questions to Excel for review if needed.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_filter-questions-by-department": {
+  "procedure_id": "mcl-dashboard-faq-revised_filter-questions-by-department",
+  "title": "Filter Questions by Department",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Use department filters or keyword search to find items.",
+    "image_ids": []
+   },
+   {
+    "text": "Ensure each question is linked to a department to appear in relevant checklists.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_create-and-edit-checklists": {
+  "procedure_id": "mcl-dashboard-faq-revised_create-and-edit-checklists",
+  "title": "Create and Edit Checklists",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Open the Checklists section.",
+    "image_ids": []
+   },
+   {
+    "text": "Click + to create a new checklist or click the Pencil Icon to change one.",
+    "image_ids": []
+   },
+   {
+    "text": "Link checklists to specific departments and markets.",
+    "image_ids": []
+   },
+   {
+    "text": "Add repeat, role, and visibility settings before saving.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_analyze-checklist-or-question-data": {
+  "procedure_id": "mcl-dashboard-faq-revised_analyze-checklist-or-question-data",
+  "title": "Analyze Checklist or Question Data",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Use the Data Analysis section.",
+    "image_ids": []
+   },
+   {
+    "text": "Filter results by company, market, or time period.",
+    "image_ids": []
+   },
+   {
+    "text": "Review key metrics such as completion rates and response distributions.",
+    "image_ids": []
+   },
+   {
+    "text": "Identify trends to improve performance and compliance.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_view-assigned-tasks": {
+  "procedure_id": "mcl-dashboard-faq-revised_view-assigned-tasks",
+  "title": "View Assigned Tasks",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Open the Tasks module to view assigned items.",
+    "image_ids": []
+   },
+   {
+    "text": "Click on a task to view details, add notes, or upload photos.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_close-assigned-tasks": {
+  "procedure_id": "mcl-dashboard-faq-revised_close-assigned-tasks",
+  "title": "Close Assigned Tasks",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Use the Close Task option if the issue is resolved.",
+    "image_ids": []
+   },
+   {
+    "text": "Assign tasks to users or markets to improve accountability.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_create-new-task-or-announcement": {
+  "procedure_id": "mcl-dashboard-faq-revised_create-new-task-or-announcement",
+  "title": "Create a New Task or Announcement",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "From the dashboard, select Newsletters or Announcements.",
+    "image_ids": []
+   },
+   {
+    "text": "Enter the title and message details.",
+    "image_ids": []
+   },
+   {
+    "text": "Attach optional photos or PDFs.",
+    "image_ids": []
+   },
+   {
+    "text": "Ensure the sender is configured as a market contact to publish successfully.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_assign-reports-to-roles-and-recipients": {
+  "procedure_id": "mcl-dashboard-faq-revised_assign-reports-to-roles-and-recipients",
+  "title": "Assign Reports to Specific Roles and Recipients",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "In the Assign Report Roles section, select a report and assign it to roles such as Manager or Admin.",
+    "image_ids": []
+   },
+   {
+    "text": "Add up to three email addresses for automatic delivery.",
+    "image_ids": []
+   },
+   {
+    "text": "Save the settings for future reports.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_navigate-checklist-task-analysis": {
+  "procedure_id": "mcl-dashboard-faq-revised_navigate-checklist-task-analysis",
+  "title": "Navigate Between Checklist and Task Analysis",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Use the top navigation bar to switch between Checklists and Tasks.",
+    "image_ids": []
+   },
+   {
+    "text": "Adjust the time period with filters such as This Week, Last Week, Today, or Yesterday.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_search-filter-download-reports": {
+  "procedure_id": "mcl-dashboard-faq-revised_search-filter-download-reports",
+  "title": "Search, Filter, and Download Checklist Reports as PDFs",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Open the Reports pane.",
+    "image_ids": []
+   },
+   {
+    "text": "Use the search bar or filters to find a specific checklist.",
+    "image_ids": []
+   },
+   {
+    "text": "Download reports directly as a PDF.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_analyze-questions-answers": {
+  "procedure_id": "mcl-dashboard-faq-revised_analyze-questions-answers",
+  "title": "Analyze Specific Questions or Answers in the Dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Go to Data Analysis.",
+    "image_ids": []
+   },
+   {
+    "text": "Filter by market, checklist, and time period.",
+    "image_ids": []
+   },
+   {
+    "text": "View question-level answers and export related PDF reports.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_delete-tasks-in-bulk": {
+  "procedure_id": "mcl-dashboard-faq-revised_delete-tasks-in-bulk",
+  "title": "Delete Tasks in Bulk",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "In the Tasks section, use the checkbox selection tool to select multiple tasks.",
+    "image_ids": []
+   },
+   {
+    "text": "Click Delete Tasks.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_set-photo-or-comment-requirements": {
+  "procedure_id": "mcl-dashboard-faq-revised_set-photo-or-comment-requirements",
+  "title": "Set Photo or Comment Requirements During Task Creation",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "During task creation, enable options that require a photo or comment before completion.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_assign-reports-to-roles": {
+  "procedure_id": "mcl-dashboard-faq-revised_assign-reports-to-roles",
+  "title": "Assign Reports to Specific Roles",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "In the Checklist Edit View, open Report Distribution.",
+    "image_ids": []
+   },
+   {
+    "text": "Enable the role setting ('Yes').",
+    "image_ids": []
+   },
+   {
+    "text": "Select desired markets, departments, or users.",
+    "image_ids": []
+   },
+   {
+    "text": "Save the configuration for future checklists.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_create-checklist-groups": {
+  "procedure_id": "mcl-dashboard-faq-revised_create-checklist-groups",
+  "title": "Create Checklist Groups and Assign Checklists",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Under Company → Groups, create groups and subgroups.",
+    "image_ids": []
+   },
+   {
+    "text": "In the Checklist Editor, assign checklists under the Group field for easier filtering and navigation.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_include-checklist-in-dashboard-analyses": {
+  "procedure_id": "mcl-dashboard-faq-revised_include-checklist-in-dashboard-analyses",
+  "title": "Include a New Checklist in Current Dashboard Analyses",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Enable Include in Current Period when creating the checklist.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_filter-data-in-dashboard": {
+  "procedure_id": "mcl-dashboard-faq-revised_filter-data-in-dashboard",
+  "title": "Filter Data by Company, Market, or Time Period",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "At the top of the dashboard, use Company, Market, and Date Range filters to refine displayed data.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_export-dashboard-data": {
+  "procedure_id": "mcl-dashboard-faq-revised_export-dashboard-data",
+  "title": "Export Dashboard Data for Further Reporting",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "Export checklist, task, and report data to Excel or PDF.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_upload-multiple-markets": {
+  "procedure_id": "mcl-dashboard-faq-revised_upload-multiple-markets",
+  "title": "How to upload multiple markets at once in the dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Download the Excel template from the MCL web interface.",
+    "image_ids": []
+   },
+   {
+    "text": "Fill in mandatory fields marked in red.",
+    "image_ids": []
+   },
+   {
+    "text": "Upload via Market Upload option.",
+    "image_ids": []
+   },
+   {
+    "text": "Assign departments and review configurations.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_upload-multiple-users": {
+  "procedure_id": "mcl-dashboard-faq-revised_upload-multiple-users",
+  "title": "How to upload multiple users at once in the dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Use the Excel template for user upload.",
+    "image_ids": []
+   },
+   {
+    "text": "Fill in required fields (names, emails, roles).",
+    "image_ids": []
+   },
+   {
+    "text": "Upload and link users to departments and markets.",
+    "image_ids": []
+   },
+   {
+    "text": "Copy-pasting data will cause upload errors.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_handle-upload-errors": {
+  "procedure_id": "mcl-dashboard-faq-revised_handle-upload-errors",
+  "title": "What to do if there are errors while uploading",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Errors will appear in the Error Window.",
+    "image_ids": []
+   },
+   {
+    "text": "Review, correct in Excel, and re-upload.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_create-and-configure-tags": {
+  "procedure_id": "mcl-dashboard-faq-revised_create-and-configure-tags",
+  "title": "Create and Configure Tags in the Dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Navigate to Markets → Tags.",
+    "image_ids": []
+   },
+   {
+    "text": "Click + to create new categories and tags.",
+    "image_ids": []
+   },
+   {
+    "text": "Save changes for filtering.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_assign-tags-to-markets": {
+  "procedure_id": "mcl-dashboard-faq-revised_assign-tags-to-markets",
+  "title": "Assign Tags to Markets in the Dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Open Markets, select a market, and go to Tags Tab.",
+    "image_ids": []
+   },
+   {
+    "text": "Use checkboxes to assign tags.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_edit-task-in-dashboard": {
+  "procedure_id": "mcl-dashboard-faq-revised_edit-task-in-dashboard",
+  "title": "Edit a Task in the Dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Open a task marked as Not Started.",
+    "image_ids": []
+   },
+   {
+    "text": "Select Edit.",
+    "image_ids": []
+   },
+   {
+    "text": "Update title, description, and attachments.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_create-new-checklist": {
+  "procedure_id": "mcl-dashboard-faq-revised_create-new-checklist",
+  "title": "How to create a new checklist in the dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 10,
+  "steps": [
+   {
+    "text": "Click the + icon in Checklists.",
+    "image_ids": []
+   },
+   {
+    "text": "Enter a checklist name (required).",
+    "image_ids": []
+   },
+   {
+    "text": "Set start/end dates and times.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose a recurrence (daily, weekly, etc.).",
+    "image_ids": []
+   },
+   {
+    "text": "Select N.A. (Not Applicable) to make it always available.",
+    "image_ids": []
+   },
+   {
+    "text": "Set signature and department options.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_edit-delete-export-checklists": {
+  "procedure_id": "mcl-dashboard-faq-revised_edit-delete-export-checklists",
+  "title": "How to edit, delete, or export checklists in the dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 10,
+  "steps": [
+   {
+    "text": "Edit: Use the Pencil Icon.",
+    "image_ids": []
+   },
+   {
+    "text": "Delete: Use the Trash Icon.",
+    "image_ids": []
+   },
+   {
+    "text": "Export: Use the Excel Icon to download.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_make-checklist-always-available": {
+  "procedure_id": "mcl-dashboard-faq-revised_make-checklist-always-available",
+  "title": "Make a Checklist Always Available",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "Select N.A. (Not Applicable) under Recurring in General.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_configure-checklist-recurrence": {
+  "procedure_id": "mcl-dashboard-faq-revised_configure-checklist-recurrence",
+  "title": "Configure Checklist Recurrence in the Dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "In General → Recurring, choose from: N.A., Daily, Weekly, Monthly, Quarterly, Semi-annually, or Annually.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_allow-free-department-selection": {
+  "procedure_id": "mcl-dashboard-faq-revised_allow-free-department-selection",
+  "title": "Allow Free Department Selection for Checklists",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "In General, enable Department Selection.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_assign-role-to-checklist": {
+  "procedure_id": "mcl-dashboard-faq-revised_assign-role-to-checklist",
+  "title": "Assign a Role to a Checklist in the Dashboard",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "In Roles, assign who has access.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-dashboard-faq-revised_determine-email-recipients-for-reports": {
+  "procedure_id": "mcl-dashboard-faq-revised_determine-email-recipients-for-reports",
+  "title": "Determine Who Receives Checklist Reports by Email",
+  "document": "Mcl Dashboard Faq Revised.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "In E-Mail Settings during checklist creation, enter up to three email addresses, separated by commas.",
+    "image_ids": []
+   },
+   {
+    "text": "Assign roles that should automatically receive reports.",
+    "image_ids": []
+   },
+   {
+    "text": "To enable, change 'No' to 'Yes' under Assigned.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_log-in-to-mcl-mobile-app": {
+  "procedure_id": "mcl-mobile-app-faq-revised_log-in-to-mcl-mobile-app",
+  "title": "Log in to the MCL Mobile App",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Open the MCL App.",
+    "image_ids": []
+   },
+   {
+    "text": "Enter your login credentials on the start screen.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_navigate-within-mcl-app": {
+  "procedure_id": "mcl-mobile-app-faq-revised_navigate-within-mcl-app",
+  "title": "Navigate within the MCL App",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Log in to the app.",
+    "image_ids": []
+   },
+   {
+    "text": "See icons at the bottom of the screen for Checklists, Reports, Tasks, and Configuration.",
+    "image_ids": []
+   },
+   {
+    "text": "Use the menu bar to switch between sections, access settings, or manage your profile.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_start-a-checklist-in-mcl-app": {
+  "procedure_id": "mcl-mobile-app-faq-revised_start-a-checklist-in-mcl-app",
+  "title": "Start a checklist in the MCL App",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Open the Checklists tab.",
+    "image_ids": []
+   },
+   {
+    "text": "Select a checklist.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose between Routine Inspection or Special Inspection.",
+    "image_ids": []
+   },
+   {
+    "text": "If enabled, select the departments you want to include.",
+    "image_ids": []
+   },
+   {
+    "text": "Adjust the department order if necessary.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Start Checklist to begin.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_finish-a-checklist-in-mcl-app": {
+  "procedure_id": "mcl-mobile-app-faq-revised_finish-a-checklist-in-mcl-app",
+  "title": "Finish a checklist in the MCL App",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "After the final checklist question, provide an electronic signature if prompted.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Finish Report to complete the checklist.",
+    "image_ids": []
+   },
+   {
+    "text": "The report will be uploaded to the system.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose how you want to send the report: Full Report, Results Only, or Tasks Only.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_navigate-through-checklist": {
+  "procedure_id": "mcl-mobile-app-faq-revised_navigate-through-checklist",
+  "title": "Navigate through a checklist",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Use the arrows at the bottom of the screen to move through questions.",
+    "image_ids": []
+   },
+   {
+    "text": "Swipe left or right to switch between questions.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_switch-between-departments": {
+  "procedure_id": "mcl-mobile-app-faq-revised_switch-between-departments",
+  "title": "Switch Between Non-Consecutive Departments",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Tap the Magnifying Glass icon (top left corner).",
+    "image_ids": []
+   },
+   {
+    "text": "Select the department you want to jump to.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_add-photos-to-checklist-questions": {
+  "procedure_id": "mcl-mobile-app-faq-revised_add-photos-to-checklist-questions",
+  "title": "Add Photos to Checklist Questions",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Tap the Camera Icon to take a photo with the integrated camera.",
+    "image_ids": []
+   },
+   {
+    "text": "Use zoom or markup to highlight details.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_add-comments-to-checklist-questions": {
+  "procedure_id": "mcl-mobile-app-faq-revised_add-comments-to-checklist-questions",
+  "title": "Add Comments to Checklist Questions",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Tap the Comment Field and type your note.",
+    "image_ids": []
+   },
+   {
+    "text": "Alternatively, use the Microphone Icon to dictate a comment (online mode required).",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_swipe-to-complete-task": {
+  "procedure_id": "mcl-mobile-app-faq-revised_swipe-to-complete-task",
+  "title": "Complete a Task by Swiping",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Go to the Tasks Overview.",
+    "image_ids": []
+   },
+   {
+    "text": "Swipe the task from right to left.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Complete Task when prompted.",
+    "image_ids": []
+   },
+   {
+    "text": "If swiping doesn’t work, a photo or comment is mandatory.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_filter-tasks": {
+  "procedure_id": "mcl-mobile-app-faq-revised_filter-tasks",
+  "title": "Filter Tasks",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Tap the Filter Icon (Funnel) in the top left.",
+    "image_ids": []
+   },
+   {
+    "text": "Filter by Due Date or Created Date.",
+    "image_ids": []
+   },
+   {
+    "text": "Adjust date range or filter by Responsible Person, Market, or Status.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_create-task-from-checklist": {
+  "procedure_id": "mcl-mobile-app-faq-revised_create-task-from-checklist",
+  "title": "Create a Task from a Checklist",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Tap the Add Task icon (bottom of the question view).",
+    "image_ids": []
+   },
+   {
+    "text": "Enter details: Market, Description, Assignee, and Due Date.",
+    "image_ids": []
+   },
+   {
+    "text": "Optionally attach a photo.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Save.",
+    "image_ids": []
+   },
+   {
+    "text": "The task will appear in the task list once the checklist is completed.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_add-photos-to-task": {
+  "procedure_id": "mcl-mobile-app-faq-revised_add-photos-to-task",
+  "title": "Add Photos to a Task",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Tap the Photo Icon to attach an image.",
+    "image_ids": []
+   },
+   {
+    "text": "Take a photo with the integrated camera.",
+    "image_ids": []
+   },
+   {
+    "text": "Use zoom or markup tools for details.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_complete-a-task": {
+  "procedure_id": "mcl-mobile-app-faq-revised_complete-a-task",
+  "title": "How to complete a task",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Swipe Method: Complete directly if no photo/comment is required.",
+    "image_ids": []
+   },
+   {
+    "text": "Note Method: Open the task.",
+    "image_ids": []
+   },
+   {
+    "text": "Toggle Complete Task = Yes.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Add.",
+    "image_ids": []
+   },
+   {
+    "text": "If photo/comment fields are red-bordered, fill them before completion.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_complete-a-task-on-mobile": {
+  "procedure_id": "mcl-mobile-app-faq-revised_complete-a-task-on-mobile",
+  "title": "How to complete a task on Mobile",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Open the task.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap the Note Icon (top right).",
+    "image_ids": []
+   },
+   {
+    "text": "Set Complete Task = Yes.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Add.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_complete-a-task-on-tablet": {
+  "procedure_id": "mcl-mobile-app-faq-revised_complete-a-task-on-tablet",
+  "title": "How to complete a task on Tablet",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Go to the Tasks Overview.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Note next to the task.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap the Note Icon (top right).",
+    "image_ids": []
+   },
+   {
+    "text": "Set Complete Task = Yes.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Add.",
+    "image_ids": []
+   },
+   {
+    "text": "If red borders appear, a photo or comment is required before completion.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_edit-task-mobile": {
+  "procedure_id": "mcl-mobile-app-faq-revised_edit-task-mobile",
+  "title": "Edit a Task on Mobile",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Open the task.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Three Lines and Pencil Icon.",
+    "image_ids": []
+   },
+   {
+    "text": "Edit.",
+    "image_ids": []
+   },
+   {
+    "text": "Save.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_edit-task-tablet": {
+  "procedure_id": "mcl-mobile-app-faq-revised_edit-task-tablet",
+  "title": "Edit a Task on Tablet",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Tap Note.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Three Lines and Pencil Icon.",
+    "image_ids": []
+   },
+   {
+    "text": "Edit.",
+    "image_ids": []
+   },
+   {
+    "text": "Save.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_synchronize-app": {
+  "procedure_id": "mcl-mobile-app-faq-revised_synchronize-app",
+  "title": "Synchronize the App",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Go to the Checklists tab.",
+    "image_ids": []
+   },
+   {
+    "text": "Wait for the app to automatically sync.",
+    "image_ids": []
+   },
+   {
+    "text": "If not synced, log out and log back in.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_email-checklist-results": {
+  "procedure_id": "mcl-mobile-app-faq-revised_email-checklist-results",
+  "title": "Email Checklist Results",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Enter email addresses manually or select from the saved directory.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_filter-reports": {
+  "procedure_id": "mcl-mobile-app-faq-revised_filter-reports",
+  "title": "Filter Reports in the MCL App",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Filter by Date Range (Start/End Date).",
+    "image_ids": []
+   },
+   {
+    "text": "Ensure only reports saved on the device and completed in the current session are filtered.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_select-department-in-checklist": {
+  "procedure_id": "mcl-mobile-app-faq-revised_select-department-in-checklist",
+  "title": "How to select a department in a checklist",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "Select a checklist.",
+    "image_ids": []
+   },
+   {
+    "text": "The available departments will be displayed.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose the desired department.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_change-order-of-departments": {
+  "procedure_id": "mcl-mobile-app-faq-revised_change-order-of-departments",
+  "title": "How to change the order of departments",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "In the checklist configuration, tap the Three Lines next to a department.",
+    "image_ids": []
+   },
+   {
+    "text": "Drag and drop to rearrange the order.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_activate-voice-input": {
+  "procedure_id": "mcl-mobile-app-faq-revised_activate-voice-input",
+  "title": "How to activate voice input",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Press the Microphone Icon in both Tasks and Checklists.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_copy-checklist-question-android": {
+  "procedure_id": "mcl-mobile-app-faq-revised_copy-checklist-question-android",
+  "title": "How to copy a checklist question in the MCL App (Android)",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Long press the question text.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Copy to save the text to the clipboard.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_copy-partial-question": {
+  "procedure_id": "mcl-mobile-app-faq-revised_copy-partial-question",
+  "title": "How to copy only part of a question",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Adjust the blue markers after selecting text to highlight only the desired section.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_paste-copied-question": {
+  "procedure_id": "mcl-mobile-app-faq-revised_paste-copied-question",
+  "title": "How to paste a copied question into another field",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Go to the desired input field (e.g., task description or comment box), tap once, and select Paste.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_copy-checklist-question-ios": {
+  "procedure_id": "mcl-mobile-app-faq-revised_copy-checklist-question-ios",
+  "title": "How to copy a checklist question in iOS",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Tap the question you want to copy.",
+    "image_ids": []
+   },
+   {
+    "text": "The text will automatically be highlighted and copied to the clipboard.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_duplicate-content-between-checklists": {
+  "procedure_id": "mcl-mobile-app-faq-revised_duplicate-content-between-checklists",
+  "title": "How to duplicate content between checklists",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Copy text from one checklist.",
+    "image_ids": []
+   },
+   {
+    "text": "Paste it into another checklist as long as both are open in the same session.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_save-checklist-progress": {
+  "procedure_id": "mcl-mobile-app-faq-revised_save-checklist-progress",
+  "title": "Save Checklist Progress",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Always exit using the Door Icon to save your progress properly.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_checklist-permissions": {
+  "procedure_id": "mcl-mobile-app-faq-revised_checklist-permissions",
+  "title": "Check Checklist Permissions",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Check checklist permissions or contact your MCL Administrator.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_add-questions-to-checklist": {
+  "procedure_id": "mcl-mobile-app-faq-revised_add-questions-to-checklist",
+  "title": "Add Questions to Checklist",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Manually add the questions you want to include after selecting departments during checklist creation.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_activate-checklist": {
+  "procedure_id": "mcl-mobile-app-faq-revised_activate-checklist",
+  "title": "Activate Checklist",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Check the Start/End Dates and Times.",
+    "image_ids": []
+   },
+   {
+    "text": "Use N.A. (Not Applicable) only for checklists that should always be available.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_finalize-checklist": {
+  "procedure_id": "mcl-mobile-app-faq-revised_finalize-checklist",
+  "title": "Finalize Checklist",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Always click Complete to save and activate.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_edit-not-started-tasks": {
+  "procedure_id": "mcl-mobile-app-faq-revised_edit-not-started-tasks",
+  "title": "Edit Not Started Tasks",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Only Not Started tasks can be edited in the app.",
+    "image_ids": []
+   },
+   {
+    "text": "To modify ongoing tasks, use the Dashboard.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_fix-synchronization-issues": {
+  "procedure_id": "mcl-mobile-app-faq-revised_fix-synchronization-issues",
+  "title": "Fix Synchronization Issues",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Ensure your device is online.",
+    "image_ids": []
+   },
+   {
+    "text": "Return to the Checklist Overview.",
+    "image_ids": []
+   },
+   {
+    "text": "If synchronization doesn’t start automatically, log out and log back in.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_receive-task-notifications": {
+  "procedure_id": "mcl-mobile-app-faq-revised_receive-task-notifications",
+  "title": "How to Receive Task Notifications",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "Ensure the task has a due date.",
+    "image_ids": []
+   },
+   {
+    "text": "Enable device notifications for the MCL App.",
+    "image_ids": []
+   },
+   {
+    "text": "Log out of the MCL App.",
+    "image_ids": []
+   },
+   {
+    "text": "Log back into the MCL App to refresh notification permissions.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_view-or-cancel-notification": {
+  "procedure_id": "mcl-mobile-app-faq-revised_view-or-cancel-notification",
+  "title": "How to Handle Notifications",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "Tap 'View' on a notification to open a filtered task list showing relevant tasks.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap 'Cancel' on a notification to dismiss it for that task.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-mobile-app-faq-revised_enable-notifications": {
+  "procedure_id": "mcl-mobile-app-faq-revised_enable-notifications",
+  "title": "Enable Notifications for MCL App",
+  "document": "Mcl Mobile App Faq Revised.pdf",
+  "page": 12,
+  "steps": [
+   {
+    "text": "Go to your device Settings.",
+    "image_ids": []
+   },
+   {
+    "text": "Navigate to Notifications.",
+    "image_ids": []
+   },
+   {
+    "text": "Select MCL App.",
+    "image_ids": []
+   },
+   {
+    "text": "Disable notifications if desired.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-mcl-app_select-market": {
+  "procedure_id": "visual-guide-checklist-mcl-app_select-market",
+  "title": "Select a Market to Open Checklist Overview",
+  "document": "Visual Guide Checklist MCL APP.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Open the app and navigate to the Markets screen.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap on a market to open its checklist overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-mcl-app_checklist-preparation": {
+  "procedure_id": "visual-guide-checklist-mcl-app_checklist-preparation",
+  "title": "Checklist Preparation",
+  "document": "Visual Guide Checklist MCL APP.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Select a Checklist to begin execution.",
+    "image_ids": [
+     "visual-guide-checklist-mcl-app_p4_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-mcl-app_select-reason-for-execution": {
+  "procedure_id": "visual-guide-checklist-mcl-app_select-reason-for-execution",
+  "title": "Select Reason for Execution",
+  "document": "Visual Guide Checklist MCL APP.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Select the reason for execution.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-mcl-app_select-department": {
+  "procedure_id": "visual-guide-checklist-mcl-app_select-department",
+  "title": "Select Department",
+  "document": "Visual Guide Checklist MCL APP.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Select the department to go through.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-mcl-app_start-checklist": {
+  "procedure_id": "visual-guide-checklist-mcl-app_start-checklist",
+  "title": "Start Checklist",
+  "document": "Visual Guide Checklist MCL APP.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Start the checklist.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-mcl-app_send-report": {
+  "procedure_id": "visual-guide-checklist-mcl-app_send-report",
+  "title": "Send a Report",
+  "document": "Visual Guide Checklist MCL APP.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "Select the 'General report' toggle to send a complete report.",
+    "image_ids": [
+     "visual-guide-checklist-mcl-app_p11_i1"
+    ]
+   },
+   {
+    "text": "Select the 'Only results' toggle to send a simplified report.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the 'Only tasks list' toggle to send a simplified report with only tasks.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-mcl-app_send-report-to-email": {
+  "procedure_id": "visual-guide-checklist-mcl-app_send-report-to-email",
+  "title": "Send Report to Manually Entered Email Address",
+  "document": "Visual Guide Checklist MCL APP.pdf",
+  "page": 12,
+  "steps": [
+   {
+    "text": "Click the envelope icon to send the report to a manually entered email address.",
+    "image_ids": []
+   },
+   {
+    "text": "Enter the email address in the provided field.",
+    "image_ids": []
+   },
+   {
+    "text": "Click the “FINISH” button to execute the action and complete the process.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-mcl-app_send-report-via-internal-directory": {
+  "procedure_id": "visual-guide-checklist-mcl-app_send-report-via-internal-directory",
+  "title": "Send Report via Internal Contact List",
+  "document": "Visual Guide Checklist MCL APP.pdf",
+  "page": 12,
+  "steps": [
+   {
+    "text": "Click the contact card icon to select recipient(s) from the internal address book.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose the desired recipient(s) from the list.",
+    "image_ids": []
+   },
+   {
+    "text": "Click the “FINISH” button to execute the action and complete the process.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-mcl-app_view-report-as-pdf": {
+  "procedure_id": "visual-guide-checklist-mcl-app_view-report-as-pdf",
+  "title": "View Report as PDF",
+  "document": "Visual Guide Checklist MCL APP.pdf",
+  "page": 12,
+  "steps": [
+   {
+    "text": "Click the PDF icon to open the report directly in the app as a PDF.",
+    "image_ids": []
+   },
+   {
+    "text": "Review the report in PDF format.",
+    "image_ids": []
+   },
+   {
+    "text": "Click the “FINISH” button to complete the process.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-tasks-mcl-app_start-checklist": {
+  "procedure_id": "visual-guide-checklist-tasks-mcl-app_start-checklist",
+  "title": "Start a Checklist",
+  "document": "Visual Guide Checklist Tasks MCL APP.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Select a market from the market list.",
+    "image_ids": []
+   },
+   {
+    "text": "Open the checklist overview for the selected store.",
+    "image_ids": []
+   },
+   {
+    "text": "Begin executing the checklist.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-tasks-mcl-app_create-task-from-checklist-question": {
+  "procedure_id": "visual-guide-checklist-tasks-mcl-app_create-task-from-checklist-question",
+  "title": "Create a Task from a Checklist Question",
+  "document": "Visual Guide Checklist Tasks MCL APP.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Tap the calendar icon located at the bottom center of the screen.",
+    "image_ids": [
+     "visual-guide-checklist-tasks-mcl-app_p3_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-tasks-mcl-app_select-start-date": {
+  "procedure_id": "visual-guide-checklist-tasks-mcl-app_select-start-date",
+  "title": "Select Start Date for Task",
+  "document": "Visual Guide Checklist Tasks MCL APP.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Access the Task Creation screen within the Checklist.",
+    "image_ids": []
+   },
+   {
+    "text": "Navigate to the Start Date Selection section.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose the desired start date for the task.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-tasks-mcl-app_set-start-date": {
+  "procedure_id": "visual-guide-checklist-tasks-mcl-app_set-start-date",
+  "title": "Set Start Date for Task",
+  "document": "Visual Guide Checklist Tasks MCL APP.pdf",
+  "page": 9,
+  "steps": [
+   {
+    "text": "Tap to open the calendar picker.",
+    "image_ids": [
+     "visual-guide-checklist-tasks-mcl-app_p9_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-tasks-mcl-app_set-due-date": {
+  "procedure_id": "visual-guide-checklist-tasks-mcl-app_set-due-date",
+  "title": "Set Due Date for Task",
+  "document": "Visual Guide Checklist Tasks MCL APP.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "Tap to open the calendar picker.",
+    "image_ids": [
+     "visual-guide-checklist-tasks-mcl-app_p11_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-tasks-mcl-app_attach-photo-or-note": {
+  "procedure_id": "visual-guide-checklist-tasks-mcl-app_attach-photo-or-note",
+  "title": "Attach a Photo and/or Note to the Task",
+  "document": "Visual Guide Checklist Tasks MCL APP.pdf",
+  "page": 13,
+  "steps": [
+   {
+    "text": "Tap the text box area to enter notes relating to the task.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap the microphone icon to use the microphone to transcribe voice into text.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap the camera icon to open the device camera.",
+    "image_ids": [
+     "visual-guide-checklist-tasks-mcl-app_p13_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-checklist-tasks-mcl-app_create-task": {
+  "procedure_id": "visual-guide-checklist-tasks-mcl-app_create-task",
+  "title": "Create a Task",
+  "document": "Visual Guide Checklist Tasks MCL APP.pdf",
+  "page": 14,
+  "steps": [
+   {
+    "text": "Select the responsible user, start date, due date, and task.",
+    "image_ids": []
+   },
+   {
+    "text": "Complete the task details.",
+    "image_ids": []
+   },
+   {
+    "text": "Press ADD to create the task and link it to the checklist question.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-configuration-mcl-app_access-app-configuration": {
+  "procedure_id": "visual-guide-configuration-mcl-app_access-app-configuration",
+  "title": "Access App Configuration",
+  "document": "Visual Guide Configuration MCL APP.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Select the User Icon to open the app configuration.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-notifications-app-web_view-due-or-new-tasks": {
+  "procedure_id": "visual-guide-notifications-app-web_view-due-or-new-tasks",
+  "title": "View Due or New Tasks in MCL App",
+  "document": "Visual Guide Notifications APP & WEB.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Open the MCL app.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the 'View' button to open the task list.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-notifications-app-web_report-options-after-checklist-completion": {
+  "procedure_id": "visual-guide-notifications-app-web_report-options-after-checklist-completion",
+  "title": "Report Options After Checklist Completion",
+  "document": "Visual Guide Notifications APP & WEB.pdf",
+  "page": 7,
+  "steps": [
+   {
+    "text": "Select how the checklist report should be handled.",
+    "image_ids": [
+     "visual-guide-notifications-app-web_p7_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-notifications-app-web_handle-report-after-checklist-completion": {
+  "procedure_id": "visual-guide-notifications-app-web_handle-report-after-checklist-completion",
+  "title": "Handle Report After Completing a Checklist",
+  "document": "Visual Guide Notifications APP & WEB.pdf",
+  "page": 8,
+  "steps": [
+   {
+    "text": "Select how the report should be handled.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose the report type: General report, Only results, or Only Task.",
+    "image_ids": []
+   },
+   {
+    "text": "Select an option: Email icon, Contact selection, or PDF icon.",
+    "image_ids": []
+   },
+   {
+    "text": "Click the Finish button.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose to send via email, open as PDF, or share with recipients.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-notifications-app-web_open-pdf-report": {
+  "procedure_id": "visual-guide-notifications-app-web_open-pdf-report",
+  "title": "Open PDF Report",
+  "document": "Visual Guide Notifications APP & WEB.pdf",
+  "page": 11,
+  "steps": [
+   {
+    "text": "Open the checklist report via the printer/PDF icon.",
+    "image_ids": [
+     "visual-guide-notifications-app-web_p11_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-notifications-app-web_view-task-notes": {
+  "procedure_id": "visual-guide-notifications-app-web_view-task-notes",
+  "title": "View Task Notes After Clicking Email Link",
+  "document": "Visual Guide Notifications APP & WEB.pdf",
+  "page": 13,
+  "steps": [
+   {
+    "text": "Click the link in the task completion email.",
+    "image_ids": [
+     "visual-guide-notifications-app-web_p13_i1"
+    ]
+   },
+   {
+    "text": "Review the completion information and comments in the task notes view.",
+    "image_ids": []
+   },
+   {
+    "text": "Use the visible interface elements to reopen the task or go back to the task list.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-notifications-app-web_view-task-from-email": {
+  "procedure_id": "visual-guide-notifications-app-web_view-task-from-email",
+  "title": "View Task from Email Notification",
+  "document": "Visual Guide Notifications APP & WEB.pdf",
+  "page": 15,
+  "steps": [
+   {
+    "text": "Click the link in the email notification.",
+    "image_ids": [
+     "visual-guide-notifications-app-web_p15_i1"
+    ]
+   },
+   {
+    "text": "Review the task details displayed in the MCL dashboard.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-notifications-app-web_create-note-in-assigned-task": {
+  "procedure_id": "visual-guide-notifications-app-web_create-note-in-assigned-task",
+  "title": "Creating a note in an assigned task",
+  "document": "Visual Guide Notifications APP & WEB.pdf",
+  "page": 16,
+  "steps": [
+   {
+    "text": "Click the '+' icon on the task.",
+    "image_ids": [
+     "visual-guide-notifications-app-web_p16_i1"
+    ]
+   },
+   {
+    "text": "Select 'Create a note'.",
+    "image_ids": [
+     "visual-guide-notifications-app-web_p16_i2"
+    ]
+   },
+   {
+    "text": "Enter the task note.",
+    "image_ids": []
+   },
+   {
+    "text": "Upload an image.",
+    "image_ids": []
+   },
+   {
+    "text": "Close the task by checking the box for yes or leaving it empty for no.",
+    "image_ids": []
+   },
+   {
+    "text": "Save the note.",
+    "image_ids": [
+     "visual-guide-notifications-app-web_p16_i3"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-reports-mcl-app_access-checklist-overview": {
+  "procedure_id": "visual-guide-reports-mcl-app_access-checklist-overview",
+  "title": "Access Checklist Overview",
+  "document": "Visual Guide Reports MCL APP.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Open the store overview by tapping the checklist icon.",
+    "image_ids": []
+   },
+   {
+    "text": "Select a store to open its checklist overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-reports-mcl-app_access-reports-overview": {
+  "procedure_id": "visual-guide-reports-mcl-app_access-reports-overview",
+  "title": "Access Reports Overview",
+  "document": "Visual Guide Reports MCL APP.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Select the book icon to open the report overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-reports-mcl-app_access-tasks-overview": {
+  "procedure_id": "visual-guide-reports-mcl-app_access-tasks-overview",
+  "title": "Access Tasks Overview",
+  "document": "Visual Guide Reports MCL APP.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Select the clock icon to access the tasks overview.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-reports-mcl-app_open-app-configuration": {
+  "procedure_id": "visual-guide-reports-mcl-app_open-app-configuration",
+  "title": "Open App Configuration",
+  "document": "Visual Guide Reports MCL APP.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Tap the user icon to open app configuration.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-reports-mcl-app_review-checklist-reports": {
+  "procedure_id": "visual-guide-reports-mcl-app_review-checklist-reports",
+  "title": "Review Checklist Reports on Mobile Device",
+  "document": "Visual Guide Reports MCL APP.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Select the start date for filtering reports using the Date From Selector.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the end date for filtering reports using the Date To Selector.",
+    "image_ids": []
+   },
+   {
+    "text": "Press the Search Button to execute the search based on the selected date range.",
+    "image_ids": []
+   },
+   {
+    "text": "View the Report List Entry that displays available reports matching the selected criteria.",
+    "image_ids": []
+   },
+   {
+    "text": "Select a report entry to open the detailed checklist report view.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-reports-mcl-app_report-view-selection": {
+  "procedure_id": "visual-guide-reports-mcl-app_report-view-selection",
+  "title": "Select Report View",
+  "document": "Visual Guide Reports MCL APP.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Select a report from the report list.",
+    "image_ids": [
+     "visual-guide-reports-mcl-app_p5_i1"
+    ]
+   },
+   {
+    "text": "Choose to view the report directly within the app or send it via email.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "visual-guide-reports-mcl-app_open-report": {
+  "procedure_id": "visual-guide-reports-mcl-app_open-report",
+  "title": "Open the checklist report in PDF format",
+  "document": "Visual Guide Reports MCL APP.pdf",
+  "page": 6,
+  "steps": [
+   {
+    "text": "Tap Report to open the full checklist report in PDF format.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_create-task": {
+  "procedure_id": "mcl-user-guide-qa-en_create-task",
+  "title": "How to create a task in the mobile app",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Open Tasks from the app menu and tap the add/new-task button.",
+    "image_ids": []
+   },
+   {
+    "text": "Enter a clear title and description; choose the due date and, if available, priority.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the store (market) and the coworker(s) who should complete it.",
+    "image_ids": []
+   },
+   {
+    "text": "Attach evidence if needed, then save/send the task.",
+    "image_ids": []
+   },
+   {
+    "text": "The assignee sees it in their task list.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_complete-checklist": {
+  "procedure_id": "mcl-user-guide-qa-en_complete-checklist",
+  "title": "How to fill out / complete a checklist in my store",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "Open the checklist scheduled for your store.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the relevant department if prompted.",
+    "image_ids": []
+   },
+   {
+    "text": "Answer every required question using the response control configured for the question.",
+    "image_ids": []
+   },
+   {
+    "text": "Add comments or evidence when required.",
+    "image_ids": []
+   },
+   {
+    "text": "Review the progress indicator.",
+    "image_ids": []
+   },
+   {
+    "text": "Tap Finish/Complete and confirm any signature requirement.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_start-inspection": {
+  "procedure_id": "mcl-user-guide-qa-en_start-inspection",
+  "title": "How to start an inspection in a store",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "From the checklist or inspection area, select your store and the checklist.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose Routine check for the planned recurring inspection.",
+    "image_ids": []
+   },
+   {
+    "text": "Select Special inspection for an ad-hoc inspection outside the routine schedule.",
+    "image_ids": []
+   },
+   {
+    "text": "Complete the same question flow and finish the run.",
+    "image_ids": []
+   },
+   {
+    "text": "Special inspections are reported separately from routine checks.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_attach-photo-evidence": {
+  "procedure_id": "mcl-user-guide-qa-en_attach-photo-evidence",
+  "title": "How to attach a photo as evidence when answering a checklist question",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 1,
+  "steps": [
+   {
+    "text": "On the question, tap the camera/photo control.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose Camera or Gallery.",
+    "image_ids": []
+   },
+   {
+    "text": "Capture/select the image.",
+    "image_ids": []
+   },
+   {
+    "text": "Confirm the image.",
+    "image_ids": []
+   },
+   {
+    "text": "Save the answer.",
+    "image_ids": []
+   },
+   {
+    "text": "Let the image upload during synchronization before deleting it from the device.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_sync-data": {
+  "procedure_id": "mcl-user-guide-qa-en_sync-data",
+  "title": "How to sync data in MCL",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Reconnect to the internet.",
+    "image_ids": []
+   },
+   {
+    "text": "Return to the home screen or pull to refresh/reopen the app.",
+    "image_ids": []
+   },
+   {
+    "text": "Use the available Sync/Update action if your version shows one.",
+    "image_ids": []
+   },
+   {
+    "text": "Sign out and back in only after pending offline work has synchronized.",
+    "image_ids": []
+   },
+   {
+    "text": "Contact the administrator to verify your market, role, and checklist assignments.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_enable-notifications": {
+  "procedure_id": "mcl-user-guide-qa-en_enable-notifications",
+  "title": "How to turn on task notifications",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Allow notifications for MCL in the phone operating-system settings.",
+    "image_ids": []
+   },
+   {
+    "text": "Keep the app updated.",
+    "image_ids": []
+   },
+   {
+    "text": "Ask the administrator to check the task notification configuration and your assigned device/account if you do not receive reminders.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_assign-task": {
+  "procedure_id": "mcl-user-guide-qa-en_assign-task",
+  "title": "How to assign a task to a coworker",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Create or edit the task.",
+    "image_ids": []
+   },
+   {
+    "text": "Select the target market and choose one or more users assigned to that market.",
+    "image_ids": []
+   },
+   {
+    "text": "Save the task.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_mark-task-done": {
+  "procedure_id": "mcl-user-guide-qa-en_mark-task-done",
+  "title": "How a coworker marks a task as done",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Open the task from Tasks.",
+    "image_ids": []
+   },
+   {
+    "text": "Complete the requested work.",
+    "image_ids": []
+   },
+   {
+    "text": "Add a note/evidence if required.",
+    "image_ids": []
+   },
+   {
+    "text": "Use the completion/close action.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_daily-routine": {
+  "procedure_id": "mcl-user-guide-qa-en_daily-routine",
+  "title": "Typical daily routine in the app",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Open MCL after connecting to the network.",
+    "image_ids": []
+   },
+   {
+    "text": "Check whether today’s data has refreshed.",
+    "image_ids": []
+   },
+   {
+    "text": "Review Tasks for due or overdue items.",
+    "image_ids": []
+   },
+   {
+    "text": "Run the scheduled routine checklists for your store/department.",
+    "image_ids": []
+   },
+   {
+    "text": "Record accurate answers and evidence at the point of work.",
+    "image_ids": []
+   },
+   {
+    "text": "Submit completed checklists and complete assigned tasks.",
+    "image_ids": []
+   },
+   {
+    "text": "Reconnect if necessary before leaving.",
+    "image_ids": []
+   },
+   {
+    "text": "Confirm that the app has synchronized.",
+    "image_ids": []
+   },
+   {
+    "text": "Resolve any failed uploads or pending items.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_view-inspection-results": {
+  "procedure_id": "mcl-user-guide-qa-en_view-inspection-results",
+  "title": "How to see the results of inspections",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Open Reports/Checklist History in the mobile app to view completed runs and their answers.",
+    "image_ids": []
+   },
+   {
+    "text": "Use Reports and Data Analysis/Dashboard on the web for filtered, aggregated results.",
+    "image_ids": []
+   },
+   {
+    "text": "Apply available filters commonly including time period, market group, checklist group, and checklist.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_open-dashboard": {
+  "procedure_id": "mcl-user-guide-qa-en_open-dashboard",
+  "title": "How to open the dashboard on the web",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 2,
+  "steps": [
+   {
+    "text": "Open https://marktcheckliste.de/ in a browser.",
+    "image_ids": []
+   },
+   {
+    "text": "Sign in with your MCL account.",
+    "image_ids": []
+   },
+   {
+    "text": "Use the company-provided branded or test URL if instructed.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_export-inspection-results": {
+  "procedure_id": "mcl-user-guide-qa-en_export-inspection-results",
+  "title": "Export Inspection Results to Excel or PDF",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 3,
+  "steps": [
+   {
+    "text": "Open the completed run from Reports/History.",
+    "image_ids": []
+   },
+   {
+    "text": "Use the PDF/download option when available.",
+    "image_ids": []
+   },
+   {
+    "text": "If Excel export is needed, check if it is enabled for your role or tenant configuration.",
+    "image_ids": []
+   },
+   {
+    "text": "If no export control is present, ask the administrator to provide the report or enable the appropriate permission.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_log-in-to-mcl-app": {
+  "procedure_id": "mcl-user-guide-qa-en_log-in-to-mcl-app",
+  "title": "How to log in to the MCL app for the first time",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 4,
+  "steps": [
+   {
+    "text": "Install the MCL app supplied by your company.",
+    "image_ids": []
+   },
+   {
+    "text": "Open the app with an internet connection.",
+    "image_ids": []
+   },
+   {
+    "text": "Enter the email/username and password issued to you.",
+    "image_ids": []
+   },
+   {
+    "text": "Sign in.",
+    "image_ids": []
+   },
+   {
+    "text": "Accept notification permission if you want task alerts.",
+    "image_ids": []
+   },
+   {
+    "text": "If authentication fails, confirm the account has been created and assigned to a company/market.",
+    "image_ids": [
+     "mcl-user-guide-qa-en_p4_i1"
+    ]
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_reset-password": {
+  "procedure_id": "mcl-user-guide-qa-en_reset-password",
+  "title": "How to reset your password if you forget it",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Use the Forgot password option on the MCL web sign-in page.",
+    "image_ids": []
+   },
+   {
+    "text": "Enter the email address registered for your account.",
+    "image_ids": []
+   },
+   {
+    "text": "Follow the email reset link.",
+    "image_ids": []
+   },
+   {
+    "text": "Create a password that meets the company policy.",
+    "image_ids": []
+   },
+   {
+    "text": "Ask your company MCL administrator to verify the account email and reset access if you do not receive the email or no reset option is shown in the app.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_add-new-user": {
+  "procedure_id": "mcl-user-guide-qa-en_add-new-user",
+  "title": "How to add a new user from your company to MCL",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Open the web administration area (typically Companies/Users).",
+    "image_ids": []
+   },
+   {
+    "text": "Create or invite the user with their name and email.",
+    "image_ids": []
+   },
+   {
+    "text": "Assign the user to the company.",
+    "image_ids": []
+   },
+   {
+    "text": "Choose the role for the user.",
+    "image_ids": []
+   },
+   {
+    "text": "Assign the relevant markets/departments.",
+    "image_ids": []
+   },
+   {
+    "text": "Have the new user sign in and synchronize the app.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_change-app-language": {
+  "procedure_id": "mcl-user-guide-qa-en_change-app-language",
+  "title": "How to change the app language",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Use the language option in the app/profile/settings if your version exposes it.",
+    "image_ids": []
+   },
+   {
+    "text": "Restart or refresh the app after changing the language.",
+    "image_ids": []
+   },
+   {
+    "text": "Ask an administrator for help if the setting is not available to your role.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_create-recurring-checklist": {
+  "procedure_id": "mcl-user-guide-qa-en_create-recurring-checklist",
+  "title": "How to make a checklist repeat automatically",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Create a recurring checklist using the Checklist Wizard/configuration permission.",
+    "image_ids": []
+   },
+   {
+    "text": "Set its periodicity and weekday/time-related rules.",
+    "image_ids": []
+   },
+   {
+    "text": "Assign the target markets/departments and roles.",
+    "image_ids": []
+   },
+   {
+    "text": "Save the checklist.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ },
+ "mcl-user-guide-qa-en_checklist-wizard-steps": {
+  "procedure_id": "mcl-user-guide-qa-en_checklist-wizard-steps",
+  "title": "How to use the Checklist Wizard step by step",
+  "document": "MCL_User_Guide_QA_EN.pdf",
+  "page": 5,
+  "steps": [
+   {
+    "text": "Open Checklists > Checklist Wizard and choose Add (or copy an existing checklist).",
+    "image_ids": []
+   },
+   {
+    "text": "Enter the general setup: name, recurring/periodicity settings, signature requirement and any relevant tags or groups.",
+    "image_ids": []
+   },
+   {
+    "text": "Add departments and decide whether users may select a department.",
+    "image_ids": []
+   },
+   {
+    "text": "Add questions, choose each question type and configure options, sequence, evidence/sensor settings and required behavior.",
+    "image_ids": []
+   },
+   {
+    "text": "Assign the roles and markets that may run the checklist; configure notifications/email rules if required.",
+    "image_ids": []
+   },
+   {
+    "text": "Preview the checklist, verify the assignments and complete/save it.",
+    "image_ids": []
+   },
+   {
+    "text": "Synchronize a test device and run a test inspection before production use.",
+    "image_ids": []
+   }
+  ],
+  "approved": false
+ }
+}

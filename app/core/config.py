@@ -21,9 +21,10 @@ ENABLE_MCL_IMAGE_VALIDATION = os.getenv("ENABLE_MCL_IMAGE_VALIDATION", "false").
 MCL_VALIDATION_CONFIDENCE_THRESHOLD = float(os.getenv("MCL_VALIDATION_CONFIDENCE_THRESHOLD", "0.5"))
 
 # --- Ragie retrieval (Layer 5) ---
-RAGIE_API_KEY = os.getenv("RAGIE_API_KEY", "")
+RAGIE_API_KEY = os.getenv("RAGIE_API_KEY", "")   # only the legacy /api/ragie/image proxy; retrieval is in-house
 RAGIE_PARTITION = os.getenv("RAGIE_PARTITION", "mcl_spike")
-RAGIE_TOP_K = int(os.getenv("RAGIE_TOP_K", "6"))
+KB_TOP_K = int(os.getenv("KB_TOP_K", os.getenv("RAGIE_TOP_K", "6")))
+KB_INDEX_DIR = os.getenv("KB_INDEX_DIR", os.path.join(os.path.dirname(__file__), "..", "kb_index"))
 
 
 def _resolve_public_url() -> str:
@@ -32,6 +33,11 @@ def _resolve_public_url() -> str:
 
 
 API_PUBLIC_URL = _resolve_public_url()
+
+# Unanswerable questions. A local MarieClaire sets GAP_SINK_URL to the central backend so the
+# database credential stays in Azure; the central backend leaves it empty and writes directly.
+GAP_SINK_URL = os.getenv("GAP_SINK_URL", "").strip()
+GAP_INGEST_TOKEN = os.getenv("GAP_INGEST_TOKEN", "").strip()
 
 
 def _resolve_memories_dir() -> str:

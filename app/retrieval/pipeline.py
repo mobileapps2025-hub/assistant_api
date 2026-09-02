@@ -30,6 +30,6 @@ def run(query: str, messages: List[Dict[str, Any]], *, language: Optional[str] =
     contextualized = contextualize(query, messages)
     flow(f"🔁 query → '{contextualized[:50]}'")
     chunks = retrieve(contextualized)
-    flow(f"📄 retrieved {len(chunks)} chunk(s) from Ragie")
+    flow(f"📄 retrieved {len(chunks)} chunk(s) from the KB index")
     return answer(contextualized, chunks, language=language, device=device,
                   history_text=_history_text(messages), memory=memory)

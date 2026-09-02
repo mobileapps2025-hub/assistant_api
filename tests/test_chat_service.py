@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.services.chat_service import ChatService, _format_device, _format_today
 from app.enforcement import pending
 from app.models import Device
+from app.retrieval.retriever import Unit
 
 
 def test_format_device_combines_present_fields():
@@ -185,7 +186,7 @@ class TestHandleAgentRequest:
     ):
         service = make_service(mock_vision_service, mock_image_validator)
         messages = [{"role": "user", "content": "How do I sync?"}]
-        chunk = types.SimpleNamespace(document_name="sync_guide.md", text="Tap Sync.")
+        chunk = Unit(kind="text", id="u1", document_name="sync_guide.md", text="Tap Sync.")
         with patch("app.services.chat_service.contextualize", return_value="MCL sync"), \
              patch("app.services.chat_service.retrieve", return_value=[chunk]) as mock_retrieve, \
              patch("app.services.chat_service.client") as mock_client:
@@ -200,6 +201,114 @@ class TestHandleAgentRequest:
         mock_retrieve.assert_called_once_with("MCL sync")
         assert "[Source: sync_guide.md]" in result["response"]
         assert "fake.md" not in result["response"]
+
+    @pytest.mark.asyncio
+    async def test_knowledge_tool_offers_step_markers_and_renders_screenshots(
+        self, mock_vision_service, mock_image_validator
+    ):
+        service = make_service(mock_vision_service, mock_image_validator)
+        messages = [{"role": "user", "content": "How do I create a task?"}]
+        procedure = Unit(
+            kind="procedure", id="create_task", document_name="tasks.pdf",
+            text="Creating a task", title="Creating a task",
+            steps=[
+                {"text": "Open the Task menu", "images": []},
+                {"text": "Tap the + button", "images": [{"id": "img7", "path": "task_plus.png", "alt": "Plus button"}]},
+            ],
+        )
+        with patch("app.services.chat_service.contextualize", return_value="create a task"), \
+             patch("app.services.chat_service.retrieve", return_value=[procedure]), \
+             patch("app.services.chat_service.client") as mock_client:
+            mock_client.chat.completions.create.side_effect = [
+                _tool_response("search_mcl_documentation", '{"query":"create a task"}'),
+                _text_response(
+                    "1. Open the Task menu [Source: tasks.pdf]\n"
+                    "2. Tap the **+** button [Source: tasks.pdf] {{step:create_task.2}}"
+                ),
+            ]
+            result = await service._handle_agent_request(
+                messages, messages[0], "s1", None, "", "English", ""
+            )
+
+        tool_context = mock_client.chat.completions.create.call_args_list[1].kwargs["messages"][-1]["content"]
+        assert "{{step:create_task.2}}" in tool_context
+        assert "# PROCEDURES" in tool_context
+
+        assert "![Plus button](" in result["response"]
+        assert "/images/task_plus.png" in result["response"]
+        assert "{{step:" not in result["response"]
+
+    @pytest.mark.asyncio
+    async def test_invented_marker_is_stripped_not_rendered(
+        self, mock_vision_service, mock_image_validator
+    ):
+        service = make_service(mock_vision_service, mock_image_validator)
+        messages = [{"role": "user", "content": "Show me the dashboard"}]
+        chunk = Unit(kind="text", id="u1", document_name="dash.pdf", text="The dashboard shows cards.")
+        with patch("app.services.chat_service.contextualize", return_value="dashboard"), \
+             patch("app.services.chat_service.retrieve", return_value=[chunk]), \
+             patch("app.services.chat_service.client") as mock_client:
+            mock_client.chat.completions.create.side_effect = [
+                _tool_response("search_mcl_documentation", '{"query":"dashboard"}'),
+                _text_response("Here it is [Source: dash.pdf] {{image:not_a_real_id}}"),
+            ]
+            result = await service._handle_agent_request(
+                messages, messages[0], "s1", None, "", "English", ""
+            )
+
+        assert "not_a_real_id" not in result["response"]
+        assert "![" not in result["response"]
+        assert "[Source: dash.pdf]" in result["response"]
+
+    @pytest.mark.asyncio
+    async def test_missing_information_is_recorded_with_the_full_question(
+        self, mock_vision_service, mock_image_validator
+    ):
+        service = make_service(mock_vision_service, mock_image_validator)
+        messages = [{"role": "user", "content": "and can I use it on a smartwatch?"}]
+        chunk = Unit(kind="text", id="u1", document_name="guide.pdf", text="MCL runs on phones and tablets.")
+        recorded = []
+
+        async def fake_record(question, language=None):
+            recorded.append((question, language))
+            return True
+
+        with patch("app.services.chat_service.contextualize", return_value="MCL smartwatch support"),              patch("app.services.chat_service.retrieve", return_value=[chunk]),              patch("app.services.chat_service.record_gap", side_effect=fake_record),              patch("app.services.chat_service.client") as mock_client:
+            mock_client.chat.completions.create.side_effect = [
+                _tool_response("search_mcl_documentation", '{"query":"smartwatch"}'),
+                _tool_response("report_missing_information", '{"question":"Does MCL run on a smartwatch?"}'),
+                _text_response("I did not find that, and I logged your question."),
+            ]
+            result = await service._handle_agent_request(
+                messages, messages[0], "s1", None, "", "English", ""
+            )
+
+        assert recorded == [("Does MCL run on a smartwatch?", "English")]
+        assert "logged" in result["response"]
+
+    @pytest.mark.asyncio
+    async def test_answered_question_records_no_gap(
+        self, mock_vision_service, mock_image_validator
+    ):
+        service = make_service(mock_vision_service, mock_image_validator)
+        messages = [{"role": "user", "content": "How do I sync?"}]
+        chunk = Unit(kind="text", id="u1", document_name="sync.pdf", text="Tap Sync.")
+        recorded = []
+
+        async def fake_record(question, language=None):
+            recorded.append(question)
+            return True
+
+        with patch("app.services.chat_service.contextualize", return_value="MCL sync"),              patch("app.services.chat_service.retrieve", return_value=[chunk]),              patch("app.services.chat_service.record_gap", side_effect=fake_record),              patch("app.services.chat_service.client") as mock_client:
+            mock_client.chat.completions.create.side_effect = [
+                _tool_response("search_mcl_documentation", '{"query":"sync"}'),
+                _text_response("Tap Sync [Source: sync.pdf]."),
+            ]
+            await service._handle_agent_request(
+                messages, messages[0], "s1", None, "", "English", ""
+            )
+
+        assert recorded == []
 
     @pytest.mark.asyncio
     async def test_write_confirmation_stores_conversation_context(

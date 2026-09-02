@@ -1,0 +1,109 @@
+{
+ "is_error": false,
+ "duration_api_ms": 248414,
+ "num_turns": 45,
+ "stop_reason": "end_turn",
+ "session_id": "3b0525a6-5c41-49d7-9cbe-8860b23b980e",
+ "total_cost_usd": 3.6301720000000004,
+ "usage": {
+  "input_tokens": 54,
+  "cache_creation_input_tokens": 154901,
+  "cache_read_input_tokens": 3325184,
+  "output_tokens": 16732,
+  "output_tokens_details": {
+   "thinking_tokens": 6184
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 154901,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 4337,
+    "cache_read_input_tokens": 177051,
+    "cache_creation_input_tokens": 2194,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 2194
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-opus-5[1m]": {
+   "inputTokens": 54,
+   "outputTokens": 16732,
+   "cacheReadInputTokens": 3325184,
+   "cacheCreationInputTokens": 154901,
+   "webSearchRequests": 0,
+   "costUSD": 3.6301720000000004,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [
+  {
+   "tool_name": "Bash",
+   "tool_use_id": "toolu_011kCD9ZSqbrsHmTnJG2fkyF",
+   "tool_input": {
+    "command": "cd \"/c/Users/tparr/Documents/TOMAS/WORKAPPS/SpotplanAssistant/Repos/_pinned/api/CheckListService/Controllers\" && grep -n -E '^\\s*(\\[Route|\\[Http|public |private |protected )' ChekListControllerV8.cs | awk -F: '$1>1750 && $1<2950' | head -80",
+    "description": "List V8 controller members near email code"
+   }
+  }
+ ],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "## MCL notifications & emails — what triggers what\n\nVerified against `api/CheckListService` (CheckList Service V8), `web/CheckListWebV3` (web portal), and the mobile app (`MCLCore`/`MCLNET`/`CheckList.iOS`). Notes on uncertainty are flagged inline.\n\n---\n\n### Push notifications\n\nMCL sends push through Azure Notification Hubs (iOS) and Firebase Cloud Messaging (Android). You only receive push if you are logged in and your device is registered and active in MCL — registration happens automatically at login/startup (`InsertUpdateDevice`), tagged to your user ID.\n\n| Event | Who gets it | What it says | How it fires |\n|---|---|---|---|\n| **New tasks have been assigned to you** | Every user with newly assigned tasks not yet notified, in every company | Title **\"Aufgaben\"**, text **\"Ihnen wurden neue Aufgaben zugewiesen\"** | Batch job (`Notification/SendTaskAssignedNotification`), **not** at the moment the task is created |\n| **You have tasks due today** | Every user with tasks due today | Title **\"Aufgaben\"**, text **\"Sie haben für HEUTE fällige Aufgaben\"** | Batch job (`Notification/SendTaskDueNotification`) |\n| **Message from an administrator** | Users the admin selects (by company → roles → markets → departments), who have an MCL device registered | Free text — the admin types the title and body | Manually, from the web portal **Notifications** page |\n\nBehaviour worth documenting for users:\n\n- **Tapping an automatic push** opens MCL and shows a dialog (\"You have *N* tasks…\") with a button that takes you straight to the task list. The push carries the open-task count, so the dialog can show a number.\n- **Opening the task list clears that batch.** The app reports back (`SetTaskAssignedNotification`) that the assigned-task notification was seen, so the same batch is not announced again.\n- **The two automatic messages are always in German**, regardless of your app language. Only the admin broadcast uses whatever text the admin typed.\n- **Timing is not instant.** Both automatic endpoints take no parameters and loop over all companies, i.e. they are called on a schedule from outside these repositories. The exact times must be confirmed with operations before you put them in the docs — don't write \"immediately\".\n\n---\n\n### Emails\n\n| Event | Who gets it | Subject | How it fires |\n|---|---|---|---|\n| **A checklist you completed has been uploaded** (report email) | The person who ran the checklist, plus their second and third email addresses, the market's email, the checklist's email, any role-based recipients configured for that checklist, and the market's store managers — de-duplicated | *\"\\<Market\\>, \\<Checklist\\> – neuer Bericht / new report / nuevo informe\"* | Automatically, at the end of a successful sync from the app (`v8/MailAdministrator`). Attaches the PDF report if the company setting for PDF-by-mail is on |\n| **You send a report yourself** | The address you type, or one you pick from the company's stored email list | Same report subject as above | You tap *send by email* on a report or in the checklist history (`v8/MailUser`) |\n| **New tasks assigned to you** | Each user with tasks assigned to them personally, dated yesterday or later, not yet mailed | *\"Neue Aufgaben: Ihnen zugewiesen\" / \"New Tasks assigned to you\" / \"Tareas asignadas a ti\"* | Batch job (`v8/SendMailTasksAssignedToUser`). Each task is flagged as mailed, so you get it once |\n| **A task you created has been closed** | The user who created the task (the mail names the assignee and links to the task) | *\"Aufgabe geschlossen\" / \"Task closed\" / \"Tarea cerrada\"* | When the task is closed **in the web portal** |\n| **Password reset** | The account's email address | *\"Passwort zurücksetzen\"* | You request it on the web portal's *forgot password* page. German only |\n| **Registration** | The newly registered address | Registration confirmation | Completing the web portal registration form |\n\nEmail language follows your user profile (German, English, Spanish); it falls back to German if no language is set. Every automatic email carries the footer \"this email was sent automatically — please do not reply\".\n\nThe app's *request a demo* / contact form also sends mail, but to x2/WorkApps support, not to the user.\n\n---\n\n### Events that send nothing\n\nUsers ask about these, so state them explicitly:\n\n- **Creating, editing, or deleting a task** (in the portal or via the API) sends no immediate push or email. The assignee learns about it on the next scheduled run.\n- **Tasks assigned to a market** rather than to a named person produce **no email**. The market variant of the assignment mail exists but is switched off in the code.\n- **Closing a task in the mobile app** does not send the \"task closed\" email — only the web portal does.\n- **Adding a note, comment, or photo to a task** sends nothing.\n- **Answering questions or syncing** sends nothing on its own; only finishing the upload of a completed checklist triggers the report email.\n\n---\n\n### Two things to resolve before publishing\n\n1. **Scheduler cadence.** Confirm with ops when the assigned-task push, due-task push, and assigned-task email jobs actually run. Nothing in the repos sets a schedule, and the app's own code for triggering them is commented out.\n2. **Silent failures.** All three notification/email jobs swallow errors and report success. If a user says \"I never got it\", there is no user-visible error and no retry — support has to check the email log table (`AddLogEmail` writes recipient, function, and report ID for every mail sent). Worth a line in the troubleshooting section.\n\nSkipped: the debug-only endpoints (`…NotificationGio`, `…Notification1`, `…NotificationUser1/User2`, `SendDefaultNotificationMCLOnboard`), which are hard-coded to single test user IDs, and the older `SendToAll`/`SendToAudience` App Center endpoints — none describe production behaviour.\n\nUnrelated but visible while reading: `NotificationHubService.cs`, `Web.config`, and `web/…/Database/Service.cs` contain live Azure SAS keys, blob storage keys, and a portal admin username/password in plain source, plus a committed Firebase admin service-account JSON. Not a docs issue — worth raising with the team separately.",
+ "ttft_ms": 5872,
+ "ttft_stream_ms": 2316,
+ "time_to_request_ms": 404,
+ "type": "result",
+ "duration_ms": 268770,
+ "uuid": "3b142122-5b3d-4386-9cff-88d615e8e455",
+ "queued_turn_count": 0,
+ "wall_seconds": 272.5,
+ "structuring": {
+  "is_error": false,
+  "model": "gpt-4o-mini",
+  "usage": 2223
+ }
+}

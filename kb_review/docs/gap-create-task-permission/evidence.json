@@ -1,0 +1,63 @@
+{
+ "gap_id": "gap-create-task-permission",
+ "question": "What decides whether a user is allowed to create a task in MCL?",
+ "language": "English",
+ "status": "partial",
+ "platform": "both",
+ "title": "Task Creation Permissions in MCL",
+ "summary_for_reviewer": "The report outlines the conditions under which a user can create tasks in the MCL web portal and highlights differences in the mobile app. It notes potential gaps in enforcement of permissions, particularly for users accessing the task creation page directly. The mobile app allows task creation regardless of web portal permissions, which could lead to inconsistencies.",
+ "abstain_reason": "",
+ "evidence_files": [],
+ "uncertainties": [
+  "The enforcement of task creation permissions may not be consistent across different entry points in the web portal.",
+  "The mobile app allows task creation without the same restrictions as the web portal, which could lead to confusion."
+ ],
+ "sources": [
+  {
+   "name": "api",
+   "repository": "https://dev.azure.com/workapps/x2Solutions/_git/Checklist_Service",
+   "branch": "release2025",
+   "commit_sha": "464d837d450c5a4c1a5f59a225aa439588cd7ca6",
+   "app_version": "unknown",
+   "sha_verified_by_mcl_team": false
+  },
+  {
+   "name": "web",
+   "repository": "https://dev.azure.com/workapps/x2Solutions/_git/Checklist_Web",
+   "branch": "2026",
+   "commit_sha": "d3b04ed71417e94558e6e5e583bfd4b99dee0da9",
+   "app_version": "unknown",
+   "sha_verified_by_mcl_team": false
+  },
+  {
+   "name": "app-ios",
+   "repository": "https://workapps.visualstudio.com/MCLAPP_NET/_git/MCLAPP_NET",
+   "branch": "release-ios-4.91-appstore",
+   "commit_sha": "dd79c68de2442bd2602ccc4844129b1bc0e66bda",
+   "app_version": "iOS 4.91",
+   "sha_verified_by_mcl_team": false
+  },
+  {
+   "name": "app-android",
+   "repository": "https://workapps.visualstudio.com/MCLAPP_NET/_git/MCLAPP_NET",
+   "branch": "release-android-3.063-play",
+   "commit_sha": "3be1185d5c61d459b3e4782bddd82792c9e85112",
+   "app_version": "Android 3.063 (versionCode 3263)",
+   "sha_verified_by_mcl_team": false
+  }
+ ],
+ "generated_at": "2026-08-26T17:53:41+00:00",
+ "review": {
+  "decision": "pending",
+  "reviewed_by": null,
+  "reviewed_at": null,
+  "notes": ""
+ },
+ "run": {
+  "cost_usd": 2.9630674999999993,
+  "turns": 48,
+  "wall_seconds": 244.4,
+  "permission_denials": [],
+  "is_error": false
+ }
+}
