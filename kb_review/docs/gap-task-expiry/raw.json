@@ -1,0 +1,117 @@
+{
+ "is_error": false,
+ "duration_api_ms": 247807,
+ "num_turns": 45,
+ "stop_reason": "end_turn",
+ "session_id": "7cffb3d1-4f83-46e5-b9da-8630ef0350f5",
+ "total_cost_usd": 3.2041535000000008,
+ "usage": {
+  "input_tokens": 56,
+  "cache_creation_input_tokens": 146369,
+  "cache_read_input_tokens": 2811617,
+  "output_tokens": 13375,
+  "output_tokens_details": {
+   "thinking_tokens": 4406
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 146369,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "not_available",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 1847,
+    "cache_read_input_tokens": 145392,
+    "cache_creation_input_tokens": 977,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 977
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard"
+ },
+ "modelUsage": {
+  "claude-opus-5[1m]": {
+   "inputTokens": 56,
+   "outputTokens": 13375,
+   "cacheReadInputTokens": 2811617,
+   "cacheCreationInputTokens": 146369,
+   "webSearchRequests": 0,
+   "costUSD": 3.2041535000000008,
+   "contextWindow": 1000000,
+   "maxOutputTokens": 64000,
+   "canonicalModel": "claude-opus-5",
+   "provider": "firstParty",
+   "costBasis": "list"
+  }
+ },
+ "permission_denials": [
+  {
+   "tool_name": "Bash",
+   "tool_use_id": "toolu_018Nhxs8EokReZq3AVvcKM4V",
+   "tool_input": {
+    "command": "ls -la \"C:/Users/tparr/Documents/TOMAS/WORKAPPS/SpotplanAssistant\"",
+    "description": "List project root"
+   }
+  },
+  {
+   "tool_name": "Bash",
+   "tool_use_id": "toolu_01JkPV1XNXbdKt26nzayJZ6S",
+   "tool_input": {
+    "command": "cd \"C:/Users/tparr/Documents/TOMAS/WORKAPPS/SpotplanAssistant/Repos/_pinned\" && for d in api app-android app-ios web; do echo \"=== $d ===\"; ls -la $d | head -40; done",
+    "description": "List contents of each pinned repo"
+   }
+  }
+ ],
+ "terminal_reason": "completed",
+ "fast_mode_state": "off",
+ "fast_mode_disabled_reason": "sdk_opt_in_required",
+ "subagent_stats": {
+  "spawned": 0,
+  "requested": {
+   "background": 0,
+   "foreground": 0,
+   "unset": 0
+  },
+  "started_in_background": 0,
+  "max_depth": 0,
+  "spawned_by_subagents": 0,
+  "completed": 0,
+  "failed": 0,
+  "killed": {
+   "parent": 0,
+   "user": 0,
+   "system": 0
+  },
+  "refused": {
+   "depth_limit": 0,
+   "concurrency_limit": 0,
+   "budget": 0
+  },
+  "by_type": {}
+ },
+ "subtype": "success",
+ "api_error_status": null,
+ "result": "## What happens to a task after its due date passes\n\nShort answer: **nothing changes automatically.** The due date in MCL is a target, not a deadline the system enforces.\n\n### Status\nThe task keeps the status it already had. MCL tasks only ever have these statuses:\n\n| Status | Meaning |\n|---|---|\n| Not started | Assigned, no work recorded yet |\n| In progress | Someone has added a note, photo, or partial update |\n| Completed | Closed by the assignee |\n| Draft | Created in the web portal but not yet sent out |\n\nThere is **no \"Overdue\" or \"Expired\" status.** A task that was *Not started* yesterday is still *Not started* today. Only a person can change a task's status.\n\n### Notifications\n- **On the due date itself**, assignees with the mobile app get a push notification: *\"You have tasks due TODAY.\"* Tapping it opens the task list filtered to today's due, not-yet-completed tasks.\n- **After the due date passes, no further notification is sent.** There is no overdue reminder, no repeat notice, and no escalation to a manager or task creator.\n- The only other task emails are sent at the start and end of a task's life: one when the task is assigned to you, and one to the task's creator when you complete it.\n\n### Visibility\nThe task **stays fully visible and fully actionable**, indefinitely:\n\n- It remains in your open task list. Task lists are never filtered by due date — only *completing* a task moves it out of the open list and into the completed/closed view.\n- Lists are sorted by due date, oldest first, so past-due tasks sit at the top. (Tasks with no due date sort last and show as *No date*.)\n- You can still add notes and photos, and still close the task, exactly as before. Nothing locks or expires.\n\n### How to find overdue tasks\nBecause there is no automatic flag, you spot overdue work yourself:\n\n- **Mobile app:** the task list is already sorted oldest-due-first; anything above today's date is overdue. You can also filter by a due-date range.\n- **Web portal:** the task grid sorts and filters by due date the same way.\n\n> **Note:** the web portal's *Delays / Expired* report covers **checklists**, not tasks. There is currently no equivalent overdue-tasks report.\n\n---\n\nTwo things worth flagging to the product owner before this ships:\n\n- The backend already calculates a past-due flag for every task and sends it to the mobile app, but no screen uses it — the row highlighting that would have shown it is commented out in the iOS app and was never built in Android. If you want overdue tasks to look different, the data is already there.\n- The \"due today\" push list is built by a database stored procedure (`sp_Get_TaskUserDueNotifications`) that isn't in the application code, so I could not verify from source whether it *only* picks up same-day tasks or also re-notifies for dates already passed. The notification wording says \"TODAY\", and the app's tap-through filters strictly on today — but someone with DB access should confirm the procedure matches before we publish \"no further notification is sent\" as fact.",
+ "ttft_ms": 7992,
+ "ttft_stream_ms": 4424,
+ "time_to_request_ms": 549,
+ "type": "result",
+ "duration_ms": 299811,
+ "uuid": "26f47886-e0dd-4a41-a8b9-afd0ce916b07",
+ "queued_turn_count": 0,
+ "wall_seconds": 303.7,
+ "structuring": {
+  "is_error": false,
+  "model": "gpt-4o-mini",
+  "usage": 1321
+ }
+}

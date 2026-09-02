@@ -45,16 +45,21 @@ def _images_context(units: List[Any]) -> str:
     return "\n".join(lines)
 
 
-def _build_user_prompt(query: str, units: List[Any], history_text: str) -> str:
-    prompt = ""
+def build_context_sections(units: List[Any]) -> str:
+    """Render retrieved units for the model: prose, procedures carrying step markers, and
+    standalone screenshots. The single place screenshot markers are offered to a model."""
+    sections = ""
     if text := _textual_context(units):
-        prompt += f"# TEXTUAL CONTEXT\n{text}\n"
+        sections += f"# TEXTUAL CONTEXT\n{text}\n"
     if procedures := _procedures_context(units):
-        prompt += f"\n# PROCEDURES (step-by-step, with screenshot markers)\n{procedures}\n"
+        sections += f"\n# PROCEDURES (step-by-step, with screenshot markers)\n{procedures}\n"
     if images := _images_context(units):
-        prompt += f"\n# STANDALONE SCREENSHOTS\n{images}\n"
-    if not prompt:
-        prompt = "# TEXTUAL CONTEXT\n(nothing retrieved)\n"
+        sections += f"\n# STANDALONE SCREENSHOTS\n{images}\n"
+    return sections
+
+
+def _build_user_prompt(query: str, units: List[Any], history_text: str) -> str:
+    prompt = build_context_sections(units) or "# TEXTUAL CONTEXT\n(nothing retrieved)\n"
     if history_text:
         prompt += f"\n{history_text}\n"
     prompt += (

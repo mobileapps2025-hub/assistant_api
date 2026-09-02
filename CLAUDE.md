@@ -19,7 +19,9 @@ python -m pytest tests/ --cov=app --cov-report=term-missing
 ```bash
 python ingest_kb.py extract --file "../docs/<guide>.pdf" ...   # cut screenshots, draft descriptions + procedures
 python review_server.py                                        # human review at http://127.0.0.1:8010 (saves to kb_review/*.json)
-python ingest_kb.py build                                      # strict gate -> app/kb_index/ (committed; deploys ship it)
+python ingest_kb.py redescribe                                 # re-run the vision pass with the current prompt (skips what you reviewed)
+python ingest_kb.py build                                      # veto gate -> app/kb_index/ (committed; deploys ship it)
+cd ../codebase_agent && python research.py --gaps gaps.selected.json   # research the questions queued from the review tool
 ```
 
 No ingestion runs on the server. Review state lives in `kb_review/{images.json,procedures.json}`
@@ -39,6 +41,9 @@ No ingestion runs on the server. Review state lives in `kb_review/{images.json,p
 | `MEMORIES_DIR` | No | `$HOME/data/memories` on Azure, else `app/memories` | Where per-user durable memory is stored. Defaults to Azure's persistent `$HOME` (survives redeploys) when `WEBSITE_HOSTNAME` is set; override to relocate. |
 | `MEMORY_SELECT_THRESHOLD` | No | `8` | Above this many stored memories, recall runs a `gpt-4o-mini` relevance selector for the current question; at/below it, all memories are sent (no extra call). |
 | `ENABLE_MCL_IMAGE_VALIDATION` | No | `false` | Pre-check uploaded images are MCL screens |
+| `GAP_INGEST_TOKEN` | No | `""` | Shared secret for `/api/gaps*` (the questions MarieClaire could not answer). Unset = those endpoints are closed. |
+| `GAP_SINK_URL` | No | `""` | Set on a **local** MarieClaire to the central backend, so unanswered questions are forwarded over HTTP and no database credential lives locally. Unset = write straight to the database (the central backend). |
+| `GAP_API_URL` | No | `http://127.0.0.1:8001` | Read by `review_server.py` to show the waiting questions. |
 | `FLOW_TRACE` | No | `true` | Prints a human-readable, arrow-connected flow trace to stderr for manual testing (`app/core/flow.py`). Set `false` in production. |
 
 ## Architecture

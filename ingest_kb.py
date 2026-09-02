@@ -44,6 +44,7 @@ SELF_DIR = Path(__file__).resolve().parent
 INDEX_DIR = SELF_DIR / "app" / "kb_index"
 IMAGES_DIR = SELF_DIR / "static" / "images" / "kb"
 REVIEW_DIR = SELF_DIR / "kb_review"
+DOCS_DIR = REVIEW_DIR / "docs"          # researched answers from codebase_agent/research.py
 EXTRACTED_FILE = REVIEW_DIR / "extracted.json"
 IMAGES_FILE = REVIEW_DIR / "images.json"
 PROCEDURES_FILE = REVIEW_DIR / "procedures.json"
@@ -60,16 +61,25 @@ CONTEXT_CHARS = 220
 IMAGE_PROMPT = (
     "This screenshot comes from a user guide for MCL (Mobile Checklist), a retail checklist app "
     "(mobile app + web dashboard).\n"
-    "ANNOTATION CONVENTION: a red rectangle/box/outline drawn on the screenshot is NOT part of the "
-    "app UI — the guide author drew it to point at the element the reader must look at or tap. "
-    "Treat whatever is inside the red box as the subject of the screenshot: name that element "
-    "precisely (button label, menu item, field, icon) and describe the action it illustrates. "
-    "Mention the rest of the screen only as context.\n"
-    "Return JSON with two fields:\n"
-    '"semantic_description": 2-3 sentences for search and reasoning — which screen this is, the '
-    "highlighted element and what tapping/using it does, plus the other visible controls.\n"
-    '"alt_text": one short sentence a user would read under the image, centered on the highlighted '
-    "element (e.g. \"The Filter icon at the top of the Tasks list\").\n"
+    "FIRST, decide whether the guide author drew an annotation on the screenshot: a red "
+    "rectangle, box, outline, circle or arrow that is NOT part of the app UI. Many screenshots "
+    "have none. Do not assume one is there, and do not treat a red element that belongs to the "
+    "interface (an error message, a badge, a red button) as an annotation.\n"
+    "IF THERE IS AN ANNOTATION: whatever it points at is the subject. Name that element precisely "
+    "(button label, menu item, field, icon) and describe the action it illustrates. Mention the "
+    "rest of the screen only as context.\n"
+    "IF THERE IS NO ANNOTATION: the whole screen is the subject. Describe which screen it is and "
+    "what it shows - sections, lists, controls, the state it is in. Never say or imply that "
+    "anything is highlighted, marked, pointed at, selected or emphasised, and do not single out "
+    "one element as if it were marked.\n"
+    "Return JSON with three fields:\n"
+    '"annotated": true or false - whether the author drew an annotation.\n'
+    '"semantic_description": 2-3 sentences for search and reasoning. When annotated, cover the '
+    "marked element, what using it does, and the surrounding controls. When not annotated, cover "
+    "the screen as a whole and everything notable on it.\n"
+    '"alt_text": one short sentence a user would read under the image. When annotated, centre it '
+    'on the marked element (e.g. "The Filter icon at the top of the Tasks list"). When not '
+    'annotated, name the screen (e.g. "The Tasks list in the MCL app").\n'
     "Be concrete; name UI elements. Do not invent what isn't visible."
 )
 PROCEDURE_PROMPT = (
@@ -155,6 +165,7 @@ def _draft_image(png: bytes) -> dict:
     return {
         "semantic_description": drafted.get("semantic_description", "").strip(),
         "alt_text": drafted.get("alt_text", "").strip(),
+        "annotated": bool(drafted.get("annotated")),
     }
 
 
@@ -261,7 +272,9 @@ def cmd_extract(args) -> None:
 # ----------------------------------------------------------------------------- build
 
 def _showable(images: dict) -> dict:
-    return {i: rec for i, rec in images.items() if rec["approved"] and rec["keep"] and rec["safe_to_show"]}
+    # Veto model (not permission): a screenshot ships unless the reviewer unticked Keep or
+    # Safe-to-show. `approved` is now only a "I have looked at this" marker, not a gate.
+    return {i: rec for i, rec in images.items() if rec.get("keep", True) and rec.get("safe_to_show", True)}
 
 
 def _image_ref(rec: dict) -> dict:
@@ -290,7 +303,7 @@ def _text_units(extracted: list[dict], showable: dict) -> list[dict]:
 def _procedure_units(procedures: dict, showable: dict) -> list[dict]:
     units = []
     for proc in procedures.values():
-        if not proc["approved"]:
+        if proc.get("excluded"):          # veto model: ships unless the reviewer excluded it
             continue
         steps = [{"text": s["text"], "images": [_image_ref(showable[i]) for i in s["image_ids"] if i in showable]}
                  for s in proc["steps"]]
@@ -299,6 +312,32 @@ def _procedure_units(procedures: dict, showable: dict) -> list[dict]:
                       "text": text, "title": proc["title"], "steps": steps,
                       "images": [img for s in steps for img in s["images"]]})
     return units
+
+
+def _doc_units() -> tuple[list[dict], int]:
+    """Researched answers from the codebase worker. Only draft.md ever enters the index —
+    evidence.json/report.md (file names, code, uncertainties) stay reviewer-only. Veto model:
+    ships unless the reviewer marked it rejected or needs_product_owner."""
+    units, held = [], 0
+    if not DOCS_DIR.exists():
+        return units, held
+    for folder in sorted(DOCS_DIR.iterdir()):
+        evidence_file, draft_file = folder / "evidence.json", folder / "draft.md"
+        if not evidence_file.exists() or not draft_file.exists():
+            continue
+        evidence = _load_json(evidence_file, {})
+        draft = draft_file.read_text(encoding="utf-8").strip()
+        if evidence.get("review", {}).get("decision") in ("rejected", "needs_product_owner") or not draft:
+            held += 1
+            continue
+        units.append({
+            "kind": "text", "id": f"doc_{evidence['gap_id']}",
+            "document_name": evidence.get("title") or f"MCL notes: {evidence['gap_id']}",
+            "text": draft, "images": [], "steps": [],
+            "provenance": {"gap_id": evidence["gap_id"], "question": evidence.get("question", ""),
+                           "sources": evidence.get("sources", []), "status": evidence.get("status", "")},
+        })
+    return units, held
 
 
 def _image_units(showable: dict) -> list[dict]:
@@ -316,18 +355,49 @@ def _embed(texts: list[str]) -> np.ndarray:
     return matrix / np.linalg.norm(matrix, axis=1, keepdims=True)
 
 
+def cmd_redescribe(args) -> None:
+    """Re-run the vision pass over pictures already extracted, using the current IMAGE_PROMPT.
+    Pictures you have reviewed are left alone unless --all is given."""
+    images = _load_json(IMAGES_FILE, {})
+    if not images:
+        raise SystemExit("No images to redescribe — run extract first.")
+
+    targets = [i for i, rec in images.items() if args.all or not rec.get("approved")]
+    print(f"Redescribing {len(targets)} of {len(images)} picture(s)")
+    annotated = redone = 0
+    for n, image_id in enumerate(targets, start=1):
+        png_path = IMAGES_DIR / Path(images[image_id]["path"]).name
+        if not png_path.exists():
+            print(f"  [{n}/{len(targets)}] {image_id}: file missing, skipped")
+            continue
+        drafted = _draft_image(png_path.read_bytes())
+        if not drafted["semantic_description"]:
+            print(f"  [{n}/{len(targets)}] {image_id}: model returned nothing, kept old text")
+            continue
+        images[image_id] = {**images[image_id], **drafted}
+        annotated += drafted["annotated"]
+        redone += 1
+        _save_json(IMAGES_FILE, images)          # progress survives a rate-limit stop
+        print(f"  [{n}/{len(targets)}] {image_id} {'[marked]' if drafted['annotated'] else '[plain screen]'}: {drafted['alt_text'][:70]}")
+
+    print()
+    print(f"Redescribed {redone} picture(s): {annotated} with an annotation, {redone - annotated} plain screens")
+    print("Next: python ingest_kb.py build")
+
+
 def cmd_build(args) -> None:
     if not EXTRACTED_FILE.exists():
         sys.exit("Nothing extracted yet — run: python ingest_kb.py extract --file ...")
     images, procedures = _load_json(IMAGES_FILE, {}), _load_json(PROCEDURES_FILE, {})
     showable = _showable(images)
+    doc_units, docs_held = _doc_units()
     units = _text_units(_load_json(EXTRACTED_FILE, []), showable) + \
-        _procedure_units(procedures, showable) + _image_units(showable)
+        _procedure_units(procedures, showable) + _image_units(showable) + doc_units
 
-    excluded_img = len(images) - len(showable)
-    excluded_proc = sum(1 for p in procedures.values() if not p["approved"])
-    if excluded_img or excluded_proc:
-        print(f"Strict gate: {excluded_img} image(s) and {excluded_proc} procedure(s) not approved -> excluded")
+    vetoed_img = len(images) - len(showable)
+    vetoed_proc = sum(1 for p in procedures.values() if p.get("excluded"))
+    if vetoed_img or vetoed_proc or docs_held:
+        print(f"Veto gate: excluded {vetoed_img} image(s), {vetoed_proc} procedure(s), {docs_held} researched doc(s)")
 
     print(f"Embedding {len(units)} units with {EMBED_MODEL}...")
     embeddings = _embed([u["text"] for u in units])
@@ -346,6 +416,9 @@ def main() -> None:
     extract = sub.add_parser("extract")
     extract.add_argument("--file", nargs="+", required=True, help="PDF(s) to extract")
     extract.set_defaults(func=cmd_extract)
+    redescribe = sub.add_parser("redescribe")
+    redescribe.add_argument("--all", action="store_true", help="also redo pictures you already reviewed")
+    redescribe.set_defaults(func=cmd_redescribe)
     sub.add_parser("build").set_defaults(func=cmd_build)
     args = parser.parse_args()
     args.func(args)

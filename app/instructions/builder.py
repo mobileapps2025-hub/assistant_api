@@ -25,6 +25,9 @@ Mode = Literal["chat", "tools", "rag", "vision", "agent"]
 _INSTRUCTIONS_DIR = Path(__file__).parent
 _VALID_MODES = ("chat", "tools", "rag", "vision", "agent")
 
+# Modes that can receive retrieved KB context, and so may emit screenshot markers.
+_SCREENSHOT_MODES = ("rag", "agent")
+
 # The user's "today", resolved per request from their browser timezone and set once by the
 # caller (see set_request_date). Read by every prompt so relative dates ("tomorrow") ground
 # correctly. Falls back to the server date when the caller sets nothing.
@@ -132,7 +135,10 @@ def get_system_prompt(
             f"Unknown instruction mode '{mode}'. Valid modes: {', '.join(_VALID_MODES)}."
         )
 
-    sections = [_load("core"), _load(mode), _current_date_directive(current_date)]
+    sections = [_load("core"), _load(mode)]
+    if mode in _SCREENSHOT_MODES:
+        sections.append(_load("screenshots"))
+    sections.append(_current_date_directive(current_date))
     if tools_catalog:
         sections.append(_tools_block(tools_catalog))
     if language:

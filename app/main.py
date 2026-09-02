@@ -17,7 +17,7 @@ from sqlalchemy import exc
 
 from app.models import ChatRequest, Message, ContentItem, ChatResponse, generate_response_id, FeedbackRequest, FeedbackResponse, SessionRequest, SessionResponse, MarketInfo, UserMarketsResponse, AuthContext, MemorySaveRequest, MemoryInfo, MemoryListResponse, MemorySaveResponse, MemoryUpdateRequest, MemoryRecallResponse, MemoryStoreRequest, ConfirmRequest, LoginRequest
 from app.core.config import ENABLE_MCL_IMAGE_VALIDATION, get_db, engine, CORS_ORIGINS, AsyncSessionLocal, RAGIE_API_KEY, RAGIE_PARTITION
-from app.core.database import Feedback, Base
+from app.core.database import Feedback, DocumentationGap, Base
 from app.core.dependencies import get_chat_service, get_speech_service
 from app.services.chat_service import ChatService
 from app.services.speech_service import SpeechService
@@ -25,6 +25,7 @@ from app.routers import vision
 from app.core.logging import setup_logging, get_logger, request_id_var
 from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
+from app.services.gap_service import GAP_INGEST_TOKEN, record_gap
 
 # Setup logging
 setup_logging()
@@ -113,6 +114,72 @@ async def root():
             "health": "/health",
         }
     }
+
+
+# --- Unanswerable questions: the central list a local MarieClaire reports into ---
+
+GAP_STATUSES = ("pending", "researching", "researched", "discarded")
+
+
+def _require_gap_token(request: Request) -> None:
+    """These endpoints carry the questions of every user, and let a caller change their state,
+    so they are token-gated. Unset token = closed, never open."""
+    if not GAP_INGEST_TOKEN:
+        raise HTTPException(503, "Gap collection is not configured on this server.")
+    supplied = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+    if supplied != GAP_INGEST_TOKEN:
+        raise HTTPException(401, "Invalid or missing token.")
+
+
+@app.post("/api/gaps")
+async def report_gap(request: Request, body: dict):
+    """Record a question MarieClaire could not answer. Repeats bump the count."""
+    _require_gap_token(request)
+    question = str(body.get("question") or "").strip()
+    if not question:
+        raise HTTPException(422, "question is required")
+    recorded = await record_gap(question, body.get("language"))
+    if not recorded:
+        raise HTTPException(503, "Could not record the question.")
+    return {"recorded": True}
+
+
+@app.get("/api/gaps")
+async def list_gaps(request: Request, status: str = "pending", db: AsyncSession = Depends(get_db)):
+    """The collected questions, most-asked first — the local research tray reads this."""
+    _require_gap_token(request)
+    if status not in GAP_STATUSES + ("all",):
+        raise HTTPException(422, f"status must be one of {GAP_STATUSES + ('all',)}")
+    query = select(DocumentationGap).order_by(
+        DocumentationGap.times_asked.desc(), DocumentationGap.last_asked_at.desc()
+    )
+    if status != "all":
+        query = query.where(DocumentationGap.status == status)
+    rows = (await db.execute(query)).scalars().all()
+    return {"gaps": [
+        {
+            "id": row.id, "question": row.question, "language": row.language,
+            "times_asked": row.times_asked, "status": row.status,
+            "first_asked_at": row.first_asked_at.isoformat() if row.first_asked_at else None,
+            "last_asked_at": row.last_asked_at.isoformat() if row.last_asked_at else None,
+        }
+        for row in rows
+    ]}
+
+
+@app.patch("/api/gaps/{gap_id}")
+async def update_gap(gap_id: int, request: Request, body: dict, db: AsyncSession = Depends(get_db)):
+    """Move a question along: discard noise, mark it as being researched or done."""
+    _require_gap_token(request)
+    new_status = body.get("status")
+    if new_status not in GAP_STATUSES:
+        raise HTTPException(422, f"status must be one of {GAP_STATUSES}")
+    row = (await db.execute(select(DocumentationGap).where(DocumentationGap.id == gap_id))).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "No such question.")
+    row.status = new_status
+    await db.commit()
+    return {"id": gap_id, "status": new_status}
 
 @app.get("/health")
 async def health_check():

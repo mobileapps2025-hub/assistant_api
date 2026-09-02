@@ -34,6 +34,11 @@ def _resolve_public_url() -> str:
 
 API_PUBLIC_URL = _resolve_public_url()
 
+# Unanswerable questions. A local MarieClaire sets GAP_SINK_URL to the central backend so the
+# database credential stays in Azure; the central backend leaves it empty and writes directly.
+GAP_SINK_URL = os.getenv("GAP_SINK_URL", "").strip()
+GAP_INGEST_TOKEN = os.getenv("GAP_INGEST_TOKEN", "").strip()
+
 
 def _resolve_memories_dir() -> str:
     explicit = os.getenv("MEMORIES_DIR")
