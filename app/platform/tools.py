@@ -45,6 +45,9 @@ _READS: List[Dict[str, Any]] = [
      "description": "The checklist questions configured for the user's company (live).", "params": {}},
     {"tool": "list_assignable_users", "operation": "users.list",
      "description": "The people the user may assign tasks to (live), with their markets.", "params": {}},
+    {"tool": "list_company_users", "operation": "company.users",
+     "description": ("The company's user accounts for administration (live): name, username, role, markets, "
+                     "locked or not — plus the list of roles. Use before proposing a change to a user."), "params": {}},
 ]
 
 # ---- writes: tool name -> proposal operation ----------------------------------------------
@@ -76,6 +79,52 @@ _WRITES: List[Dict[str, Any]] = [
      "description": ("Propose deleting one of the user's tasks. Irreversible once confirmed, so name the task "
                      "clearly in the summary (number and description)."),
      "params": {"taskId": {"type": "string", "description": "The task's id (not its number)."}}},
+    # --- markets (company administrators) ---
+    {"tool": "propose_market_creation", "operation": "markets.create",
+     "description": "Propose creating a market/store. Company administrators only; the app confirms.",
+     "params": {"name": {"type": "string"}, "city": {"type": ["string", "null"]}, "address": {"type": ["string", "null"]},
+                "postalCode": {"type": ["string", "null"]},
+                "departments": {"type": ["string", "null"], "description": "Department names or ids, separated by ';'. Null for none."}}},
+    {"tool": "propose_market_update", "operation": "markets.update",
+     "description": "Propose changing a market's name, city, address or departments. Look it up with list_markets first.",
+     "params": {"marketId": {"type": "string"}, "name": {"type": ["string", "null"]}, "city": {"type": ["string", "null"]},
+                "address": {"type": ["string", "null"]}, "postalCode": {"type": ["string", "null"]},
+                "departments": {"type": ["string", "null"], "description": "New full list of department names or ids, ';'-separated; null to keep."}}},
+    {"tool": "propose_market_deletion", "operation": "markets.delete",
+     "description": "Propose deleting a market. MCL refuses if it is still in use. Name it clearly in the summary.",
+     "params": {"marketId": {"type": "string"}}},
+    # --- departments (company administrators) ---
+    {"tool": "propose_department_creation", "operation": "departments.create",
+     "description": "Propose creating a department. Company administrators only.",
+     "params": {"name": {"type": "string"}, "description": {"type": ["string", "null"]}}},
+    {"tool": "propose_department_update", "operation": "departments.update",
+     "description": "Propose renaming a department or changing its description. Look it up with list_departments first.",
+     "params": {"departmentId": {"type": "string"}, "name": {"type": ["string", "null"]}, "description": {"type": ["string", "null"]}}},
+    {"tool": "propose_department_deletion", "operation": "departments.delete",
+     "description": "Propose deleting a department. MCL refuses if it is still in use. Name it clearly in the summary.",
+     "params": {"departmentId": {"type": "string"}}},
+    # --- users (company administrators; creating users is NOT possible here — it needs a password) ---
+    {"tool": "propose_user_update", "operation": "users.update",
+     "description": ("Propose changing a user account: name, role, markets, language, or locking/unlocking it. "
+                     "Look the user up with list_company_users first. Only pass the fields that change."),
+     "params": {"userId": {"type": "string"}, "fullName": {"type": ["string", "null"]},
+                "role": {"type": ["string", "null"], "description": "Role name or id from list_company_users."},
+                "markets": {"type": ["string", "null"], "description": "New full list of market names or ids, ';'-separated; null to keep."},
+                "language": {"type": ["string", "null"], "description": "de, en or es."},
+                "locked": {"type": ["string", "null"], "description": "'true' to lock the account, 'false' to unlock, null to keep."}}},
+    {"tool": "propose_user_removal", "operation": "users.remove",
+     "description": "Propose removing a user from the company. Irreversible; name the person clearly in the summary.",
+     "params": {"userId": {"type": "string"}}},
+    # --- checklists (checklist editors); composing questions stays in the checklist editor ---
+    {"tool": "propose_checklist_rename", "operation": "checklists.rename",
+     "description": "Propose renaming a checklist. Look it up with list_checklists first.",
+     "params": {"checklistId": {"type": "string"}, "name": {"type": "string"}}},
+    {"tool": "propose_checklist_activation", "operation": "checklists.set_active",
+     "description": "Propose activating or deactivating a checklist. Deactivating stops it from being run in stores.",
+     "params": {"checklistId": {"type": "string"}, "active": {"type": "string", "description": "'true' or 'false'."}}},
+    {"tool": "propose_checklist_archiving", "operation": "checklists.set_archived",
+     "description": "Propose archiving (hiding) or restoring a checklist.",
+     "params": {"checklistId": {"type": "string"}, "archived": {"type": "string", "description": "'true' or 'false'."}}},
 ]
 
 _SUMMARY_PARAM = {
@@ -113,9 +162,12 @@ PLATFORM_SURFACE_NOTE = (
     "permissions. You never create, change or delete anything yourself: for any change to a task, "
     "call the matching propose_* tool and the app shows the user a card to confirm. A proposal needs "
     "the task's id — get it from list_my_tasks or get_task, never from the user's memory of a number. "
-    "Not available from here: creating or editing checklists, markets, departments or users, the sync "
-    "snapshot, 'services to download' and notification e-mails — say so plainly and explain how to do "
-    "it in MCL instead. Never ask the user to connect or sign in."
+    "Company administrators can also propose changes to markets, departments and user accounts, and "
+    "checklist editors can rename, activate/deactivate or archive checklists — always through a "
+    "propose_* tool, never directly. Not possible from here: creating a new user (it needs a password, "
+    "which never goes through the chat), composing a checklist's questions (use the checklist editor), "
+    "the sync snapshot, 'services to download' and notification e-mails — say so plainly and explain "
+    "how to do it in MCL instead. Never ask the user to connect or sign in."
 )
 
 
@@ -193,11 +245,16 @@ def build_proposal(tool_name: str, args: Dict[str, Any], markets: Optional[List[
         if not clean.get("description"):
             return None
         clean["marketId"] = resolve_market(clean.get("marketId"), markets or [])
-    elif not clean.get("taskId"):
+    elif operation.endswith(".create"):
+        if not clean.get("name"):
+            return None
+    elif not any(clean.get(key) for key in ("taskId", "marketId", "departmentId", "userId", "checklistId")):
         return None
     elif operation == "tasks.comment" and not clean.get("note"):
         return None
     elif operation == "tasks.update" and not (clean.get("description") or clean.get("dueDate")):
+        return None
+    elif operation == "users.update" and not any(clean.get(k) for k in ("fullName", "role", "markets", "language", "locked")):
         return None
     return {"operation": operation, "args": clean, "summary": summary}
 
@@ -224,7 +281,8 @@ def _missing_field_instruction(operation: str) -> str:
         "tasks.update": "A task id, at least one change (description or dueDate) and a summary are required. Look the task up first.",
         "tasks.comment": "A task id, the note text and a summary are required. Look the task up first.",
         "tasks.delete": "A task id and a summary naming the task are required. Look the task up first.",
-    }.get(operation, "The proposal is incomplete; gather the missing details first.")
+    }.get(operation, "The proposal is incomplete: it needs the record's id (from the matching list_* tool), the change, "
+                     "and a one-sentence summary. Look the record up first.")
 
 
 def _json_or_empty(response: httpx.Response) -> Dict[str, Any]:

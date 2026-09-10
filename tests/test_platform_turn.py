@@ -300,8 +300,8 @@ def test_every_read_tool_maps_to_an_operation_and_every_write_to_a_proposal():
     assert set(names) == set(OPERATION_FOR_TOOL) | set(PROPOSAL_FOR_TOOL)
     assert {"my_profile", "list_markets", "list_departments", "list_checklists", "list_questions",
             "list_assignable_users"} <= set(OPERATION_FOR_TOOL)
-    assert PROPOSAL_FOR_TOOL == {"propose_task_creation": "tasks.create", "propose_task_update": "tasks.update",
-                                 "propose_task_note": "tasks.comment", "propose_task_deletion": "tasks.delete"}
+    assert {"propose_task_creation": "tasks.create", "propose_task_update": "tasks.update",
+            "propose_task_note": "tasks.comment", "propose_task_deletion": "tasks.delete"}.items() <= PROPOSAL_FOR_TOOL.items()
     for tool in PLATFORM_TOOLS:
         fn = tool["function"]
         assert fn["strict"] is True and set(fn["parameters"]["required"]) == set(fn["parameters"]["properties"])
@@ -364,3 +364,19 @@ def test_closure_failure_yields_no_message_not_an_error(secret_configured):
         mock_client.chat.completions.create.side_effect = RuntimeError("boom")
         response = TestClient(app).post("/api/platform/closure", json=CLOSURE, headers=HEADERS)
     assert response.status_code == 200 and response.json()["message"] is None
+
+
+def test_all_company_proposals_exist_and_need_an_id_or_a_name():
+    from app.platform.tools import PROPOSAL_FOR_TOOL, build_proposal
+    assert {"markets.create", "markets.update", "markets.delete", "departments.create", "departments.update",
+            "departments.delete", "users.update", "users.remove", "checklists.rename", "checklists.set_active",
+            "checklists.set_archived"} <= set(PROPOSAL_FOR_TOOL.values())
+    assert "users.create" not in PROPOSAL_FOR_TOOL.values()          # passwords never pass through the chat
+
+    assert build_proposal("propose_market_creation", {"name": "Neu", "city": None, "address": None, "postalCode": None,
+                                                      "departments": "Frische; Kasse", "summary": "Create market Neu."})["args"]["departments"] == "Frische; Kasse"
+    assert build_proposal("propose_market_creation", {"name": "", "summary": "x"}) is None
+    assert build_proposal("propose_user_update", {"userId": "u1", "locked": "true", "summary": "Lock Ana."})["args"]["locked"] == "true"
+    assert build_proposal("propose_user_update", {"userId": "u1", "summary": "nothing changes"}) is None
+    assert build_proposal("propose_checklist_archiving", {"checklistId": "c1", "archived": "true", "summary": "Archive it."})["operation"] == "checklists.set_archived"
+    assert build_proposal("propose_department_deletion", {"departmentId": "", "summary": "Delete."}) is None
