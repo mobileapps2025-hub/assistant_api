@@ -1,0 +1,23 @@
+{
+  "screen": "Standard reports",
+  "menu_label": "Reports",
+  "route": "/modules/reports/standard",
+  "document_name": "MCL Web Guide - Standard reports",
+  "aliases": [
+    "standard reports",
+    "export",
+    "excel export",
+    "period package",
+    "download report"
+  ],
+  "overview": "Standard reports is under 'Reports' in the left menu. Its heading is 'Standard reports'. It exports operational data to Excel or downloads the complete period package. You choose the Period (for example Monthly), the Year and the Month, and the selected date range is shown. The Reports menu also has Ad hoc / Checklist reports as a sibling.",
+  "screenshots": [
+    {
+      "id": "web-reports-standard",
+      "file": "web-reports-standard.jpg",
+      "alt": "The Standard reports page in the MCL web platform",
+      "description": "The MCL web 'Standard reports' page: Period, Year and Month selectors with the selected range shown, and an area to prepare and download the Excel export / period package."
+    }
+  ],
+  "procedures": []
+}

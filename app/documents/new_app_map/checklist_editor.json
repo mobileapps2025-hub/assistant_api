@@ -1,0 +1,61 @@
+{
+  "screen": "Checklist editor",
+  "menu_label": "Checklists",
+  "route": "/modules/checklists/new",
+  "document_name": "MCL Web Guide - Checklist editor",
+  "aliases": [
+    "create a checklist",
+    "new checklist",
+    "checklist editor",
+    "build a checklist",
+    "checklist wizard",
+    "configure a checklist",
+    "add questions to a checklist",
+    "checklist schedule",
+    "checklist periodicity",
+    "checklist notifications",
+    "checklist roles and departments"
+  ],
+  "overview": "The checklist editor is where you build and configure a checklist, opened by 'New checklist' on the Checklists page (or by opening an existing checklist). Its heading is 'New checklist' and it edits every setting on one scrolling page, saved together in one operation. A left rail lists six sections you can jump to: 1 General information, 2 Schedule and availability, 3 Access and scope, 4 Questions and order, 5 Notifications, and 6 Preview. Some sections unlock as you fill earlier ones: you must choose departments before you can add questions, and choose roles before you can pick who is notified. At the top are 'Ask AI Assistant', Cancel, 'Save draft' and 'Save and activate'. This screen replaces the old 'Checklist Wizard'.",
+  "screenshots": [
+    {
+      "id": "web-checklist-editor",
+      "file": "web-checklist-editor.jpg",
+      "alt": "The New checklist editor, General information step",
+      "description": "The MCL web checklist editor 'New checklist', step 1 General information: Checklist name, General email address, and the toggles Signature required (the user must sign the execution) and Allow department selection (the executing user can choose the applicable department); left rail with all six steps; buttons Ask AI Assistant, Cancel, Save draft and Save and activate."
+    },
+    {
+      "id": "web-checklist-editor-schedule",
+      "file": "web-checklist-editor-schedule.jpg",
+      "alt": "The checklist editor, Schedule and availability step",
+      "description": "Step 2 Schedule and availability of the MCL web checklist editor: Periodicity (for example Weekly), Execution day, Available from and Available to dates, Time from and Time to, and a Count current period option."
+    },
+    {
+      "id": "web-checklist-editor-access",
+      "file": "web-checklist-editor-access.jpg",
+      "alt": "The checklist editor, Access and scope step",
+      "description": "Step 3 Access and scope of the MCL web checklist editor: Select roles, Select departments and Select tags for the checklist."
+    },
+    {
+      "id": "web-checklist-editor-questions",
+      "file": "web-checklist-editor-questions.jpg",
+      "alt": "The checklist editor, Questions and order and Notifications steps",
+      "description": "Steps 4 and 5 of the MCL web checklist editor: Questions and order ('Add questions by department and arrange them directly', with a question count and a note to select at least one department first), and Notifications (optional, enable the roles that should be notified about executions)."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "web_create_checklist",
+      "title": "Create a checklist",
+      "steps": [
+        {"text": "On the Checklists page click 'New checklist' to open the editor.", "image": "web-checklist-editor"},
+        {"text": "Step 1 General information: enter the Checklist name and a General email address, and turn on Signature required or Allow department selection if you need them.", "image": "web-checklist-editor"},
+        {"text": "Step 2 Schedule and availability: set the Periodicity (for example Weekly), the Execution day, the Available from and to dates, the Time from and to, and Count current period if it should count now.", "image": "web-checklist-editor-schedule"},
+        {"text": "Step 3 Access and scope: select the Roles that run it, the Departments it applies to, and any Tags.", "image": "web-checklist-editor-access"},
+        {"text": "Step 4 Questions and order: after at least one department is chosen, add questions by department and drag them into the order you want.", "image": "web-checklist-editor-questions"},
+        {"text": "Step 5 Notifications (optional): after roles are chosen, enable the roles that should be notified about executions.", "image": "web-checklist-editor-questions"},
+        {"text": "Step 6 Preview: review the whole checklist, then 'Save draft' to keep it as a draft or 'Save and activate' to make it live. All sections are saved together in one operation. 'Ask AI Assistant' can prepare a draft for you to review first.", "image": null}
+      ]
+    }
+  ]
+}

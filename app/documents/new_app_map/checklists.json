@@ -1,0 +1,38 @@
+{
+  "screen": "Checklists",
+  "menu_label": "Checklists",
+  "route": "/modules/checklists",
+  "document_name": "MCL Web Guide - Checklists",
+  "aliases": [
+    "checklists",
+    "checklist administration",
+    "checklist list",
+    "manage checklists",
+    "where are checklists"
+  ],
+  "overview": "Checklists is in the left menu. Its heading is 'Checklist administration'. It lists the company's checklists with counters for Checklists, Active checklists, Drafts and Archived. The table shows Checklist name, Periodicity, Departments, number of Questions and Status, with a Search box and a 'New checklist' button. From here you open a checklist to edit it, or create a new one; building the questions happens in the checklist editor.",
+  "screenshots": [
+    {
+      "id": "web-checklists",
+      "file": "web-checklists.jpg",
+      "alt": "The Checklist administration page in the MCL web platform",
+      "description": "The MCL web Checklist administration page: counters for Checklists, Active checklists, Drafts and Archived; a table with Checklist, Periodicity, Departments, Questions and Status; a New checklist button; empty state reads 'No checklists found'."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "web_open_checklist_admin",
+      "title": "Create or open a checklist",
+      "steps": [
+        {
+          "text": "On the Checklists page, click 'New checklist' to start a new one, which opens the checklist editor.",
+          "image": "web-checklists"
+        },
+        {
+          "text": "To change an existing one, click its row to open it in the editor.",
+          "image": null
+        }
+      ]
+    }
+  ]
+}

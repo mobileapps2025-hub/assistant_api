@@ -1,0 +1,39 @@
+{
+  "screen": "Users",
+  "menu_label": "Users & roles",
+  "route": "/modules/users",
+  "document_name": "MCL Web Guide - Users",
+  "aliases": [
+    "users",
+    "user management",
+    "accounts",
+    "user accounts",
+    "users and roles",
+    "manage users"
+  ],
+  "overview": "Users & roles is in the left menu (company administrators); the Users page is headed 'User management'. It manages accounts, roles and market/department access. Counters show Total users, Active users, Company administrators and Assignments. The table lists Full name, Email, Role, Language, Markets, Departments and Status, with Edit per row and a Search box. Roles live on the sibling Roles page. Note: you can edit, lock or remove users here, but creating a brand-new user needs a password and is done in MCL, not through the assistant.",
+  "screenshots": [
+    {
+      "id": "web-users",
+      "file": "web-users.jpg",
+      "alt": "The User management page in the MCL web platform",
+      "description": "The MCL web User management page: counters for Total users, Active users, Company administrators and Assignments; a table of users with Full name, Email, Role, Language, Markets, Departments and Status, plus Edit; a Users/Roles submenu."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "web_edit_user",
+      "title": "Change a user's role, markets or status",
+      "steps": [
+        {
+          "text": "On the Users page, find the person and click Edit on their row.",
+          "image": "web-users"
+        },
+        {
+          "text": "Change their role, markets, departments, language, or lock/unlock the account, then save.",
+          "image": null
+        }
+      ]
+    }
+  ]
+}

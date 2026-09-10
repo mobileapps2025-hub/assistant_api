@@ -1,0 +1,23 @@
+{
+  "screen": "Checklist reports",
+  "menu_label": "Reports",
+  "route": "/modules/reports/checklists",
+  "document_name": "MCL Web Guide - Checklist reports",
+  "aliases": [
+    "checklist reports",
+    "ad hoc reports",
+    "executions",
+    "pdf report",
+    "review answers"
+  ],
+  "overview": "Checklist reports is under 'Reports' in the left menu. Its heading is 'Checklist reports'. You find checklist executions, review their answers and tasks, and generate the complete PDF report. Filters include Period, Day, Market, Checklist, Report options (for example Full report) and Executed by. The results table lists each execution with its date and time, market, checklist, executor, score, answers and tasks.",
+  "screenshots": [
+    {
+      "id": "web-reports-checklists",
+      "file": "web-reports-checklists.jpg",
+      "alt": "The Checklist reports page in the MCL web platform",
+      "description": "The MCL web 'Checklist reports' page: filters for Period, Day, Market, Checklist, Report options and Executed by, a count of reports and the selected period, and a results table with columns for date/time, Market, Checklist, Executed by, Score, Answers and Tasks."
+    }
+  ],
+  "procedures": []
+}

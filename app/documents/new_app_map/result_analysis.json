@@ -1,0 +1,23 @@
+{
+  "screen": "Result analysis",
+  "menu_label": "Data analysis",
+  "route": "/modules/analysis/results",
+  "document_name": "MCL Web Guide - Result analysis",
+  "aliases": [
+    "result analysis",
+    "results",
+    "analyze answers",
+    "positive negative answers",
+    "data analysis"
+  ],
+  "overview": "Result analysis is under 'Data analysis' in the left menu. Its heading is 'Result analysis'. It analyses positive, negative and not-applicable answers down to each checklist execution. You pick the Calendar year and an exact Period (day, week, month or quarter), an Answer selection (for example Include not applicable), and narrow with analysis filters: Question type, Condition, Markets and Question.",
+  "screenshots": [
+    {
+      "id": "web-analysis-results",
+      "file": "web-analysis-results.jpg",
+      "alt": "The Result analysis page in the MCL web platform",
+      "description": "The MCL web 'Result analysis' page: Period controls (Calendar year, Period, Day, Answer selection) and analysis filters for Question type, Condition, Markets and Question, above the results."
+    }
+  ],
+  "procedures": []
+}

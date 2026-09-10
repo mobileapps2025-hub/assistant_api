@@ -1,0 +1,26 @@
+{
+  "screen": "My company",
+  "menu_label": "Company",
+  "route": "/company",
+  "document_name": "MCL Web Guide - Company",
+  "aliases": [
+    "company",
+    "my company",
+    "company settings",
+    "company profile",
+    "branding",
+    "corporate design",
+    "functional settings",
+    "regionalization"
+  ],
+  "overview": "My company is under 'Company' in the left menu (company administrators). Its heading is 'My company'. It manages company information, branding and functional settings, with a 'Save changes' button. It has tabs: Company profile (name, phone, city, address), Corporate design (branding), Functional settings, and Language and regionalization. A side panel shows read-only Technical information such as the Company ID and plan. The Tags page is the sibling entry under Company.",
+  "screenshots": [
+    {
+      "id": "web-company",
+      "file": "web-company.jpg",
+      "alt": "The My company settings page in the MCL web platform",
+      "description": "The MCL web 'My company' page: a company profile header, tabs Company profile, Corporate design, Functional settings and Language and regionalization, a General information form, a read-only Technical information panel with Company ID and plan, and a Save changes button."
+    }
+  ],
+  "procedures": []
+}

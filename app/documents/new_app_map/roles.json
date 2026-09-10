@@ -1,0 +1,23 @@
+{
+  "screen": "Roles",
+  "menu_label": "Users & roles",
+  "route": "/modules/roles",
+  "document_name": "MCL Web Guide - Roles",
+  "aliases": [
+    "roles",
+    "permissions",
+    "roles and permissions",
+    "permission matrix",
+    "what can a role do"
+  ],
+  "overview": "Roles is under 'Users & roles' in the left menu (company administrators). Its heading is 'Roles and permissions'. It controls what each company role can do, with counters for Configured roles, Users and Protected roles. A permission matrix lists each role in rows and capabilities in columns (for example Dashboard, Create tasks, Tasks for markets, Tasks for users, Sensor administration, Sensor monitoring, Break lists, Subscriptions), with a tick where the role has that capability. You edit permissions per role here.",
+  "screenshots": [
+    {
+      "id": "web-roles",
+      "file": "web-roles.jpg",
+      "alt": "The Roles and permissions page in the MCL web platform",
+      "description": "The MCL web Roles and permissions page: counters for Configured roles, Users and Protected roles; a permission matrix with roles as rows and capabilities (Dashboard, Create tasks, Tasks for markets, Tasks for users, Sensor administration, Sensor monitoring, Break lists, Subscriptions) as columns, ticked where allowed."
+    }
+  ],
+  "procedures": []
+}

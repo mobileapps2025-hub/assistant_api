@@ -1,0 +1,24 @@
+{
+  "screen": "Break lists",
+  "menu_label": "Break lists",
+  "route": "/modules/break-lists",
+  "document_name": "MCL Web Guide - Break lists",
+  "aliases": [
+    "break lists",
+    "break-list",
+    "waste",
+    "shrinkage",
+    "monthly list",
+    "breakage"
+  ],
+  "overview": "Break lists is in the left menu. Its heading is 'Break-list workspace'. It manages monthly lists, products and reasons in one place, shown as three tabs: Monthly list, Products and Reasons.",
+  "screenshots": [
+    {
+      "id": "web-break-lists",
+      "file": "web-break-lists.jpg",
+      "alt": "The Break-list workspace in the MCL web platform",
+      "description": "The MCL web 'Break-list workspace' with three tabs: Monthly list, Products and Reasons."
+    }
+  ],
+  "procedures": []
+}

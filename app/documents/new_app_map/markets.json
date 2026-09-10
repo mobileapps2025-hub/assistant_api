@@ -1,0 +1,43 @@
+{
+  "screen": "Markets",
+  "menu_label": "Markets",
+  "route": "/modules/markets",
+  "document_name": "MCL Web Guide - Markets",
+  "aliases": [
+    "markets",
+    "market management",
+    "stores",
+    "locations",
+    "new market",
+    "market"
+  ],
+  "overview": "Markets is in the left menu (company administrators). Its heading is 'Market management'. It lists the company's markets (stores) with counters for Locations, With contact details, and Department assignments. The table has columns Market name, Address, City, Phone, Email and Departments, with Edit, Delete and Assign departments actions per row, a Search box, and a 'New market' button at the top right.",
+  "screenshots": [
+    {
+      "id": "web-markets",
+      "file": "web-markets.jpg",
+      "alt": "The Market management page in the MCL web platform",
+      "description": "The MCL web Market management page: counters for Locations, With contact details and Department assignments; a searchable table of markets with columns Market name, Address, City, Phone, Email, Departments and Edit/Delete/Assign departments actions; a New market button."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "web_create_market",
+      "title": "Create a market",
+      "steps": [
+        {
+          "text": "On the Markets page, click the 'New market' button at the top right.",
+          "image": "web-markets"
+        },
+        {
+          "text": "Enter the market's name and any details (address, city, phone, email) and assign its departments.",
+          "image": null
+        },
+        {
+          "text": "Save. Use Edit or Delete on a row to change or remove an existing market.",
+          "image": null
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "screen": "Company tags",
+  "menu_label": "Company",
+  "route": "/company/tags",
+  "document_name": "MCL Web Guide - Company tags",
+  "aliases": [
+    "tags",
+    "company tags",
+    "market tags",
+    "checklist tags",
+    "groups",
+    "market groups",
+    "checklist groups"
+  ],
+  "overview": "Company tags is under 'Company' in the left menu. Its heading is 'Company tags'. It organises markets and checklists into reusable groups. Two sections, Market tags and Checklist tags, each with counters for Groups, Child tags and Assignments. A table lists tag names with their assignments, and a 'New group' button; each tag can have child tags and Edit/Delete actions. These groups are the 'market groups' and 'checklist groups' used as filters elsewhere.",
+  "screenshots": [
+    {
+      "id": "web-company-tags",
+      "file": "web-company-tags.jpg",
+      "alt": "The Company tags page in the MCL web platform",
+      "description": "The MCL web 'Company tags' page: Market tags and Checklist tags sections, counters for Groups, Child tags and Assignments, a table of tag names with assignments and Child tag/Edit/Delete actions, and a New group button."
+    }
+  ],
+  "procedures": []
+}

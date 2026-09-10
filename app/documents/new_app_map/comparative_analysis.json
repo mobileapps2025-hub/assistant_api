@@ -1,0 +1,22 @@
+{
+  "screen": "Comparative analysis",
+  "menu_label": "Data analysis",
+  "route": "/modules/analysis/comparative",
+  "document_name": "MCL Web Guide - Comparative analysis",
+  "aliases": [
+    "comparative analysis",
+    "compare scores",
+    "benchmark markets",
+    "compare markets"
+  ],
+  "overview": "Comparative analysis is under 'Data analysis' in the left menu. Its heading is 'Comparative analysis'. It compares scores by market, department and executor, and lets you open the underlying executions. You choose the Period (for example Calendar week), the Calendar year and week, the Report type and the Markets to compare.",
+  "screenshots": [
+    {
+      "id": "web-analysis-comparative",
+      "file": "web-analysis-comparative.jpg",
+      "alt": "The Comparative analysis page in the MCL web platform",
+      "description": "The MCL web 'Comparative analysis' page: filters for Period, Calendar year, Calendar week, Report type and Markets, with the selected period shown and the comparison below."
+    }
+  ],
+  "procedures": []
+}

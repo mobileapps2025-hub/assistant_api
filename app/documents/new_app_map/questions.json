@@ -1,0 +1,38 @@
+{
+  "screen": "Questions",
+  "menu_label": "Questions",
+  "route": "/modules/questions",
+  "document_name": "MCL Web Guide - Questions",
+  "aliases": [
+    "questions",
+    "question management",
+    "new question",
+    "question bank",
+    "answer rules"
+  ],
+  "overview": "Questions is in the left menu. Its heading is 'Question management'. It manages the company's checklist questions: their type, answer rules, extra information and department assignments. Counters show Questions, Active questions and Used in checklists. The table lists the Question text, its Question type (for example Yes/No), the Departments it belongs to, its Status and how many checklists use it, with Edit and Delete per row, a Search box, and a 'New question' button.",
+  "screenshots": [
+    {
+      "id": "web-questions",
+      "file": "web-questions.jpg",
+      "alt": "The Question management page in the MCL web platform",
+      "description": "The MCL web Question management page: counters for Questions, Active questions and Used in checklists; a table with Question text, Question type, Departments, Status and Checklist uses, plus Edit/Delete; a New question button."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "web_create_question",
+      "title": "Create a question",
+      "steps": [
+        {
+          "text": "On the Questions page, click 'New question'.",
+          "image": "web-questions"
+        },
+        {
+          "text": "Set the question text, its type and answer rules, any extra information, and the departments it belongs to, then save.",
+          "image": null
+        }
+      ]
+    }
+  ]
+}

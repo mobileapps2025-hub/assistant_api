@@ -1,0 +1,23 @@
+{
+  "screen": "AI Assistant",
+  "menu_label": "AI Assistant",
+  "route": "/modules/ai-assistant",
+  "document_name": "MCL Web Guide - AI Assistant",
+  "aliases": [
+    "ai assistant",
+    "company ai assistant",
+    "ask ai",
+    "checklist draft",
+    "suggest questions"
+  ],
+  "overview": "AI Assistant is in the left menu. Its heading is 'AI Assistant'. You can ask about MCL or have it prepare a reviewable checklist draft. It is drafts only: it never saves or activates anything; you review every proposal before it is copied into the form. The page offers shortcuts 'Create a checklist', 'Suggest questions' and 'Explain MCL', with a chat on the left and a 'Complete preview' of the draft on the right.",
+  "screenshots": [
+    {
+      "id": "web-ai-assistant",
+      "file": "web-ai-assistant.jpg",
+      "alt": "The company AI Assistant page in the MCL web platform",
+      "description": "The MCL web 'AI Assistant' page: a note that it is drafts only and never saves or activates data, shortcut cards Create a checklist, Suggest questions and Explain MCL, a chat area, and a Complete preview panel for the draft."
+    }
+  ],
+  "procedures": []
+}

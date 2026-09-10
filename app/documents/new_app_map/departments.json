@@ -1,0 +1,37 @@
+{
+  "screen": "Departments",
+  "menu_label": "Departments",
+  "route": "/modules/departments",
+  "document_name": "MCL Web Guide - Departments",
+  "aliases": [
+    "departments",
+    "department management",
+    "new department",
+    "department"
+  ],
+  "overview": "Departments is in the left menu (company administrators). Its heading is 'Department management'. It lists departments with counters for Departments, From standard template, Market assignments and Checklist assignments. The table shows Department name, Description, and how many Markets, Checklists, Questions and Users each is linked to, with Edit and Delete per row, a Search box, and a 'New department' button.",
+  "screenshots": [
+    {
+      "id": "web-departments",
+      "file": "web-departments.jpg",
+      "alt": "The Department management page in the MCL web platform",
+      "description": "The MCL web Department management page: counters for Departments, From standard template, Market assignments and Checklist assignments; a table of departments with Description and counts of Markets, Checklists, Questions and Users, plus Edit/Delete; a New department button."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "web_create_department",
+      "title": "Create a department",
+      "steps": [
+        {
+          "text": "On the Departments page, click 'New department'.",
+          "image": "web-departments"
+        },
+        {
+          "text": "Enter the name and an optional description, then save. Use Edit or Delete on a row to change or remove one.",
+          "image": null
+        }
+      ]
+    }
+  ]
+}

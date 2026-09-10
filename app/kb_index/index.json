@@ -12407,6 +12407,494 @@
   },
   {
    "kind": "text",
+   "id": "web_ai_assistant_overview",
+   "document_name": "MCL Web Guide - AI Assistant",
+   "text": "Screen: AI Assistant (web platform). Menu: AI Assistant.\nAI Assistant is in the left menu. Its heading is 'AI Assistant'. You can ask about MCL or have it prepare a reviewable checklist draft. It is drafts only: it never saves or activates anything; you review every proposal before it is copied into the form. The page offers shortcuts 'Create a checklist', 'Suggest questions' and 'Explain MCL', with a chat on the left and a 'Complete preview' of the draft on the right.\nAlso asked about as: ai assistant, company ai assistant, ask ai, checklist draft, suggest questions.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-ai-assistant",
+   "document_name": "MCL Web Guide - AI Assistant",
+   "text": "The MCL web 'AI Assistant' page: a note that it is drafts only and never saves or activates data, shortcut cards Create a checklist, Suggest questions and Explain MCL, a chat area, and a Complete preview panel for the draft.",
+   "images": [
+    {
+     "id": "web-ai-assistant",
+     "path": "kb/webmap/web-ai-assistant.jpg",
+     "alt": "The company AI Assistant page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_break_lists_overview",
+   "document_name": "MCL Web Guide - Break lists",
+   "text": "Screen: Break lists (web platform). Menu: Break lists.\nBreak lists is in the left menu. Its heading is 'Break-list workspace'. It manages monthly lists, products and reasons in one place, shown as three tabs: Monthly list, Products and Reasons.\nAlso asked about as: break lists, break-list, waste, shrinkage, monthly list, breakage.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-break-lists",
+   "document_name": "MCL Web Guide - Break lists",
+   "text": "The MCL web 'Break-list workspace' with three tabs: Monthly list, Products and Reasons.",
+   "images": [
+    {
+     "id": "web-break-lists",
+     "path": "kb/webmap/web-break-lists.jpg",
+     "alt": "The Break-list workspace in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_checklist_editor_overview",
+   "document_name": "MCL Web Guide - Checklist editor",
+   "text": "Screen: Checklist editor (web platform). Menu: Checklists.\nThe checklist editor is where you build and configure a checklist, opened by 'New checklist' on the Checklists page (or by opening an existing checklist). Its heading is 'New checklist' and it edits every setting on one scrolling page, saved together in one operation. A left rail lists six sections you can jump to: 1 General information, 2 Schedule and availability, 3 Access and scope, 4 Questions and order, 5 Notifications, and 6 Preview. Some sections unlock as you fill earlier ones: you must choose departments before you can add questions, and choose roles before you can pick who is notified. At the top are 'Ask AI Assistant', Cancel, 'Save draft' and 'Save and activate'. This screen replaces the old 'Checklist Wizard'.\nAlso asked about as: create a checklist, new checklist, checklist editor, build a checklist, checklist wizard, configure a checklist, add questions to a checklist, checklist schedule, checklist periodicity, checklist notifications, checklist roles and departments.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-checklist-editor",
+   "document_name": "MCL Web Guide - Checklist editor",
+   "text": "The MCL web checklist editor 'New checklist', step 1 General information: Checklist name, General email address, and the toggles Signature required (the user must sign the execution) and Allow department selection (the executing user can choose the applicable department); left rail with all six steps; buttons Ask AI Assistant, Cancel, Save draft and Save and activate.",
+   "images": [
+    {
+     "id": "web-checklist-editor",
+     "path": "kb/webmap/web-checklist-editor.jpg",
+     "alt": "The New checklist editor, General information step"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-checklist-editor-schedule",
+   "document_name": "MCL Web Guide - Checklist editor",
+   "text": "Step 2 Schedule and availability of the MCL web checklist editor: Periodicity (for example Weekly), Execution day, Available from and Available to dates, Time from and Time to, and a Count current period option.",
+   "images": [
+    {
+     "id": "web-checklist-editor-schedule",
+     "path": "kb/webmap/web-checklist-editor-schedule.jpg",
+     "alt": "The checklist editor, Schedule and availability step"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-checklist-editor-access",
+   "document_name": "MCL Web Guide - Checklist editor",
+   "text": "Step 3 Access and scope of the MCL web checklist editor: Select roles, Select departments and Select tags for the checklist.",
+   "images": [
+    {
+     "id": "web-checklist-editor-access",
+     "path": "kb/webmap/web-checklist-editor-access.jpg",
+     "alt": "The checklist editor, Access and scope step"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-checklist-editor-questions",
+   "document_name": "MCL Web Guide - Checklist editor",
+   "text": "Steps 4 and 5 of the MCL web checklist editor: Questions and order ('Add questions by department and arrange them directly', with a question count and a note to select at least one department first), and Notifications (optional, enable the roles that should be notified about executions).",
+   "images": [
+    {
+     "id": "web-checklist-editor-questions",
+     "path": "kb/webmap/web-checklist-editor-questions.jpg",
+     "alt": "The checklist editor, Questions and order and Notifications steps"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "procedure",
+   "id": "web_create_checklist",
+   "document_name": "MCL Web Guide - Checklist editor",
+   "text": "Procedure: Create a checklist\n1. On the Checklists page click 'New checklist' to open the editor.\n2. Step 1 General information: enter the Checklist name and a General email address, and turn on Signature required or Allow department selection if you need them.\n3. Step 2 Schedule and availability: set the Periodicity (for example Weekly), the Execution day, the Available from and to dates, the Time from and to, and Count current period if it should count now.\n4. Step 3 Access and scope: select the Roles that run it, the Departments it applies to, and any Tags.\n5. Step 4 Questions and order: after at least one department is chosen, add questions by department and drag them into the order you want.\n6. Step 5 Notifications (optional): after roles are chosen, enable the roles that should be notified about executions.\n7. Step 6 Preview: review the whole checklist, then 'Save draft' to keep it as a draft or 'Save and activate' to make it live. All sections are saved together in one operation. 'Ask AI Assistant' can prepare a draft for you to review first.",
+   "title": "Create a checklist",
+   "steps": [
+    {
+     "text": "On the Checklists page click 'New checklist' to open the editor.",
+     "images": [
+      {
+       "id": "web-checklist-editor",
+       "path": "kb/webmap/web-checklist-editor.jpg",
+       "alt": "The New checklist editor, General information step"
+      }
+     ]
+    },
+    {
+     "text": "Step 1 General information: enter the Checklist name and a General email address, and turn on Signature required or Allow department selection if you need them.",
+     "images": [
+      {
+       "id": "web-checklist-editor",
+       "path": "kb/webmap/web-checklist-editor.jpg",
+       "alt": "The New checklist editor, General information step"
+      }
+     ]
+    },
+    {
+     "text": "Step 2 Schedule and availability: set the Periodicity (for example Weekly), the Execution day, the Available from and to dates, the Time from and to, and Count current period if it should count now.",
+     "images": [
+      {
+       "id": "web-checklist-editor-schedule",
+       "path": "kb/webmap/web-checklist-editor-schedule.jpg",
+       "alt": "The checklist editor, Schedule and availability step"
+      }
+     ]
+    },
+    {
+     "text": "Step 3 Access and scope: select the Roles that run it, the Departments it applies to, and any Tags.",
+     "images": [
+      {
+       "id": "web-checklist-editor-access",
+       "path": "kb/webmap/web-checklist-editor-access.jpg",
+       "alt": "The checklist editor, Access and scope step"
+      }
+     ]
+    },
+    {
+     "text": "Step 4 Questions and order: after at least one department is chosen, add questions by department and drag them into the order you want.",
+     "images": [
+      {
+       "id": "web-checklist-editor-questions",
+       "path": "kb/webmap/web-checklist-editor-questions.jpg",
+       "alt": "The checklist editor, Questions and order and Notifications steps"
+      }
+     ]
+    },
+    {
+     "text": "Step 5 Notifications (optional): after roles are chosen, enable the roles that should be notified about executions.",
+     "images": [
+      {
+       "id": "web-checklist-editor-questions",
+       "path": "kb/webmap/web-checklist-editor-questions.jpg",
+       "alt": "The checklist editor, Questions and order and Notifications steps"
+      }
+     ]
+    },
+    {
+     "text": "Step 6 Preview: review the whole checklist, then 'Save draft' to keep it as a draft or 'Save and activate' to make it live. All sections are saved together in one operation. 'Ask AI Assistant' can prepare a draft for you to review first.",
+     "images": []
+    }
+   ],
+   "images": [
+    {
+     "id": "web-checklist-editor",
+     "path": "kb/webmap/web-checklist-editor.jpg",
+     "alt": "The New checklist editor, General information step"
+    },
+    {
+     "id": "web-checklist-editor",
+     "path": "kb/webmap/web-checklist-editor.jpg",
+     "alt": "The New checklist editor, General information step"
+    },
+    {
+     "id": "web-checklist-editor-schedule",
+     "path": "kb/webmap/web-checklist-editor-schedule.jpg",
+     "alt": "The checklist editor, Schedule and availability step"
+    },
+    {
+     "id": "web-checklist-editor-access",
+     "path": "kb/webmap/web-checklist-editor-access.jpg",
+     "alt": "The checklist editor, Access and scope step"
+    },
+    {
+     "id": "web-checklist-editor-questions",
+     "path": "kb/webmap/web-checklist-editor-questions.jpg",
+     "alt": "The checklist editor, Questions and order and Notifications steps"
+    },
+    {
+     "id": "web-checklist-editor-questions",
+     "path": "kb/webmap/web-checklist-editor-questions.jpg",
+     "alt": "The checklist editor, Questions and order and Notifications steps"
+    }
+   ],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_checklist_reports_overview",
+   "document_name": "MCL Web Guide - Checklist reports",
+   "text": "Screen: Checklist reports (web platform). Menu: Reports.\nChecklist reports is under 'Reports' in the left menu. Its heading is 'Checklist reports'. You find checklist executions, review their answers and tasks, and generate the complete PDF report. Filters include Period, Day, Market, Checklist, Report options (for example Full report) and Executed by. The results table lists each execution with its date and time, market, checklist, executor, score, answers and tasks.\nAlso asked about as: checklist reports, ad hoc reports, executions, pdf report, review answers.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-reports-checklists",
+   "document_name": "MCL Web Guide - Checklist reports",
+   "text": "The MCL web 'Checklist reports' page: filters for Period, Day, Market, Checklist, Report options and Executed by, a count of reports and the selected period, and a results table with columns for date/time, Market, Checklist, Executed by, Score, Answers and Tasks.",
+   "images": [
+    {
+     "id": "web-reports-checklists",
+     "path": "kb/webmap/web-reports-checklists.jpg",
+     "alt": "The Checklist reports page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_checklists_overview",
+   "document_name": "MCL Web Guide - Checklists",
+   "text": "Screen: Checklists (web platform). Menu: Checklists.\nChecklists is in the left menu. Its heading is 'Checklist administration'. It lists the company's checklists with counters for Checklists, Active checklists, Drafts and Archived. The table shows Checklist name, Periodicity, Departments, number of Questions and Status, with a Search box and a 'New checklist' button. From here you open a checklist to edit it, or create a new one; building the questions happens in the checklist editor.\nAlso asked about as: checklists, checklist administration, checklist list, manage checklists, where are checklists.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-checklists",
+   "document_name": "MCL Web Guide - Checklists",
+   "text": "The MCL web Checklist administration page: counters for Checklists, Active checklists, Drafts and Archived; a table with Checklist, Periodicity, Departments, Questions and Status; a New checklist button; empty state reads 'No checklists found'.",
+   "images": [
+    {
+     "id": "web-checklists",
+     "path": "kb/webmap/web-checklists.jpg",
+     "alt": "The Checklist administration page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "procedure",
+   "id": "web_open_checklist_admin",
+   "document_name": "MCL Web Guide - Checklists",
+   "text": "Procedure: Create or open a checklist\n1. On the Checklists page, click 'New checklist' to start a new one, which opens the checklist editor.\n2. To change an existing one, click its row to open it in the editor.",
+   "title": "Create or open a checklist",
+   "steps": [
+    {
+     "text": "On the Checklists page, click 'New checklist' to start a new one, which opens the checklist editor.",
+     "images": [
+      {
+       "id": "web-checklists",
+       "path": "kb/webmap/web-checklists.jpg",
+       "alt": "The Checklist administration page in the MCL web platform"
+      }
+     ]
+    },
+    {
+     "text": "To change an existing one, click its row to open it in the editor.",
+     "images": []
+    }
+   ],
+   "images": [
+    {
+     "id": "web-checklists",
+     "path": "kb/webmap/web-checklists.jpg",
+     "alt": "The Checklist administration page in the MCL web platform"
+    }
+   ],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_company_tags_overview",
+   "document_name": "MCL Web Guide - Company tags",
+   "text": "Screen: Company tags (web platform). Menu: Company.\nCompany tags is under 'Company' in the left menu. Its heading is 'Company tags'. It organises markets and checklists into reusable groups. Two sections, Market tags and Checklist tags, each with counters for Groups, Child tags and Assignments. A table lists tag names with their assignments, and a 'New group' button; each tag can have child tags and Edit/Delete actions. These groups are the 'market groups' and 'checklist groups' used as filters elsewhere.\nAlso asked about as: tags, company tags, market tags, checklist tags, groups, market groups, checklist groups.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-company-tags",
+   "document_name": "MCL Web Guide - Company tags",
+   "text": "The MCL web 'Company tags' page: Market tags and Checklist tags sections, counters for Groups, Child tags and Assignments, a table of tag names with assignments and Child tag/Edit/Delete actions, and a New group button.",
+   "images": [
+    {
+     "id": "web-company-tags",
+     "path": "kb/webmap/web-company-tags.jpg",
+     "alt": "The Company tags page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_comparative_analysis_overview",
+   "document_name": "MCL Web Guide - Comparative analysis",
+   "text": "Screen: Comparative analysis (web platform). Menu: Data analysis.\nComparative analysis is under 'Data analysis' in the left menu. Its heading is 'Comparative analysis'. It compares scores by market, department and executor, and lets you open the underlying executions. You choose the Period (for example Calendar week), the Calendar year and week, the Report type and the Markets to compare.\nAlso asked about as: comparative analysis, compare scores, benchmark markets, compare markets.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-analysis-comparative",
+   "document_name": "MCL Web Guide - Comparative analysis",
+   "text": "The MCL web 'Comparative analysis' page: filters for Period, Calendar year, Calendar week, Report type and Markets, with the selected period shown and the comparison below.",
+   "images": [
+    {
+     "id": "web-analysis-comparative",
+     "path": "kb/webmap/web-analysis-comparative.jpg",
+     "alt": "The Comparative analysis page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_departments_overview",
+   "document_name": "MCL Web Guide - Departments",
+   "text": "Screen: Departments (web platform). Menu: Departments.\nDepartments is in the left menu (company administrators). Its heading is 'Department management'. It lists departments with counters for Departments, From standard template, Market assignments and Checklist assignments. The table shows Department name, Description, and how many Markets, Checklists, Questions and Users each is linked to, with Edit and Delete per row, a Search box, and a 'New department' button.\nAlso asked about as: departments, department management, new department, department.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-departments",
+   "document_name": "MCL Web Guide - Departments",
+   "text": "The MCL web Department management page: counters for Departments, From standard template, Market assignments and Checklist assignments; a table of departments with Description and counts of Markets, Checklists, Questions and Users, plus Edit/Delete; a New department button.",
+   "images": [
+    {
+     "id": "web-departments",
+     "path": "kb/webmap/web-departments.jpg",
+     "alt": "The Department management page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "procedure",
+   "id": "web_create_department",
+   "document_name": "MCL Web Guide - Departments",
+   "text": "Procedure: Create a department\n1. On the Departments page, click 'New department'.\n2. Enter the name and an optional description, then save. Use Edit or Delete on a row to change or remove one.",
+   "title": "Create a department",
+   "steps": [
+    {
+     "text": "On the Departments page, click 'New department'.",
+     "images": [
+      {
+       "id": "web-departments",
+       "path": "kb/webmap/web-departments.jpg",
+       "alt": "The Department management page in the MCL web platform"
+      }
+     ]
+    },
+    {
+     "text": "Enter the name and an optional description, then save. Use Edit or Delete on a row to change or remove one.",
+     "images": []
+    }
+   ],
+   "images": [
+    {
+     "id": "web-departments",
+     "path": "kb/webmap/web-departments.jpg",
+     "alt": "The Department management page in the MCL web platform"
+    }
+   ],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_markets_overview",
+   "document_name": "MCL Web Guide - Markets",
+   "text": "Screen: Markets (web platform). Menu: Markets.\nMarkets is in the left menu (company administrators). Its heading is 'Market management'. It lists the company's markets (stores) with counters for Locations, With contact details, and Department assignments. The table has columns Market name, Address, City, Phone, Email and Departments, with Edit, Delete and Assign departments actions per row, a Search box, and a 'New market' button at the top right.\nAlso asked about as: markets, market management, stores, locations, new market, market.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-markets",
+   "document_name": "MCL Web Guide - Markets",
+   "text": "The MCL web Market management page: counters for Locations, With contact details and Department assignments; a searchable table of markets with columns Market name, Address, City, Phone, Email, Departments and Edit/Delete/Assign departments actions; a New market button.",
+   "images": [
+    {
+     "id": "web-markets",
+     "path": "kb/webmap/web-markets.jpg",
+     "alt": "The Market management page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "procedure",
+   "id": "web_create_market",
+   "document_name": "MCL Web Guide - Markets",
+   "text": "Procedure: Create a market\n1. On the Markets page, click the 'New market' button at the top right.\n2. Enter the market's name and any details (address, city, phone, email) and assign its departments.\n3. Save. Use Edit or Delete on a row to change or remove an existing market.",
+   "title": "Create a market",
+   "steps": [
+    {
+     "text": "On the Markets page, click the 'New market' button at the top right.",
+     "images": [
+      {
+       "id": "web-markets",
+       "path": "kb/webmap/web-markets.jpg",
+       "alt": "The Market management page in the MCL web platform"
+      }
+     ]
+    },
+    {
+     "text": "Enter the market's name and any details (address, city, phone, email) and assign its departments.",
+     "images": []
+    },
+    {
+     "text": "Save. Use Edit or Delete on a row to change or remove an existing market.",
+     "images": []
+    }
+   ],
+   "images": [
+    {
+     "id": "web-markets",
+     "path": "kb/webmap/web-markets.jpg",
+     "alt": "The Market management page in the MCL web platform"
+    }
+   ],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_my_company_overview",
+   "document_name": "MCL Web Guide - Company",
+   "text": "Screen: My company (web platform). Menu: Company.\nMy company is under 'Company' in the left menu (company administrators). Its heading is 'My company'. It manages company information, branding and functional settings, with a 'Save changes' button. It has tabs: Company profile (name, phone, city, address), Corporate design (branding), Functional settings, and Language and regionalization. A side panel shows read-only Technical information such as the Company ID and plan. The Tags page is the sibling entry under Company.\nAlso asked about as: company, my company, company settings, company profile, branding, corporate design, functional settings, regionalization.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-company",
+   "document_name": "MCL Web Guide - Company",
+   "text": "The MCL web 'My company' page: a company profile header, tabs Company profile, Corporate design, Functional settings and Language and regionalization, a General information form, a read-only Technical information panel with Company ID and plan, and a Save changes button.",
+   "images": [
+    {
+     "id": "web-company",
+     "path": "kb/webmap/web-company.jpg",
+     "alt": "The My company settings page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
    "id": "web_overview_overview",
    "document_name": "MCL Web Guide - Overview",
    "text": "Screen: Overview (web platform). Menu: Overview.\nOverview is the first item in the left menu and the page you land on when you open the MCL web platform. Its heading is 'Company overview'. It summarises checklists, tasks and answers by market for a period you choose. At the top is a Filters bar with Period, Market group, Checklist group and Checklists, and an Apply filters button. Below it are summary counters: Executed checklists, Missed checklists, Assigned tasks, Positive answers and Negative answers. Under the counters are two tabs, Checklists and Tasks, and cards such as Completed checklists, Checklists by status and Answers. This page is for seeing the state of the company at a glance; you do not create checklists or tasks here.\nAlso asked about as: overview, company overview, dashboard, home, standard dashboard, start page, landing page.",
@@ -12517,6 +13005,157 @@
   },
   {
    "kind": "text",
+   "id": "web_questions_overview",
+   "document_name": "MCL Web Guide - Questions",
+   "text": "Screen: Questions (web platform). Menu: Questions.\nQuestions is in the left menu. Its heading is 'Question management'. It manages the company's checklist questions: their type, answer rules, extra information and department assignments. Counters show Questions, Active questions and Used in checklists. The table lists the Question text, its Question type (for example Yes/No), the Departments it belongs to, its Status and how many checklists use it, with Edit and Delete per row, a Search box, and a 'New question' button.\nAlso asked about as: questions, question management, new question, question bank, answer rules.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-questions",
+   "document_name": "MCL Web Guide - Questions",
+   "text": "The MCL web Question management page: counters for Questions, Active questions and Used in checklists; a table with Question text, Question type, Departments, Status and Checklist uses, plus Edit/Delete; a New question button.",
+   "images": [
+    {
+     "id": "web-questions",
+     "path": "kb/webmap/web-questions.jpg",
+     "alt": "The Question management page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "procedure",
+   "id": "web_create_question",
+   "document_name": "MCL Web Guide - Questions",
+   "text": "Procedure: Create a question\n1. On the Questions page, click 'New question'.\n2. Set the question text, its type and answer rules, any extra information, and the departments it belongs to, then save.",
+   "title": "Create a question",
+   "steps": [
+    {
+     "text": "On the Questions page, click 'New question'.",
+     "images": [
+      {
+       "id": "web-questions",
+       "path": "kb/webmap/web-questions.jpg",
+       "alt": "The Question management page in the MCL web platform"
+      }
+     ]
+    },
+    {
+     "text": "Set the question text, its type and answer rules, any extra information, and the departments it belongs to, then save.",
+     "images": []
+    }
+   ],
+   "images": [
+    {
+     "id": "web-questions",
+     "path": "kb/webmap/web-questions.jpg",
+     "alt": "The Question management page in the MCL web platform"
+    }
+   ],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_result_analysis_overview",
+   "document_name": "MCL Web Guide - Result analysis",
+   "text": "Screen: Result analysis (web platform). Menu: Data analysis.\nResult analysis is under 'Data analysis' in the left menu. Its heading is 'Result analysis'. It analyses positive, negative and not-applicable answers down to each checklist execution. You pick the Calendar year and an exact Period (day, week, month or quarter), an Answer selection (for example Include not applicable), and narrow with analysis filters: Question type, Condition, Markets and Question.\nAlso asked about as: result analysis, results, analyze answers, positive negative answers, data analysis.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-analysis-results",
+   "document_name": "MCL Web Guide - Result analysis",
+   "text": "The MCL web 'Result analysis' page: Period controls (Calendar year, Period, Day, Answer selection) and analysis filters for Question type, Condition, Markets and Question, above the results.",
+   "images": [
+    {
+     "id": "web-analysis-results",
+     "path": "kb/webmap/web-analysis-results.jpg",
+     "alt": "The Result analysis page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_roles_overview",
+   "document_name": "MCL Web Guide - Roles",
+   "text": "Screen: Roles (web platform). Menu: Users & roles.\nRoles is under 'Users & roles' in the left menu (company administrators). Its heading is 'Roles and permissions'. It controls what each company role can do, with counters for Configured roles, Users and Protected roles. A permission matrix lists each role in rows and capabilities in columns (for example Dashboard, Create tasks, Tasks for markets, Tasks for users, Sensor administration, Sensor monitoring, Break lists, Subscriptions), with a tick where the role has that capability. You edit permissions per role here.\nAlso asked about as: roles, permissions, roles and permissions, permission matrix, what can a role do.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-roles",
+   "document_name": "MCL Web Guide - Roles",
+   "text": "The MCL web Roles and permissions page: counters for Configured roles, Users and Protected roles; a permission matrix with roles as rows and capabilities (Dashboard, Create tasks, Tasks for markets, Tasks for users, Sensor administration, Sensor monitoring, Break lists, Subscriptions) as columns, ticked where allowed.",
+   "images": [
+    {
+     "id": "web-roles",
+     "path": "kb/webmap/web-roles.jpg",
+     "alt": "The Roles and permissions page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_safe_counting_overview",
+   "document_name": "MCL Web Guide - Safe counting",
+   "text": "Screen: Safe counting (web platform). Menu: Safe counting.\nSafe counting is in the left menu. Its heading is 'Safe counting workspace'. It reviews safe counts, investigates differences and exports the complete evidence. Filters are Period, Day, Market and a Search by id, market or auditor, with Apply filters and an 'XLSX - Export all' button. Counters show Countings, Balanced, With difference and Total difference.\nAlso asked about as: safe counting, cash count, safe count, counting differences, till count.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-safe-counting",
+   "document_name": "MCL Web Guide - Safe counting",
+   "text": "The MCL web 'Safe counting workspace': filters for Period, Day, Market and Search, an XLSX Export all button, and counters for Countings, Balanced, With difference and Total difference.",
+   "images": [
+    {
+     "id": "web-safe-counting",
+     "path": "kb/webmap/web-safe-counting.jpg",
+     "alt": "The Safe counting workspace in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_standard_reports_overview",
+   "document_name": "MCL Web Guide - Standard reports",
+   "text": "Screen: Standard reports (web platform). Menu: Reports.\nStandard reports is under 'Reports' in the left menu. Its heading is 'Standard reports'. It exports operational data to Excel or downloads the complete period package. You choose the Period (for example Monthly), the Year and the Month, and the selected date range is shown. The Reports menu also has Ad hoc / Checklist reports as a sibling.\nAlso asked about as: standard reports, export, excel export, period package, download report.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-reports-standard",
+   "document_name": "MCL Web Guide - Standard reports",
+   "text": "The MCL web 'Standard reports' page: Period, Year and Month selectors with the selected range shown, and an area to prepare and download the Excel export / period package.",
+   "images": [
+    {
+     "id": "web-reports-standard",
+     "path": "kb/webmap/web-reports-standard.jpg",
+     "alt": "The Standard reports page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
    "id": "web_tasks_overview",
    "document_name": "MCL Web Guide - Tasks",
    "text": "Screen: Tasks (web platform). Menu: Tasks.\nTasks is in the left menu and its heading is 'Task workspace'. It is where you see, filter and create tasks. A task is a piece of work tied to a market, optionally to a checklist, with a due date and a status. Across the top are counters: Open, Due today, Overdue and Completed. There are three tabs: All tasks, Assigned to me, and Created by me. Below them are a Search box, an All statuses filter and an All markets filter, and a table with the columns No., Task, Market, Checklist, Assigned to, Created by, Created at, Due date and Status, with a Details link on each row. A blue New task button sits at the top right.\nAlso asked about as: tasks, task workspace, to-do, assignments, create a task, new task.",
@@ -12620,6 +13259,61 @@
      "id": "web-tasks-list",
      "path": "kb/webmap/web-tasks-list.jpg",
      "alt": "The Task workspace list in the MCL web platform"
+    }
+   ],
+   "surface": "web"
+  },
+  {
+   "kind": "text",
+   "id": "web_users_overview",
+   "document_name": "MCL Web Guide - Users",
+   "text": "Screen: Users (web platform). Menu: Users & roles.\nUsers & roles is in the left menu (company administrators); the Users page is headed 'User management'. It manages accounts, roles and market/department access. Counters show Total users, Active users, Company administrators and Assignments. The table lists Full name, Email, Role, Language, Markets, Departments and Status, with Edit per row and a Search box. Roles live on the sibling Roles page. Note: you can edit, lock or remove users here, but creating a brand-new user needs a password and is done in MCL, not through the assistant.\nAlso asked about as: users, user management, accounts, user accounts, users and roles, manage users.",
+   "images": [],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "image",
+   "id": "web-users",
+   "document_name": "MCL Web Guide - Users",
+   "text": "The MCL web User management page: counters for Total users, Active users, Company administrators and Assignments; a table of users with Full name, Email, Role, Language, Markets, Departments and Status, plus Edit; a Users/Roles submenu.",
+   "images": [
+    {
+     "id": "web-users",
+     "path": "kb/webmap/web-users.jpg",
+     "alt": "The User management page in the MCL web platform"
+    }
+   ],
+   "steps": [],
+   "surface": "web"
+  },
+  {
+   "kind": "procedure",
+   "id": "web_edit_user",
+   "document_name": "MCL Web Guide - Users",
+   "text": "Procedure: Change a user's role, markets or status\n1. On the Users page, find the person and click Edit on their row.\n2. Change their role, markets, departments, language, or lock/unlock the account, then save.",
+   "title": "Change a user's role, markets or status",
+   "steps": [
+    {
+     "text": "On the Users page, find the person and click Edit on their row.",
+     "images": [
+      {
+       "id": "web-users",
+       "path": "kb/webmap/web-users.jpg",
+       "alt": "The User management page in the MCL web platform"
+      }
+     ]
+    },
+    {
+     "text": "Change their role, markets, departments, language, or lock/unlock the account, then save.",
+     "images": []
+    }
+   ],
+   "images": [
+    {
+     "id": "web-users",
+     "path": "kb/webmap/web-users.jpg",
+     "alt": "The User management page in the MCL web platform"
     }
    ],
    "surface": "web"

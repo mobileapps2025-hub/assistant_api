@@ -1,0 +1,23 @@
+{
+  "screen": "Safe counting",
+  "menu_label": "Safe counting",
+  "route": "/modules/safe-counting",
+  "document_name": "MCL Web Guide - Safe counting",
+  "aliases": [
+    "safe counting",
+    "cash count",
+    "safe count",
+    "counting differences",
+    "till count"
+  ],
+  "overview": "Safe counting is in the left menu. Its heading is 'Safe counting workspace'. It reviews safe counts, investigates differences and exports the complete evidence. Filters are Period, Day, Market and a Search by id, market or auditor, with Apply filters and an 'XLSX - Export all' button. Counters show Countings, Balanced, With difference and Total difference.",
+  "screenshots": [
+    {
+      "id": "web-safe-counting",
+      "file": "web-safe-counting.jpg",
+      "alt": "The Safe counting workspace in the MCL web platform",
+      "description": "The MCL web 'Safe counting workspace': filters for Period, Day, Market and Search, an XLSX Export all button, and counters for Countings, Balanced, With difference and Total difference."
+    }
+  ],
+  "procedures": []
+}
