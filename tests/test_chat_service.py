@@ -5,6 +5,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from app.services.chat_service import ChatService, _format_device, _format_today
 from app.enforcement import pending
+from app.kb_surfaces import APP_SEARCH
 from app.models import Device
 from app.retrieval.retriever import Unit
 
@@ -188,6 +189,7 @@ class TestHandleAgentRequest:
         messages = [{"role": "user", "content": "How do I sync?"}]
         chunk = Unit(kind="text", id="u1", document_name="sync_guide.md", text="Tap Sync.")
         with patch("app.services.chat_service.contextualize", return_value="MCL sync"), \
+             patch("app.services.chat_service.classify_surface", return_value="app"), \
              patch("app.services.chat_service.retrieve", return_value=[chunk]) as mock_retrieve, \
              patch("app.services.chat_service.client") as mock_client:
             mock_client.chat.completions.create.side_effect = [
@@ -198,7 +200,7 @@ class TestHandleAgentRequest:
                 messages, messages[0], "s1", None, "", "English", ""
             )
 
-        mock_retrieve.assert_called_once_with("MCL sync")
+        mock_retrieve.assert_called_once_with("MCL sync", surfaces=APP_SEARCH, min_score=0.0)
         assert "[Source: sync_guide.md]" in result["response"]
         assert "fake.md" not in result["response"]
 
@@ -410,6 +412,7 @@ class TestAnswerOverImage:
             ],
         }
         with patch("app.services.chat_service.build_vision_query", return_value="checklist wizard departments") as mock_bq, \
+             patch("app.services.chat_service.classify_surface", return_value="app"), \
              patch("app.services.chat_service.retrieve", return_value=[chunk]) as mock_retrieve, \
              patch("app.services.chat_service.client") as mock_client:
             resp = MagicMock()
@@ -421,7 +424,7 @@ class TestAnswerOverImage:
 
         assert result["success"] is True and result["has_vision"] is True
         mock_bq.assert_called_once()
-        mock_retrieve.assert_called_once_with("checklist wizard departments")
+        mock_retrieve.assert_called_once_with("checklist wizard departments", surfaces=APP_SEARCH, min_score=0.0)
         assert "MCL Support Specialist" in sent[0]["content"]
         assert any(m["role"] == "system" and "# TEXTUAL CONTEXT" in m["content"] for m in sent)
         assert "[Source: guide.pdf]" in result["response"]

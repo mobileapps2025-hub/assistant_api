@@ -1,0 +1,42 @@
+{
+  "screen": "Tasks",
+  "menu_label": "Tasks",
+  "route": "/modules/tasks",
+  "document_name": "MCL Web Guide - Tasks",
+  "aliases": ["tasks", "task workspace", "to-do", "assignments", "create a task", "new task"],
+  "overview": "Tasks is in the left menu and its heading is 'Task workspace'. It is where you see, filter and create tasks. A task is a piece of work tied to a market, optionally to a checklist, with a due date and a status. Across the top are counters: Open, Due today, Overdue and Completed. There are three tabs: All tasks, Assigned to me, and Created by me. Below them are a Search box, an All statuses filter and an All markets filter, and a table with the columns No., Task, Market, Checklist, Assigned to, Created by, Created at, Due date and Status, with a Details link on each row. A blue New task button sits at the top right.",
+  "screenshots": [
+    {
+      "id": "web-tasks-list",
+      "file": "web-tasks-list.jpg",
+      "alt": "The Task workspace list in the MCL web platform",
+      "description": "The MCL web Tasks page titled 'Task workspace'. Counters for Open, Due today, Overdue and Completed; tabs All tasks, Assigned to me, Created by me; a Search box and status and market filters; and a table of tasks with columns No., Task, Market, Checklist, Assigned to, Created by, Status and a Details link."
+    },
+    {
+      "id": "web-tasks-new",
+      "file": "web-tasks-new.jpg",
+      "alt": "The New task window in the MCL web platform",
+      "description": "The New task window on the MCL web Tasks page. Fields for Description, Markets (with shortcuts All available markets, My markets, Clear selection), Start date and Due date, an Images upload (up to 3, JPG/PNG/GIF, 4 MB each), a PDF file upload, an Evidence required checkbox, and Cancel and Save task buttons."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "web_create_task",
+      "title": "Create a task",
+      "steps": [
+        {"text": "On the Tasks page, click the blue New task button at the top right.", "image": "web-tasks-new"},
+        {"text": "In the window, type a Description and choose one or more Markets (use All available markets or My markets to fill the list quickly).", "image": null},
+        {"text": "Set the Start date and Due date. Optionally attach up to three images or a PDF, and tick Evidence required if the task must be completed with proof.", "image": null},
+        {"text": "Click Save task to create it.", "image": null}
+      ]
+    },
+    {
+      "id": "web_find_task",
+      "title": "Find a task",
+      "steps": [
+        {"text": "Use the Search box, or the All statuses and All markets filters, or type in the filter row under a column header.", "image": "web-tasks-list"},
+        {"text": "Switch between All tasks, Assigned to me and Created by me with the tabs. Click Details on a row to open a task.", "image": null}
+      ]
+    }
+  ]
+}

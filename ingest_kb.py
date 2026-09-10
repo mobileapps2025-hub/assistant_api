@@ -39,6 +39,8 @@ except Exception:
     pass
 
 from app.core.config import client  # noqa: E402
+from app.kb_surfaces import WEB, classify_unit  # noqa: E402
+from app.web_map import build_web_map_units  # noqa: E402
 
 SELF_DIR = Path(__file__).resolve().parent
 INDEX_DIR = SELF_DIR / "app" / "kb_index"
@@ -392,12 +394,16 @@ def cmd_build(args) -> None:
     showable = _showable(images)
     doc_units, docs_held = _doc_units()
     units = _text_units(_load_json(EXTRACTED_FILE, []), showable) + \
-        _procedure_units(procedures, showable) + _image_units(showable) + doc_units
+        _procedure_units(procedures, showable) + _image_units(showable) + doc_units + build_web_map_units()
 
     vetoed_img = len(images) - len(showable)
     vetoed_proc = sum(1 for p in procedures.values() if p.get("excluded"))
     if vetoed_img or vetoed_proc or docs_held:
         print(f"Veto gate: excluded {vetoed_img} image(s), {vetoed_proc} procedure(s), {docs_held} researched doc(s)")
+
+    for unit in units:
+        # Web-map units declare their own surface; everything else is classified.
+        unit["surface"] = unit.get("surface") or classify_unit(unit["document_name"], unit["text"])
 
     print(f"Embedding {len(units)} units with {EMBED_MODEL}...")
     embeddings = _embed([u["text"] for u in units])
@@ -406,6 +412,35 @@ def cmd_build(args) -> None:
     np.savez_compressed(INDEX_DIR / "embeddings.npz", embeddings=embeddings)
     kinds = {k: sum(1 for u in units if u["kind"] == k) for k in ("text", "procedure", "image")}
     print(f"Wrote {len(units)} units {kinds} -> {INDEX_DIR}")
+
+
+def cmd_add_web_map(args) -> None:
+    """Append (or refresh) the web-map units in the committed index without re-embedding
+    everything else. Idempotent: existing web units are dropped first, so re-running after a
+    screen changes replaces them cleanly."""
+    index_file, embeddings_file = INDEX_DIR / "index.json", INDEX_DIR / "embeddings.npz"
+    if not index_file.exists() or not embeddings_file.exists():
+        sys.exit("No index yet — run: python ingest_kb.py build")
+
+    data = _load_json(index_file, {})
+    units = data.get("units", [])
+    embeddings = np.load(embeddings_file)["embeddings"]
+
+    kept = [(u, embeddings[i]) for i, u in enumerate(units) if u.get("surface") != WEB]
+    dropped = len(units) - len(kept)
+
+    web_units = build_web_map_units()
+    if not web_units:
+        sys.exit("No web-map screens found under app/documents/new_app_map/*.json")
+    print(f"Embedding {len(web_units)} web-map unit(s); replacing {dropped} existing web unit(s)...")
+    web_embeddings = _embed([u["text"] for u in web_units])
+
+    all_units = [u for u, _ in kept] + web_units
+    all_embeddings = np.vstack([np.array([e for _, e in kept], dtype=np.float32).reshape(len(kept), -1),
+                                web_embeddings]) if kept else web_embeddings
+    _save_json(index_file, {"model": EMBED_MODEL, "units": all_units})
+    np.savez_compressed(embeddings_file, embeddings=all_embeddings)
+    print(f"Index now has {len(all_units)} units ({len(web_units)} web) -> {INDEX_DIR}")
 
 
 # ----------------------------------------------------------------------------- cli
@@ -420,6 +455,7 @@ def main() -> None:
     redescribe.add_argument("--all", action="store_true", help="also redo pictures you already reviewed")
     redescribe.set_defaults(func=cmd_redescribe)
     sub.add_parser("build").set_defaults(func=cmd_build)
+    sub.add_parser("add-web-map").set_defaults(func=cmd_add_web_map)
     args = parser.parse_args()
     args.func(args)
 

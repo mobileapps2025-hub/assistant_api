@@ -80,7 +80,7 @@ def _language_directive(language: str) -> str:
         f"Write your entire answer in **{lang}** — the language of the user's current message. "
         f"Do this even if earlier messages, the conversation so far, your own previous replies, "
         f"or the retrieved documentation were in another language: match **{lang}**, never the "
-        f'history. Canonical MCL terms (e.g. "Dashboard", "Checklist", "Task") may stay in English.'
+        f'history. Canonical MCL terms (e.g. "Checklist", "Task", "Market") may stay in English.'
     )
 
 

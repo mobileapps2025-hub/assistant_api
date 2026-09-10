@@ -2,6 +2,7 @@
 from typing import Any, Dict, List, Optional
 
 from app.core.flow import flow
+from app.kb_surfaces import SEARCHABLE_BY_DEFAULT
 from app.retrieval.answerer import answer
 from app.retrieval.contextualizer import contextualize
 from app.retrieval.retriever import retrieve
@@ -26,10 +27,11 @@ def _history_text(messages: List[Dict[str, Any]]) -> str:
 
 
 def run(query: str, messages: List[Dict[str, Any]], *, language: Optional[str] = None,
-        device: Optional[str] = None, memory: Optional[str] = None) -> Dict[str, Any]:
+        device: Optional[str] = None, memory: Optional[str] = None,
+        surfaces=SEARCHABLE_BY_DEFAULT, min_score: float = 0.0) -> Dict[str, Any]:
     contextualized = contextualize(query, messages)
     flow(f"🔁 query → '{contextualized[:50]}'")
-    chunks = retrieve(contextualized)
+    chunks = retrieve(contextualized, surfaces=surfaces, min_score=min_score)
     flow(f"📄 retrieved {len(chunks)} chunk(s) from the KB index")
     return answer(contextualized, chunks, language=language, device=device,
                   history_text=_history_text(messages), memory=memory)

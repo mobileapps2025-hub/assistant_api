@@ -14,6 +14,8 @@ from app.services.memory_service import MemoryService
 from app.services.gap_service import record_gap
 from app.instructions import get_system_prompt, set_request_date
 from app.routing import classify_route, detect_language
+from app.kb_surfaces import min_score_for
+from app.routing.surface import base_surface, classify_surface, search_surfaces
 from app.retrieval import (
     run as run_retrieval, retrieve, build_vision_query, contextualize,
     build_context_sections, render_markers,
@@ -433,9 +435,12 @@ class ChatService:
         )
         flow(f"🧭 preflight → {decision.route}  ({decision.reason[:50]})")
 
+        caller_surface = base_surface(auth_context, device)
+        flow(f"🧱 surface base → {caller_surface}")
+
         result = await self._dispatch_route(
             decision.route, messages, latest_user_message, session_id, auth_context,
-            memory_context, language, device_context
+            memory_context, language, device_context, caller_surface
         )
         flow(f"✅ response ready ({decision.route})")
         return result
@@ -630,6 +635,7 @@ class ChatService:
         memory_context: str,
         language: str,
         device_context: str,
+        caller_surface: str,
     ) -> Dict[str, Any]:
         if route == "PERSONAL" and not _is_authenticated(auth_context):
             flow("⛔ no MCL session → ask to connect")
@@ -638,12 +644,13 @@ class ChatService:
         if _image_urls(latest_user_message) and route != "PERSONAL":
             return await self._handle_text_request(
                 messages, latest_user_message, session_id=session_id,
-                memory_context=memory_context, language=language, device_context=device_context
+                memory_context=memory_context, language=language, device_context=device_context,
+                caller_surface=caller_surface
             )
 
         return await self._handle_agent_request(
             messages, latest_user_message, session_id, auth_context,
-            memory_context, language, device_context
+            memory_context, language, device_context, caller_surface
         )
 
     async def _handle_agent_request(
@@ -655,6 +662,7 @@ class ChatService:
         memory_context: str,
         language: str,
         device_context: str,
+        caller_surface: str = "app",
     ) -> Dict[str, Any]:
         """Manager agent: answer directly, search docs, or use live MCL tools.
 
@@ -695,6 +703,7 @@ class ChatService:
         used_knowledge = False
         contextualized_gap = ""
         known_markets: List[Dict[str, Any]] = []
+        knowledge_surface: Optional[str] = None
 
         try:
             for step in range(MAX_TOOL_STEPS):
@@ -743,7 +752,11 @@ class ChatService:
                     query = str(tool_args.get("query") or "").strip()
                     contextualized = contextualize(query, messages) if query else ""
                     contextualized_gap = contextualized or contextualized_gap
-                    chunks = retrieve(contextualized) if contextualized else []
+                    if knowledge_surface is None:
+                        knowledge_surface = classify_surface(query or contextualized, messages, caller_surface)
+                        flow(f"🧭 knowledge surface → {knowledge_surface}")
+                    chunks = retrieve(contextualized, surfaces=search_surfaces(knowledge_surface),
+                                      min_score=min_score_for(knowledge_surface)) if contextualized else []
                     used_knowledge = True
                     retrieved_units.extend(chunks)
                     allowed_sources.update(
@@ -937,6 +950,7 @@ class ChatService:
         memory_context: str = "",
         language: str = "",
         device_context: str = "",
+        caller_surface: str = "app",
     ) -> Dict[str, Any]:
         logger.info(f"Answering over {len(image_urls)} image(s)")
 
@@ -959,8 +973,11 @@ class ChatService:
             search_query = raw.strip()
         flow(f"🔎 vision query → '{search_query[:50]}'")
 
-        chunks = retrieve(search_query) if search_query else []
-        flow(f"📄 retrieved {len(chunks)} chunk(s) from Ragie")
+        surface = classify_surface(search_query, messages, caller_surface)
+        flow(f"🧭 knowledge surface (image) → {surface}")
+        chunks = retrieve(search_query, surfaces=search_surfaces(surface),
+                          min_score=min_score_for(surface)) if search_query else []
+        flow(f"📄 retrieved {len(chunks)} chunk(s) from the KB index")
 
         api_messages = [
             {"role": "system", "content": get_system_prompt(
@@ -1174,12 +1191,14 @@ class ChatService:
         memory_context: str = "",
         language: str = "",
         device_context: str = "",
+        caller_surface: str = "app",
     ) -> Dict[str, Any]:
         image_urls = _image_urls(latest_user_message)
         if image_urls:
             flow("📚 KNOWLEDGE → image path")
             return await self._answer_over_image(
-                messages, latest_user_message, image_urls, memory_context, language, device_context
+                messages, latest_user_message, image_urls, memory_context, language,
+                device_context, caller_surface
             )
 
         flow("📚 KNOWLEDGE → text path")
@@ -1189,11 +1208,14 @@ class ChatService:
         user_query = user_query.strip()
 
         logger.info(f"[KNOWLEDGE] query='{user_query[:60]}'")
+        surface = classify_surface(user_query, messages, caller_surface)
+        flow(f"🧭 knowledge surface → {surface}")
 
         try:
             result = run_retrieval(
                 user_query, messages, language=language or None,
-                device=device_context or None, memory=memory_context or None
+                device=device_context or None, memory=memory_context or None,
+                surfaces=search_surfaces(surface), min_score=min_score_for(surface)
             )
             return {"response": result["answer"], "success": True, "has_vision": False}
         except Exception as e:

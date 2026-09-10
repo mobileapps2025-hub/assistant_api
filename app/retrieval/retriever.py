@@ -15,6 +15,7 @@ import numpy as np
 
 from app.core.config import KB_INDEX_DIR, KB_TOP_K, client
 from app.core.logging import get_logger
+from app.kb_surfaces import SEARCHABLE_BY_DEFAULT
 
 logger = get_logger(__name__)
 
@@ -28,6 +29,7 @@ class Unit:
     document_name: str
     text: str
     title: str = ""
+    surface: str = "both"           # app | web | both — which product the unit describes
     images: List[Dict[str, Any]] = field(default_factory=list)   # [{id, path, alt}]
     steps: List[Dict[str, Any]] = field(default_factory=list)    # procedure: [{text, images}]
 
@@ -61,7 +63,8 @@ def _embed_query(query: str) -> Optional[np.ndarray]:
         return None
 
 
-def retrieve(query: str, *, top_k: int = KB_TOP_K) -> List[Unit]:
+def retrieve(query: str, *, top_k: int = KB_TOP_K,
+             surfaces: frozenset = SEARCHABLE_BY_DEFAULT, min_score: float = 0.0) -> List[Unit]:
     loaded = _load_index()
     if loaded is None:
         return []
@@ -71,7 +74,10 @@ def retrieve(query: str, *, top_k: int = KB_TOP_K) -> List[Unit]:
 
     units, embeddings = loaded
     scores = embeddings @ query_vector
-    top = np.argsort(scores)[::-1][:top_k]
-    logger.info("[RETRIEVAL] top-%d: %s", top_k,
+    allowed = np.array([u.surface in surfaces for u in units])
+    scores = np.where(allowed, scores, -np.inf)
+    top = [i for i in np.argsort(scores)[::-1][:top_k]
+           if np.isfinite(scores[i]) and scores[i] >= min_score]
+    logger.info("[RETRIEVAL] surfaces=%s min=%.2f top-%d: %s", sorted(surfaces), min_score, top_k,
                 ", ".join(f"{units[i].kind}:{units[i].id}={scores[i]:.3f}" for i in top))
     return [units[i] for i in top]

@@ -246,8 +246,9 @@ def test_history_text_excludes_latest_and_formats_turns():
 def test_run_threads_contextualized_query(monkeypatch):
     captured = {}
 
-    def fake_retrieve(query):
+    def fake_retrieve(query, surfaces=None, min_score=0.0):
         captured["retrieved"] = query
+        captured["surfaces"] = surfaces
         return [_chunk("ctx")]
 
     def fake_answer(query, chunks, *, language=None, device=None, history_text="", memory=None):

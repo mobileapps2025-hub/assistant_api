@@ -1,0 +1,26 @@
+{
+  "screen": "Overview",
+  "menu_label": "Overview",
+  "route": "/",
+  "document_name": "MCL Web Guide - Overview",
+  "aliases": ["overview", "company overview", "dashboard", "home", "standard dashboard", "start page", "landing page"],
+  "overview": "Overview is the first item in the left menu and the page you land on when you open the MCL web platform. Its heading is 'Company overview'. It summarises checklists, tasks and answers by market for a period you choose. At the top is a Filters bar with Period, Market group, Checklist group and Checklists, and an Apply filters button. Below it are summary counters: Executed checklists, Missed checklists, Assigned tasks, Positive answers and Negative answers. Under the counters are two tabs, Checklists and Tasks, and cards such as Completed checklists, Checklists by status and Answers. This page is for seeing the state of the company at a glance; you do not create checklists or tasks here.",
+  "screenshots": [
+    {
+      "id": "web-overview",
+      "file": "web-overview.jpg",
+      "alt": "The Company overview page in the MCL web platform",
+      "description": "The MCL web Overview page titled 'Company overview'. A Filters bar with Period, Market group, Checklist group, Checklists and Apply filters. Summary counters for Executed checklists, Missed checklists, Assigned tasks, Positive answers and Negative answers, then Checklists and Tasks tabs with cards for Completed checklists, Checklists by status and Answers."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "web_filter_overview",
+      "title": "Change what the Overview shows",
+      "steps": [
+        {"text": "In the Filters bar, choose a Period, and optionally a Market group, Checklist group or specific Checklists.", "image": "web-overview"},
+        {"text": "Click Apply filters to refresh the counters and cards for that selection.", "image": null}
+      ]
+    }
+  ]
+}

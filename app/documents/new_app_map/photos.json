@@ -1,0 +1,26 @@
+{
+  "screen": "Photo management",
+  "menu_label": "Photo management",
+  "route": "/modules/photos",
+  "document_name": "MCL Web Guide - Photo management",
+  "aliases": ["photos", "photo management", "photo gallery", "photo evidence", "images", "pictures"],
+  "overview": "Photo management is in the left menu and its heading is 'Photo gallery'. It shows the photo evidence captured while checklists were completed, so you can review pictures by period, market, checklist and question. At the top is a filter row: Period, Day, Market, Department, Checklist and Question, with the selected period shown beside it. Below the filters the matching photos load in a gallery. This page is for reviewing existing photo evidence, not for taking or uploading photos.",
+  "screenshots": [
+    {
+      "id": "web-photos",
+      "file": "web-photos.jpg",
+      "alt": "The Photo gallery page in the MCL web platform",
+      "description": "The MCL web Photo management page titled 'Photo gallery'. A filter row with Period, Day, Market, Department, Checklist and Question, the selected period shown beside it, and a gallery area below that loads the matching photo evidence."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "web_review_photos",
+      "title": "Review photo evidence",
+      "steps": [
+        {"text": "On the Photo management page, set the Period and Day, then narrow by Market, Department, Checklist or Question.", "image": "web-photos"},
+        {"text": "The gallery below updates to show the photos that match your filters.", "image": null}
+      ]
+    }
+  ]
+}
