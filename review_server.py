@@ -11,11 +11,14 @@ from pathlib import Path
 
 import httpx
 import uvicorn
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from datetime import datetime, timezone
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 SELF_DIR = Path(__file__).resolve().parent
 REVIEW_DIR = SELF_DIR / "kb_review"

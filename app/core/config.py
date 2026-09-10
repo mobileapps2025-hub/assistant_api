@@ -39,6 +39,9 @@ API_PUBLIC_URL = _resolve_public_url()
 GAP_SINK_URL = os.getenv("GAP_SINK_URL", "").strip()
 GAP_INGEST_TOKEN = os.getenv("GAP_INGEST_TOKEN", "").strip()
 
+# Shared secret MCL.Api presents when it forwards a user's turn. Unset = that surface is closed.
+ASSISTANT_SERVICE_SECRET = os.getenv("ASSISTANT_SERVICE_SECRET", "").strip()
+
 
 def _resolve_memories_dir() -> str:
     explicit = os.getenv("MEMORIES_DIR")

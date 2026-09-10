@@ -22,6 +22,7 @@ from app.enforcement import check_tool_call, enforce_answer
 from app.enforcement.actions import recall_action_context, record_action
 from app.enforcement.pending import create_pending, peek_pending, take_pending
 from app.core.localize import localize
+from app.platform import tools as platform_tools
 
 logger = get_logger(__name__)
 
@@ -185,7 +186,21 @@ def _image_urls(message: Dict[str, Any]) -> List[str]:
 
 
 def _is_authenticated(auth_context: Optional[AuthContext]) -> bool:
-    return bool(auth_context and auth_context.access_token)
+    return bool(auth_context and (auth_context.access_token or auth_context.platform_turn))
+
+
+def _is_platform_actor(auth_context: Optional[AuthContext]) -> bool:
+    return bool(auth_context and getattr(auth_context, "platform_turn", None))
+
+
+def _live_tools_for(auth_context: Optional[AuthContext]) -> List[Dict[str, Any]]:
+    """Legacy callers bring a bearer token and get the /v8 tools. A platform actor never has one:
+    their live data comes through MCL.Api's operations endpoint, and writes become proposals."""
+    if _is_platform_actor(auth_context):
+        return platform_tools.PLATFORM_TOOLS
+    if auth_context and auth_context.access_token:
+        return MCL_USER_TOOLS
+    return []
 
 
 def _model_content(message: Dict[str, Any]) -> Any:
@@ -649,8 +664,11 @@ class ChatService:
         tools in one bounded loop.
         """
         flow("🤖 AGENT → manager loop")
-        mcl_tools = MCL_USER_TOOLS if _is_authenticated(auth_context) else []
-        agent_tools = [KNOWLEDGE_TOOL, MISSING_INFO_TOOL, ACTION_PLAN_TOOL, *mcl_tools]
+        mcl_tools = _live_tools_for(auth_context)
+        platform = _is_platform_actor(auth_context)
+        # The multi-step plan tool belongs to the legacy write tools only.
+        plan_tools = [ACTION_PLAN_TOOL] if mcl_tools and not platform else []
+        agent_tools = [KNOWLEDGE_TOOL, MISSING_INFO_TOOL, *plan_tools, *mcl_tools]
         action_context = recall_action_context(
             session_id, auth_context.user_id if auth_context else None
         )
@@ -664,6 +682,8 @@ class ChatService:
         )
 
         api_messages = [{"role": "system", "content": system_prompt}]
+        if platform:
+            api_messages.append({"role": "system", "content": platform_tools.PLATFORM_SURFACE_NOTE})
         if action_context:
             api_messages.append({"role": "system", "content": action_context})
         api_messages.extend(
@@ -674,6 +694,7 @@ class ChatService:
         retrieved_units: List[Any] = []
         used_knowledge = False
         contextualized_gap = ""
+        known_markets: List[Dict[str, Any]] = []
 
         try:
             for step in range(MAX_TOOL_STEPS):
@@ -763,6 +784,27 @@ class ChatService:
                         ),
                     })))
                     continue
+
+                if platform and platform_tools.is_operation_tool(function_name):
+                    tool_content = await platform_tools.run_operation(auth_context.platform_turn, function_name, tool_args)
+                    known_markets = platform_tools.markets_in(tool_content) or known_markets
+                    api_messages.append(_tool_call_message(tool_call))
+                    api_messages.append(_tool_result_message(tool_call, json.dumps(tool_content, ensure_ascii=False)))
+                    continue
+
+                if platform and platform_tools.is_proposal_tool(function_name):
+                    if function_name == platform_tools.PROPOSE_TASK and not known_markets:
+                        # Creating needs a market: fetch the user's real market ids to resolve against.
+                        listing = await platform_tools.run_operation(auth_context.platform_turn, platform_tools.LIST_TASKS, {})
+                        known_markets = platform_tools.markets_in(listing)
+                    proposal = platform_tools.build_proposal(function_name, tool_args, known_markets)
+                    problem = platform_tools.proposal_problem(function_name, tool_args, proposal, known_markets)
+                    if problem:
+                        api_messages.append(_tool_call_message(tool_call))
+                        api_messages.append(_tool_result_message(tool_call, json.dumps({"ok": False, "instruction": problem}, ensure_ascii=False)))
+                        continue
+                    flow(f"📋 proposal for MCL.Api: {proposal['summary'][:60]}")
+                    return {"response": proposal["summary"], "success": True, "has_vision": False, "proposal": proposal}
 
                 if function_name == ACTION_PLAN_TOOL_NAME:
                     if not _is_authenticated(auth_context):

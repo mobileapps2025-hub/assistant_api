@@ -40,13 +40,98 @@ class Message(BaseModel):
         }
 
 
+class PlatformTurn(BaseModel):
+    """What MCL.Api hands MarieClaire for one turn so she can ask it for live data.
+
+    The token is bound by MCL.Api to this actor and this turn, expires in about a minute, and
+    only opens the operations allowlist. It is never a user credential.
+    """
+    id: str
+    token: str
+    operations_url: str
+
+
 class AuthContext(BaseModel):
-    access_token: Optional[str] = None
+    access_token: Optional[str] = None      # legacy callers: the user's MCL bearer token
     user_id: Optional[str] = None
     company_id: Optional[str] = None
     company_name: Optional[str] = None
     full_name: Optional[str] = None
     email: Optional[str] = None
+    role_ids: List[str] = Field(default_factory=list)
+    platform_turn: Optional[PlatformTurn] = None    # MCL.Api callers: identity came from the session
+
+
+class PlatformActor(BaseModel):
+    """The signed-in user as MCL.Api derived them from the validated session. Never from the browser."""
+    user_id: str = Field(alias="userId")
+    company_id: str = Field(alias="companyId")
+    role_ids: List[str] = Field(default_factory=list, alias="roleIds")
+    language: str = "de"
+    platform: str = "web"
+
+    model_config = {"populate_by_name": True}
+
+
+class PlatformRecord(BaseModel):
+    type: str
+    id: str
+
+
+class PlatformContext(BaseModel):
+    """Where the user is in the app. MCL.Api verified any record before forwarding it."""
+    page: Optional[str] = None
+    record: Optional[PlatformRecord] = None
+    filters: Optional[dict] = None
+
+
+class PlatformTurnGrant(BaseModel):
+    id: str
+    token: str
+    operations_url: str = Field(alias="operationsUrl")
+
+    model_config = {"populate_by_name": True}
+
+
+class PlatformHistoryMessage(BaseModel):
+    role: str
+    content: str
+
+
+class PlatformTurnRequest(BaseModel):
+    actor: PlatformActor
+    message: str
+    history: List[PlatformHistoryMessage] = Field(default_factory=list)
+    context: Optional[PlatformContext] = None
+    turn: PlatformTurnGrant
+
+
+class PlatformOutcome(BaseModel):
+    status: str
+    code: str
+    task_id: Optional[str] = Field(default=None, alias="taskId")
+    task_number: Optional[int] = Field(default=None, alias="taskNumber")
+
+    model_config = {"populate_by_name": True}
+
+
+class PlatformClosureRequest(BaseModel):
+    actor: PlatformActor
+    history: List[PlatformHistoryMessage] = Field(default_factory=list)
+    proposal: dict
+    outcome: PlatformOutcome
+
+
+class PlatformClosureResponse(BaseModel):
+    message: Optional[str] = None
+
+
+class PlatformTurnResponse(BaseModel):
+    turn_id: str = Field(alias="turnId")
+    reply: str
+    proposal: Optional[dict] = None
+
+    model_config = {"populate_by_name": True}
 
 
 class SessionRequest(BaseModel):

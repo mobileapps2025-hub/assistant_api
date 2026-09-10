@@ -22,6 +22,7 @@ from app.core.dependencies import get_chat_service, get_speech_service
 from app.services.chat_service import ChatService
 from app.services.speech_service import SpeechService
 from app.routers import vision
+from app.platform.router import router as platform_router
 from app.core.logging import setup_logging, get_logger, request_id_var
 from app.clients.mcl_service_client import MCLServiceClient
 from app.services.memory_service import MemoryService
@@ -89,6 +90,7 @@ app.add_middleware(
 )
 
 app.include_router(vision.router)
+app.include_router(platform_router)
 
 # Serve visual guide images as static files
 app.mount("/images", StaticFiles(directory="static/images"), name="images")
