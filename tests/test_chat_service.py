@@ -271,11 +271,11 @@ class TestHandleAgentRequest:
         chunk = Unit(kind="text", id="u1", document_name="guide.pdf", text="MCL runs on phones and tablets.")
         recorded = []
 
-        async def fake_record(question, language=None):
-            recorded.append((question, language))
+        async def fake_record(question, language=None, surface=None, role=None):
+            recorded.append((question, language, surface))
             return True
 
-        with patch("app.services.chat_service.contextualize", return_value="MCL smartwatch support"),              patch("app.services.chat_service.retrieve", return_value=[chunk]),              patch("app.services.chat_service.record_gap", side_effect=fake_record),              patch("app.services.chat_service.client") as mock_client:
+        with patch("app.services.chat_service.contextualize", return_value="MCL smartwatch support"),              patch("app.services.chat_service.retrieve", return_value=[chunk]),              patch("app.services.chat_service.record_gap", side_effect=fake_record),              patch("app.services.chat_service.classify_surface", return_value="app"),              patch("app.services.chat_service.client") as mock_client:
             mock_client.chat.completions.create.side_effect = [
                 _tool_response("search_mcl_documentation", '{"query":"smartwatch"}'),
                 _tool_response("report_missing_information", '{"question":"Does MCL run on a smartwatch?"}'),
@@ -285,7 +285,7 @@ class TestHandleAgentRequest:
                 messages, messages[0], "s1", None, "", "English", ""
             )
 
-        assert recorded == [("Does MCL run on a smartwatch?", "English")]
+        assert recorded == [("Does MCL run on a smartwatch?", "English", "app")]
         assert "logged" in result["response"]
 
     @pytest.mark.asyncio
@@ -301,7 +301,7 @@ class TestHandleAgentRequest:
             recorded.append(question)
             return True
 
-        with patch("app.services.chat_service.contextualize", return_value="MCL sync"),              patch("app.services.chat_service.retrieve", return_value=[chunk]),              patch("app.services.chat_service.record_gap", side_effect=fake_record),              patch("app.services.chat_service.client") as mock_client:
+        with patch("app.services.chat_service.contextualize", return_value="MCL sync"),              patch("app.services.chat_service.retrieve", return_value=[chunk]),              patch("app.services.chat_service.record_gap", side_effect=fake_record),              patch("app.services.chat_service.classify_surface", return_value="app"),              patch("app.services.chat_service.client") as mock_client:
             mock_client.chat.completions.create.side_effect = [
                 _tool_response("search_mcl_documentation", '{"query":"sync"}'),
                 _text_response("Tap Sync [Source: sync.pdf]."),

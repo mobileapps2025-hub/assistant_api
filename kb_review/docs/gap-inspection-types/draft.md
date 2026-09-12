@@ -1,7 +1,0 @@
-In MCL, there are two types of inspections: Routine and Special. When you start an inspection in the mobile app, you can choose between these two options. Routine is the default choice, but you can switch to Special if needed. This choice is only available in the mobile app and does not affect how the checklist is scheduled or tracked.
-
-Each checklist also has a frequency setting that determines how often it should be completed. This setting is configured in the web dashboard and can be set to options like Daily, Weekly, Monthly, or N/A for on-demand checklists. The frequency setting is what actually controls whether a checklist is recurring or ad-hoc.
-
-Choosing Special instead of Routine does not change the scheduling of the checklist. It is simply a label that is recorded with the inspection. Both types of inspections will show as completed in the system, and the time-of-day restrictions and validity dates apply equally to both.
-
-In reports, the Routine or Special designation is included in the finished report and can be seen in the mobile app's history and in the dashboard's Data Analysis charts. However, it is not visible in the main list of completed reports or in notification emails sent after an inspection is finished.

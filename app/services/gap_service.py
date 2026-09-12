@@ -37,26 +37,27 @@ def _clean(question: str) -> str:
     return _WHITESPACE.sub(" ", question).strip()[:MAX_QUESTION_CHARS]
 
 
-async def record_gap(question: str, language: Optional[str] = None) -> bool:
+async def record_gap(question: str, language: Optional[str] = None,
+                     surface: Optional[str] = None, role: Optional[str] = None) -> bool:
     """Log one unanswerable question. Never raises — a failure here must not break a reply."""
     question = _clean(question or "")
     if not question:
         return False
     try:
         if GAP_SINK_URL:
-            return await _forward(question, language)
-        return await _store(question, language)
+            return await _forward(question, language, surface, role)
+        return await _store(question, language, surface, role)
     except Exception as err:
         logger.warning(f"[GAPS] could not record question: {err}")
         return False
 
 
-async def _forward(question: str, language: Optional[str]) -> bool:
+async def _forward(question: str, language: Optional[str], surface: Optional[str], role: Optional[str]) -> bool:
     headers = {"Authorization": f"Bearer {GAP_INGEST_TOKEN}"} if GAP_INGEST_TOKEN else {}
     async with httpx.AsyncClient(timeout=8) as http:
         response = await http.post(
             GAP_SINK_URL.rstrip("/") + "/api/gaps",
-            json={"question": question, "language": language},
+            json={"question": question, "language": language, "surface": surface, "role": role},
             headers=headers,
         )
     if response.status_code >= 400:
@@ -66,7 +67,7 @@ async def _forward(question: str, language: Optional[str]) -> bool:
     return True
 
 
-async def _store(question: str, language: Optional[str]) -> bool:
+async def _store(question: str, language: Optional[str], surface: Optional[str], role: Optional[str]) -> bool:
     from app.core.config import AsyncSessionLocal
     from app.core.database import DocumentationGap
 
@@ -87,7 +88,8 @@ async def _store(question: str, language: Optional[str]) -> bool:
             )
             logger.info(f"[GAPS] question asked again ({existing.times_asked + 1}x)")
         else:
-            session.add(DocumentationGap(fingerprint=digest, question=question, language=language))
+            session.add(DocumentationGap(
+                fingerprint=digest, question=question, language=language, surface=surface, role=role))
             logger.info("[GAPS] new question recorded")
         await session.commit()
     return True

@@ -76,13 +76,40 @@ ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
 DATABASE_CONNECTION_STRING = os.getenv("DATABASE_CONNECTION_STRING", "") or \
                              os.getenv("APPSETTING_DATABASE_CONNECTION_STRING", "")
 
+
+def _to_sqlalchemy_url(conn: str):
+    """Accept a real SQLAlchemy URL as-is; convert an Azure/ADO.NET keyword string
+    (Server=...;Initial Catalog=...;User ID=...;Password=...) into an aioodbc URL.
+    URL.create escapes the password itself, so characters like '+' survive."""
+    if "://" in conn:
+        return conn
+    from sqlalchemy.engine import URL
+    kv = dict(p.split("=", 1) for p in conn.split(";") if "=" in p)
+    g = lambda *names: next((v for k, v in kv.items() for n in names if k.strip().lower() == n), "")
+    server = g("server", "data source").removeprefix("tcp:")
+    host, _, port = server.partition(",")
+    return URL.create(
+        "mssql+aioodbc",
+        username=g("user id", "uid", "user"),
+        password=g("password", "pwd"),
+        host=host,
+        port=int(port) if port else None,
+        database=g("initial catalog", "database"),
+        query={
+            "driver": "ODBC Driver 18 for SQL Server",
+            "Encrypt": "yes",
+            "TrustServerCertificate": "yes" if g("trustservercertificate").lower() == "true" else "no",
+        },
+    )
+
+
 engine = None
 AsyncSessionLocal = None
 
 if DATABASE_CONNECTION_STRING:
     try:
         engine = create_async_engine(
-            DATABASE_CONNECTION_STRING,
+            _to_sqlalchemy_url(DATABASE_CONNECTION_STRING),
             echo=False,
             future=True
         )

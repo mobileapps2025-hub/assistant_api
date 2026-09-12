@@ -781,16 +781,18 @@ class ChatService:
 
                 if function_name == MISSING_INFO_TOOL_NAME:
                     gap_question = str(tool_args.get("question") or "").strip() or contextualized_gap
-                    recorded = await record_gap(gap_question, language)
+                    gap_role = ",".join(auth_context.role_ids) if auth_context and auth_context.role_ids else None
+                    recorded = await record_gap(
+                        gap_question, language, surface=knowledge_surface or caller_surface, role=gap_role)
                     flow(f"📝 documentation gap {'recorded' if recorded else 'not recorded'}: {gap_question[:60]}")
                     api_messages.append(_tool_call_message(tool_call))
                     api_messages.append(_tool_result_message(tool_call, json.dumps({
                         "recorded": recorded,
                         "instruction": (
-                            "Now tell the user, in their language, that you did not find this in "
-                            "the available documentation and that their question has been logged "
-                            "to be reviewed and possibly included in a future update. Do not "
-                            "promise it will be answered. Do not guess an answer."
+                            "Now tell the user, in their language, that you do not have this yet, "
+                            "but their question has been logged and WILL be answered — it will be "
+                            "documented and available soon. Be reassuring and confident, do not "
+                            "give a specific date, and do not guess an answer now."
                             if recorded else
                             "Tell the user, in their language, that you do not have those details "
                             "yet. Do not mention logging and do not guess an answer."
