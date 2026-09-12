@@ -654,7 +654,8 @@ class ChatService:
 
         return await self._handle_agent_request(
             messages, latest_user_message, session_id, auth_context,
-            memory_context, language, device_context, caller_surface, caller_capabilities
+            memory_context, language, device_context, caller_surface, caller_capabilities,
+            route=route,
         )
 
     async def _handle_agent_request(
@@ -668,6 +669,7 @@ class ChatService:
         device_context: str,
         caller_surface: str = "app",
         caller_capabilities: frozenset = frozenset(),
+        route: str = "KNOWLEDGE",
     ) -> Dict[str, Any]:
         """Manager agent: answer directly, search docs, or use live MCL tools.
 
@@ -675,13 +677,21 @@ class ChatService:
         pre-check, but normal text turns are not locked into a single downstream path.
         The capable model can call the documentation search tool and authenticated MCL
         tools in one bounded loop.
+
+        The one exception is the ASSISTANT route — questions about MarieClaire herself. She
+        answers those from her own self-knowledge (her tool descriptions, this conversation,
+        and her recent actions), so she is given no tools: the MCL knowledge base holds only
+        product facts and would be the wrong source.
         """
         flow("🤖 AGENT → manager loop")
         mcl_tools = _live_tools_for(auth_context)
         platform = _is_platform_actor(auth_context)
-        # The multi-step plan tool belongs to the legacy write tools only.
-        plan_tools = [ACTION_PLAN_TOOL] if mcl_tools and not platform else []
-        agent_tools = [KNOWLEDGE_TOOL, MISSING_INFO_TOOL, *plan_tools, *mcl_tools]
+        if route == "ASSISTANT":
+            agent_tools = []
+        else:
+            # The multi-step plan tool belongs to the legacy write tools only.
+            plan_tools = [ACTION_PLAN_TOOL] if mcl_tools and not platform else []
+            agent_tools = [KNOWLEDGE_TOOL, MISSING_INFO_TOOL, *plan_tools, *mcl_tools]
         action_context = recall_action_context(
             session_id, auth_context.user_id if auth_context else None
         )
@@ -710,16 +720,19 @@ class ChatService:
         known_markets: List[Dict[str, Any]] = []
         knowledge_surface: Optional[str] = None
 
+        tool_params = (
+            {"tools": agent_tools, "tool_choice": "auto", "parallel_tool_calls": False}
+            if agent_tools else {}
+        )
+
         try:
             for step in range(MAX_TOOL_STEPS):
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=api_messages,
-                    tools=agent_tools,
-                    tool_choice="auto",
-                    parallel_tool_calls=False,
                     temperature=0,
                     timeout=45,
+                    **tool_params,
                 )
                 choice = response.choices[0]
 

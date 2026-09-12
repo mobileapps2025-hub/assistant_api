@@ -16,7 +16,7 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-Route = Literal["CHAT", "KNOWLEDGE", "PERSONAL"]
+Route = Literal["CHAT", "ASSISTANT", "KNOWLEDGE", "PERSONAL"]
 
 ROUTING_MODEL = "gpt-4o-mini"
 DEFAULT_ROUTE: Route = "KNOWLEDGE"
@@ -33,14 +33,15 @@ MarieClaire can:
 
 Read the whole conversation, but classify the user's LATEST message; earlier turns are context (use them to resolve follow-ups like "and how do I delete it?" and references like "what do you mean by that?").
 
-PERSONAL — the user wants their OWN live data that MarieClaire must fetch via the tools above: their profile/account, company or role, assigned markets, their own checklists, their open task count, or their company's actual configuration (its departments, its checklist questions, how its markets map to departments). Typical phrasing: "my ...", "our ...", "do I have ...", "who am I", "what departments/questions/markets does my company have". Prefer PERSONAL when the question asks about the user's own company's concrete data, even without the word "my".
-KNOWLEDGE — a GENERAL product-support question about how the MCL app works, likely requiring documentation: how to use a feature, what something is or means IN MCL, troubleshooting, platform/device differences, dashboards, sync. This is about the PRODUCT, not about the assistant.
-CHAT — small talk AND anything about the ASSISTANT HERSELF: greetings, thanks, testing; who she is; what she can do or fetch for you ("what can you help with", "what kind of data can you get me", "can you delete a task?"); or a message that refers back to her own words ("what do you mean by 'my data'?").
+The four labels are about the user's INTENT — where the answer should come from:
 
-Decisive rule: if the message is about what the ASSISTANT can do, her scope, or her own prior words, choose CHAT — even when it mentions MCL data or features. KNOWLEDGE is only for questions about the MCL product itself.
-"Help me" rule: "can you help me create/set up/configure/do X" asks you to accomplish a concrete task now — never CHAT. Choose PERSONAL only when X matches one of the tools above (a live read of the user's own records, or a write those tools perform, like creating or deleting a task). Otherwise — being guided through a feature the tools cannot do for them, such as creating or configuring a checklist, setting up recurrence, or using the wizard — choose KNOWLEDGE, the step-by-step how-to. So "and can you help me create one?" after a checklist how-to is KNOWLEDGE, not PERSONAL. Only treat "can you ...?" as CHAT when it asks whether a capability exists in the abstract ("can you delete a task?", "what can you do?").
-Recent-action rule: if the user asks what the ASSISTANT just did, what values/settings/defaults she used, what she assumed, why she asked something, or why she answered a certain way, choose CHAT. These are questions about the assistant's own behavior or recent action context, not MCL documentation.
-Pick the single best preflight label for the latest message."""
+CHAT — pure small talk with no MCL content: greetings, thanks, testing, how-are-you.
+ASSISTANT — the message is about MarieClaire HERSELF: who she is, what she can or cannot do, her scope or limits ("what can you do", "what data can you get me", "can you delete a task?"), a reference back to her own words ("what do you mean by 'my data'?"), or what she just did, assumed, or which defaults she used. She answers these from her own self-knowledge, not from MCL documentation.
+KNOWLEDGE — the user wants to know or do something in the MCL PRODUCT: how a feature works, steps to accomplish a task, what something means in MCL, troubleshooting, platform/device differences, dashboards, sync. "Can you help me create/set up/do X" belongs here — the user wants to be walked through the task, not told whether the assistant is capable.
+PERSONAL — the user wants their OWN live data or an action on it that MarieClaire must reach via the tools above: their profile/account, company or role, assigned markets, their own checklists, their open task count, their company's actual configuration (its departments, its checklist questions, how its markets map to departments), or a create/edit/note/delete on their records. Typical phrasing: "my ...", "our ...", "do I have ...", "who am I". Choose PERSONAL when the user wants their company's concrete configuration or records; choose KNOWLEDGE when they ask how a feature works in general.
+
+The key line: "what CAN you do" is ASSISTANT (about her); "help me DO it" is KNOWLEDGE or PERSONAL (about the task). Choose PERSONAL over KNOWLEDGE when the task is the user's own data or an action the tools above perform.
+Pick the single best label for the latest message."""
 
 _DEFAULT_TOOLS_SUMMARY = "the user's profile, their markets, their checklists, and their open task count"
 
@@ -64,7 +65,7 @@ _ROUTE_SCHEMA = {
     "schema": {
         "type": "object",
         "properties": {
-            "route": {"type": "string", "enum": ["CHAT", "KNOWLEDGE", "PERSONAL"]},
+            "route": {"type": "string", "enum": ["CHAT", "ASSISTANT", "KNOWLEDGE", "PERSONAL"]},
             "reason": {"type": "string"},
         },
         "required": ["route", "reason"],

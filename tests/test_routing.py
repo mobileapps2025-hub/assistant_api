@@ -23,7 +23,7 @@ def _decision_json(route: str, reason: str = "r") -> str:
     return json.dumps({"route": route, "reason": reason})
 
 
-@pytest.mark.parametrize("route", ["CHAT", "KNOWLEDGE", "PERSONAL"])
+@pytest.mark.parametrize("route", ["CHAT", "ASSISTANT", "KNOWLEDGE", "PERSONAL"])
 def test_returns_label_from_structured_output(route):
     with patch("app.routing.router.client") as mock_client:
         mock_client.chat.completions.create.return_value = _response(_decision_json(route))
@@ -113,46 +113,28 @@ def test_multimodal_text_is_extracted():
     assert sent[-1]["content"] == "who am I"
 
 
-def test_tool_catalog_and_capability_rule_reach_system_prompt():
+def test_tool_catalog_and_four_buckets_reach_system_prompt():
     catalog = [{"type": "function", "function": {"name": "get_open_task_count", "description": "..."}}]
     with patch("app.routing.router.client") as mock_client:
-        mock_client.chat.completions.create.return_value = _response(_decision_json("CHAT"))
+        mock_client.chat.completions.create.return_value = _response(_decision_json("ASSISTANT"))
         classify_route([{"role": "user", "content": "what data can you get me?"}], tools_catalog=catalog)
         system_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
     assert "get_open_task_count" in system_prompt          # real capabilities injected
-    assert "ASSISTANT" in system_prompt                    # capability-vs-product rule present
+    for label in ("CHAT", "ASSISTANT", "KNOWLEDGE", "PERSONAL"):
+        assert label in system_prompt                      # all four buckets defined
     assert "preflight-classify" in system_prompt
     assert "not choose the final answer strategy" in system_prompt
 
 
-def test_recent_action_questions_rule_reaches_system_prompt():
-    messages = [
-        {"role": "user", "content": 'Create a task called "New default task"'},
-        {"role": "assistant", "content": '✓ Create a new task called "New default task" with default settings.'},
-        {"role": "user", "content": "What were the default settings?"},
-    ]
+def test_self_and_task_boundary_reaches_system_prompt():
     with patch("app.routing.router.client") as mock_client:
-        mock_client.chat.completions.create.return_value = _response(_decision_json("CHAT"))
-        classify_route(messages)
+        mock_client.chat.completions.create.return_value = _response(_decision_json("ASSISTANT"))
+        classify_route([{"role": "user", "content": "what can you do?"}])
         system_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
-    assert "Recent-action rule" in system_prompt
-    assert "values/settings/defaults" in system_prompt
-    assert "not MCL documentation" in system_prompt
-
-
-def test_help_me_task_rule_reaches_system_prompt():
-    messages = [
-        {"role": "user", "content": "how do I create a checklist"},
-        {"role": "assistant", "content": "Open the Checklist Editor, then..."},
-        {"role": "user", "content": "And can you help me creating one?"},
-    ]
-    with patch("app.routing.router.client") as mock_client:
-        mock_client.chat.completions.create.return_value = _response(_decision_json("KNOWLEDGE"))
-        classify_route(messages)
-        system_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
-    assert '"Help me" rule' in system_prompt
-    assert "accomplish a concrete task now" in system_prompt
-    assert "and can you help me create one?" in system_prompt
+    assert "about MarieClaire HERSELF" in system_prompt                 # ASSISTANT bucket
+    assert "from her own self-knowledge" in system_prompt
+    assert '"what CAN you do" is ASSISTANT' in system_prompt            # the boundary line
+    assert '"help me DO it" is KNOWLEDGE or PERSONAL' in system_prompt
 
 
 def test_system_prompt_has_default_tools_summary_without_catalog():

@@ -32,26 +32,26 @@ def A(text):
 
 
 LABELED = [
-    # CHAT
+    # CHAT — pure small talk, no MCL content
     {"messages": [U("Hi, how are you?")], "expected": "CHAT"},
     {"messages": [U("thanks!")], "expected": "CHAT"},
-    {"messages": [U("what can you do?")], "expected": "CHAT"},
     {"messages": [U("are you a real person?")], "expected": "CHAT"},
     {"messages": [U("Hallo, wie geht's?")], "expected": "CHAT"},
 
-    # Capability / meta questions about the assistant herself (must NOT go to KNOWLEDGE)
-    {"messages": [U("What kind of data can you get me?")], "expected": "CHAT", "note": "capability"},
-    {"messages": [U("Can you delete a task for me?")], "expected": "CHAT", "note": "capability (no write route yet)"},
+    # ASSISTANT — about the assistant herself: scope, capabilities, her own words/actions
+    {"messages": [U("what can you do?")], "expected": "ASSISTANT", "note": "scope"},
+    {"messages": [U("What kind of data can you get me?")], "expected": "ASSISTANT", "note": "capability"},
+    {"messages": [U("Can you delete tasks?")], "expected": "ASSISTANT", "note": "abstract capability"},
     {"messages": [U("What can you help me with"),
                   A("I can help with MCL how-to questions and look up your own MCL data, like your checklists or open tasks."),
                   U('about "my data" what do you mean? What kind of data')],
-     "expected": "CHAT", "note": "self-reference to the bot's own words"},
+     "expected": "ASSISTANT", "note": "self-reference to the bot's own words"},
     {"messages": [A("Anything else?"), U("what do you mean by that?")],
-     "expected": "CHAT", "note": "refers back to assistant's words"},
+     "expected": "ASSISTANT", "note": "refers back to assistant's words"},
     {"messages": [U('Create a task called "New default task"'),
                   A('✓ Create a new task called "New default task" with default settings.'),
                   U("What were the default settings?")],
-     "expected": "CHAT", "note": "recent action defaults"},
+     "expected": "ASSISTANT", "note": "recent action defaults"},
 
     # KNOWLEDGE
     {"messages": [U("How do I create a checklist?")], "expected": "KNOWLEDGE"},
@@ -72,7 +72,7 @@ LABELED = [
     # Company-config reads (new tools) — the user's own company data, fetched via tools
     {"messages": [U("What departments does my company have?")], "expected": "PERSONAL", "note": "company tool"},
     {"messages": [U("What questions are configured in our checklists?")], "expected": "PERSONAL", "note": "company tool"},
-    {"messages": [U("Which markets belong to each department?")], "expected": "PERSONAL", "note": "company tool"},
+    {"messages": [U("Which markets belong to each of our departments?")], "expected": "PERSONAL", "note": "company tool"},
     # Write actions (need a tool) → PERSONAL
     {"messages": [U("Create a task to clean the freezer by Friday")], "expected": "PERSONAL", "note": "write action"},
     {"messages": [U("Delete task 12345")], "expected": "PERSONAL", "note": "write action"},
@@ -90,7 +90,10 @@ LABELED = [
                   U("And can you help me creating one?")],
      "expected": "KNOWLEDGE", "note": "'help me create' is task-guidance, not a scope question"},
     {"messages": [U("Can you help me set up a recurring checklist?")],
-     "expected": "KNOWLEDGE", "note": "'can you help me do X' → how-to, not CHAT"},
+     "expected": "KNOWLEDGE", "note": "'can you help me do X' → how-to, not ASSISTANT"},
+    # The boundary: "what CAN you" (ASSISTANT) vs "help me DO it" (KNOWLEDGE)
+    {"messages": [U("Can you create checklists?")], "expected": "ASSISTANT", "note": "asks about her ability"},
+    {"messages": [U("Help me create a checklist")], "expected": "KNOWLEDGE", "note": "asks to be walked through"},
 ]
 
 DETERMINISM_SUBSET = [

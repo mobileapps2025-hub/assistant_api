@@ -182,6 +182,26 @@ class TestHandleAgentRequest:
         assert result["response"].startswith("I used no due date")
 
     @pytest.mark.asyncio
+    async def test_assistant_route_answers_self_with_no_tools(
+        self, mock_vision_service, mock_image_validator
+    ):
+        service = make_service(mock_vision_service, mock_image_validator)
+        messages = [{"role": "user", "content": "what can you do?"}]
+        with patch("app.services.chat_service.client") as mock_client, \
+             patch("app.services.chat_service.retrieve") as mock_retrieve:
+            mock_client.chat.completions.create.return_value = _text_response(
+                "I answer MCL how-to questions and look up your own MCL data."
+            )
+            result = await service._handle_agent_request(
+                messages, messages[0], "s1", None, "", "English", "", route="ASSISTANT"
+            )
+            kwargs = mock_client.chat.completions.create.call_args.kwargs
+
+        mock_retrieve.assert_not_called()
+        assert "tools" not in kwargs and "tool_choice" not in kwargs   # self-knowledge only
+        assert result["response"].startswith("I answer MCL how-to")
+
+    @pytest.mark.asyncio
     async def test_knowledge_tool_searches_docs_and_enforces_sources(
         self, mock_vision_service, mock_image_validator
     ):
