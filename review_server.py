@@ -130,6 +130,7 @@ def reject_draft(draft_id: str):
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MarieClaire review</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
 <style>
  :root{--bg:#f6f7f9;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#0f766e;
        --web:#0369a1;--web-bg:#e0f2fe;--code:#7c3aed;--code-bg:#f3e8ff;--warn:#b91c1c;--hot:#c2410c}
@@ -151,6 +152,14 @@ PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
  .qtop{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
  .badge{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:3px 9px;border-radius:999px;background:#f1f5f9;color:var(--muted)}
  .badge.web{background:var(--web-bg);color:var(--web)} .badge.code{background:var(--code-bg);color:var(--code)} .badge.app{background:#f1f5f9;color:var(--muted)}
+ .badge.fix{background:#fef3c7;color:#92400e}
+ .note{font-size:13px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin:0 0 10px}
+ .flagged{font-size:12px;color:var(--muted);margin:6px 0 4px}
+ .bubble{background:#f1f5f9;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 12px;font-size:14px;line-height:1.55}
+ .bubble p{margin:0 0 .5rem}.bubble p:last-child{margin-bottom:0}
+ .bubble ol,.bubble ul{margin:.25rem 0 .5rem;padding-left:1.25rem}.bubble li{margin:.15rem 0}
+ .bubble img{max-width:280px;border:1px solid var(--line);border-radius:8px;margin:.4rem 0;display:block}
+ .bubble code{font-size:.85em;background:#e2e8f0;padding:.05rem .3rem;border-radius:.25rem}
  .role{font-size:12.5px;color:var(--muted)} .role b{color:var(--ink);font-weight:600}
  .times{margin-left:auto;font-size:12.5px;color:var(--muted)} .times.hot{color:var(--hot);font-weight:700}
  .qtext{font-size:15.5px;line-height:1.5;margin:2px 0 12px}
@@ -202,19 +211,32 @@ function renderQuestions(problem){
   if(!QUESTIONS.length){ host.innerHTML = '<div class="empty">Nothing waiting. Every question so far was answered from the library.</div>'; return; }
   QUESTIONS.forEach(g=>{
     const surf=(g.surface||'other').toLowerCase(), badge=surf==='web'?'web':(surf==='app'?'app':'');
+    const isFix = g.kind==='correction';
     const card=document.createElement('div'); card.className='card';
     card.innerHTML = `
-      <div class="qtop"><span class="badge ${badge}">${esc(surf)}</span>
+      <div class="qtop">
+        ${isFix?'<span class="badge fix">correction</span>':''}
+        <span class="badge ${badge}">${esc(surf)}</span>
         <span class="role">role <b>${esc(g.role||'—')}</b></span>
-        <span class="times ${g.times_asked>=3?'hot':''}">asked ${g.times_asked}×</span></div>
+        <span class="times ${g.times_asked>=3?'hot':''}">${isFix?'reported':'asked'} ${g.times_asked}×</span></div>
       <div class="qtext">${esc(g.question)}</div>
-      <div class="qmeta">#${g.id} · ${esc(g.language||'')} · first asked ${esc((g.first_asked_at||'').slice(0,10))}</div>
+      ${isFix ? renderFlagged(g.note) : ''}
+      <div class="qmeta">#${g.id} · ${esc(g.language||'')} · first ${esc((g.first_asked_at||'').slice(0,10))}</div>
       <div class="row">
         <button class="primary" onclick="copyForClaude(${g.id})">Copy for Claude</button>
         <button class="ghost" onclick="setStatus(${g.id},'discarded')">Discard</button>
         <span class="ok" id="qok-${g.id}"></span></div>`;
     host.appendChild(card);
   });
+}
+function renderFlagged(note){
+  if(!note) return '';
+  const i = note.indexOf('answer given:');
+  const complaint = (i < 0 ? '' : note.slice(0, i)).replace(/\\|\\|\\s*$/, '').trim();
+  const answer = i < 0 ? note : note.slice(i + 'answer given:'.length).trim();
+  const bubble = answer ? `<div class="flagged">The answer the user reported as wrong:</div><div class="bubble">${marked.parse(answer)}</div>` : '';
+  const said = complaint ? `<div class="note">User said: ${esc(complaint)}</div>` : '';
+  return said + bubble;
 }
 async function copyForClaude(id){
   const g = QUESTIONS.find(x=>x.id===id); if(!g) return;

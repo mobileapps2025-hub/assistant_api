@@ -19,5 +19,6 @@
       "description": "The MCL web Roles and permissions page: counters for Configured roles, Users and Protected roles; a permission matrix with roles as rows and capabilities (Dashboard, Create tasks, Tasks for markets, Tasks for users, Sensor administration, Sensor monitoring, Break lists, Subscriptions) as columns, ticked where allowed."
     }
   ],
-  "procedures": []
+  "procedures": [],
+  "requires": "a Company administrator"
 }

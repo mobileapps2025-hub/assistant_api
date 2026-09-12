@@ -26,7 +26,7 @@ APP_SEARCH = frozenset({APP, BOTH})
 # The web map is small and curated, so a web answer requires a genuinely relevant unit.
 # Below this cosine score the map has nothing on the topic and MarieClaire says so, instead
 # of stitching an answer from a near-but-wrong screen (e.g. tasks for a checklist question).
-WEB_MIN_SCORE = 0.5
+WEB_MIN_SCORE = 0.45
 
 
 def min_score_for(surface: str) -> float:

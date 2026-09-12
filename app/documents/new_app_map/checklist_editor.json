@@ -48,14 +48,36 @@
       "id": "web_create_checklist",
       "title": "Create a checklist",
       "steps": [
-        {"text": "On the Checklists page click 'New checklist' to open the editor.", "image": "web-checklist-editor"},
-        {"text": "Step 1 General information: enter the Checklist name and a General email address, and turn on Signature required or Allow department selection if you need them.", "image": "web-checklist-editor"},
-        {"text": "Step 2 Schedule and availability: set the Periodicity (for example Weekly), the Execution day, the Available from and to dates, the Time from and to, and Count current period if it should count now.", "image": "web-checklist-editor-schedule"},
-        {"text": "Step 3 Access and scope: select the Roles that run it, the Departments it applies to, and any Tags.", "image": "web-checklist-editor-access"},
-        {"text": "Step 4 Questions and order: after at least one department is chosen, add questions by department and drag them into the order you want.", "image": "web-checklist-editor-questions"},
-        {"text": "Step 5 Notifications (optional): after roles are chosen, enable the roles that should be notified about executions.", "image": "web-checklist-editor-questions"},
-        {"text": "Step 6 Preview: review the whole checklist, then 'Save draft' to keep it as a draft or 'Save and activate' to make it live. All sections are saved together in one operation. 'Ask AI Assistant' can prepare a draft for you to review first.", "image": null}
+        {
+          "text": "On the Checklists page click 'New checklist' to open the editor.",
+          "image": "web-checklist-editor"
+        },
+        {
+          "text": "Step 1 General information: enter the Checklist name and a General email address, and turn on Signature required or Allow department selection if you need them.",
+          "image": "web-checklist-editor"
+        },
+        {
+          "text": "Step 2 Schedule and availability: set the Periodicity (for example Weekly), the Execution day, the Available from and to dates, the Time from and to, and Count current period if it should count now.",
+          "image": "web-checklist-editor-schedule"
+        },
+        {
+          "text": "Step 3 Access and scope: select the Roles that run it, the Departments it applies to, and any Tags.",
+          "image": "web-checklist-editor-access"
+        },
+        {
+          "text": "Step 4 Questions and order: after at least one department is chosen, add questions by department and drag them into the order you want.",
+          "image": "web-checklist-editor-questions"
+        },
+        {
+          "text": "Step 5 Notifications (optional): after roles are chosen, enable the roles that should be notified about executions.",
+          "image": "web-checklist-editor-questions"
+        },
+        {
+          "text": "Step 6 Preview: review the whole checklist, then 'Save draft' to keep it as a draft or 'Save and activate' to make it live. All sections are saved together in one operation. 'Ask AI Assistant' can prepare a draft for you to review first.",
+          "image": null
+        }
       ]
     }
-  ]
+  ],
+  "requires": "a Checklist editor role (Company administrator, Corporate manager, Checklist administrator or System administrator)"
 }

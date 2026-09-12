@@ -75,6 +75,19 @@ def test_actor_becomes_the_auth_context_and_platform_the_device(secret_configure
     assert kwargs["device"].platform == "web"
 
 
+def test_capabilities_from_the_actor_reach_the_auth_context(secret_configured, fake_chat_service):
+    turn = {**TURN, "actor": {**TURN["actor"], "capabilities": ["everyone", "checklists.edit"]}}
+    TestClient(app).post("/api/platform/turn", json=turn, headers=HEADERS)
+    auth = fake_chat_service.process_chat_request.call_args.kwargs["auth_context"]
+    assert auth.capabilities == ["everyone", "checklists.edit"]
+
+
+def test_missing_capabilities_default_to_empty(secret_configured, fake_chat_service):
+    TestClient(app).post("/api/platform/turn", json=TURN, headers=HEADERS)
+    auth = fake_chat_service.process_chat_request.call_args.kwargs["auth_context"]
+    assert auth.capabilities == []
+
+
 def test_history_and_message_become_the_conversation(secret_configured, fake_chat_service):
     turn = {**TURN, "history": [{"role": "user", "content": "Hi"}, {"role": "assistant", "content": "Hello!"}]}
     TestClient(app).post("/api/platform/turn", json=turn, headers=HEADERS)

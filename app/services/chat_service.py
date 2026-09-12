@@ -438,9 +438,12 @@ class ChatService:
         caller_surface = base_surface(auth_context, device)
         flow(f"🧱 surface base → {caller_surface}")
 
+        caller_capabilities = frozenset(auth_context.capabilities) if auth_context else frozenset()
+        flow(f"🔑 capabilities → {sorted(caller_capabilities) or 'none'}")
+
         result = await self._dispatch_route(
             decision.route, messages, latest_user_message, session_id, auth_context,
-            memory_context, language, device_context, caller_surface
+            memory_context, language, device_context, caller_surface, caller_capabilities
         )
         flow(f"✅ response ready ({decision.route})")
         return result
@@ -636,6 +639,7 @@ class ChatService:
         language: str,
         device_context: str,
         caller_surface: str,
+        caller_capabilities: frozenset = frozenset(),
     ) -> Dict[str, Any]:
         if route == "PERSONAL" and not _is_authenticated(auth_context):
             flow("⛔ no MCL session → ask to connect")
@@ -645,12 +649,12 @@ class ChatService:
             return await self._handle_text_request(
                 messages, latest_user_message, session_id=session_id,
                 memory_context=memory_context, language=language, device_context=device_context,
-                caller_surface=caller_surface
+                caller_surface=caller_surface, caller_capabilities=caller_capabilities
             )
 
         return await self._handle_agent_request(
             messages, latest_user_message, session_id, auth_context,
-            memory_context, language, device_context, caller_surface
+            memory_context, language, device_context, caller_surface, caller_capabilities
         )
 
     async def _handle_agent_request(
@@ -663,6 +667,7 @@ class ChatService:
         language: str,
         device_context: str,
         caller_surface: str = "app",
+        caller_capabilities: frozenset = frozenset(),
     ) -> Dict[str, Any]:
         """Manager agent: answer directly, search docs, or use live MCL tools.
 
@@ -756,7 +761,8 @@ class ChatService:
                         knowledge_surface = classify_surface(query or contextualized, messages, caller_surface)
                         flow(f"🧭 knowledge surface → {knowledge_surface}")
                     chunks = retrieve(contextualized, surfaces=search_surfaces(knowledge_surface),
-                                      min_score=min_score_for(knowledge_surface)) if contextualized else []
+                                      min_score=min_score_for(knowledge_surface),
+                                      capabilities=caller_capabilities) if contextualized else []
                     used_knowledge = True
                     retrieved_units.extend(chunks)
                     allowed_sources.update(
@@ -770,9 +776,16 @@ class ChatService:
                         "context": _knowledge_context(chunks),
                         "instruction": (
                             "Answer documentation facts only from this context and cite each "
-                            "documentation claim with [Source: filename]. If this context does "
-                            f"not cover the question, call {MISSING_INFO_TOOL_NAME} and then tell "
-                            "the user you do not have those details yet — never guess."
+                            "documentation claim with [Source: filename]. If the context says who "
+                            "can do this (a 'Who can do this' line naming a required role or "
+                            "permission), state that requirement first, in one short sentence, and "
+                            "that the user should ask their company administrator if their role "
+                            "does not have it — then give the steps. If the context addresses the "
+                            "user's topic but the exact feature they named does not exist, explain "
+                            "what MCL does instead using the context — do not report it missing. "
+                            f"Call {MISSING_INFO_TOOL_NAME} only when the context is unrelated to "
+                            "the question, then tell the user you do not have those details yet — "
+                            "never guess."
                         ),
                     }, ensure_ascii=False)
                     api_messages.append(_tool_call_message(tool_call))
@@ -953,6 +966,7 @@ class ChatService:
         language: str = "",
         device_context: str = "",
         caller_surface: str = "app",
+        caller_capabilities: frozenset = frozenset(),
     ) -> Dict[str, Any]:
         logger.info(f"Answering over {len(image_urls)} image(s)")
 
@@ -978,7 +992,8 @@ class ChatService:
         surface = classify_surface(search_query, messages, caller_surface)
         flow(f"🧭 knowledge surface (image) → {surface}")
         chunks = retrieve(search_query, surfaces=search_surfaces(surface),
-                          min_score=min_score_for(surface)) if search_query else []
+                          min_score=min_score_for(surface),
+                          capabilities=caller_capabilities) if search_query else []
         flow(f"📄 retrieved {len(chunks)} chunk(s) from the KB index")
 
         api_messages = [
@@ -1194,13 +1209,14 @@ class ChatService:
         language: str = "",
         device_context: str = "",
         caller_surface: str = "app",
+        caller_capabilities: frozenset = frozenset(),
     ) -> Dict[str, Any]:
         image_urls = _image_urls(latest_user_message)
         if image_urls:
             flow("📚 KNOWLEDGE → image path")
             return await self._answer_over_image(
                 messages, latest_user_message, image_urls, memory_context, language,
-                device_context, caller_surface
+                device_context, caller_surface, caller_capabilities
             )
 
         flow("📚 KNOWLEDGE → text path")
@@ -1217,7 +1233,8 @@ class ChatService:
             result = run_retrieval(
                 user_query, messages, language=language or None,
                 device=device_context or None, memory=memory_context or None,
-                surfaces=search_surfaces(surface), min_score=min_score_for(surface)
+                surfaces=search_surfaces(surface), min_score=min_score_for(surface),
+                capabilities=caller_capabilities
             )
             return {"response": result["answer"], "success": True, "has_vision": False}
         except Exception as e:

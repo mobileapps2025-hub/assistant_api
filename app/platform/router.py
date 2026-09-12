@@ -6,12 +6,14 @@ from app.core.dependencies import get_chat_service
 from app.core.flow import flow
 from app.core.logging import get_logger
 from app.models import (
-    AuthContext, Device, PlatformClosureRequest, PlatformClosureResponse, PlatformTurn,
+    AuthContext, Device, PlatformClosureRequest, PlatformClosureResponse,
+    PlatformFeedbackRequest, PlatformFeedbackResponse, PlatformTurn,
     PlatformTurnRequest, PlatformTurnResponse,
 )
 from app.platform.auth import require_service_secret
 from app.platform.closure import write_closure
 from app.services.chat_service import ChatService
+from app.services.gap_service import discard_correction, record_gap
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/platform", tags=["platform"])
@@ -27,6 +29,7 @@ def _auth_context(turn: PlatformTurnRequest) -> AuthContext:
         user_id=turn.actor.user_id,
         company_id=turn.actor.company_id,
         role_ids=turn.actor.role_ids,
+        capabilities=turn.actor.capabilities,
         platform_turn=PlatformTurn(
             id=turn.turn.id, token=turn.turn.token, operations_url=turn.turn.operations_url,
         ),
@@ -60,6 +63,28 @@ async def turn(
          f"proposal: {proposal['operation'] if proposal else 'none'}")
     logger.info(f"[PLATFORM] turn={body.turn.id} user={body.actor.user_id} company={body.actor.company_id} answered")
     return PlatformTurnResponse(turn_id=body.turn.id, reply=result["response"], proposal=proposal)
+
+
+@router.post("/feedback", response_model=PlatformFeedbackResponse)
+async def feedback(request: Request, body: PlatformFeedbackRequest) -> PlatformFeedbackResponse:
+    """A user reported an answer as wrong. Logged as a correction so it flows through the same
+    review-and-fix loop; the corrected page overwrites the wrong one on approval."""
+    require_service_secret(request)
+    if body.withdraw:
+        flow(f"🏢 MCL.Api → MarieClaire  feedback WITHDRAWN by user={body.actor.user_id}")
+        ok = await discard_correction(body.question)
+        flow(f"↩ correction {'withdrawn' if ok else 'nothing to withdraw'}")
+        return PlatformFeedbackResponse(recorded=ok)
+    flow(f"🏢 MCL.Api → MarieClaire  feedback (wrong answer) from user={body.actor.user_id}")
+    language = {"de": "German", "es": "Spanish"}.get(body.actor.language, "English")
+    note = body.note or ""
+    if body.answer:
+        note = (note + " || answer given: " + body.answer).strip(" |")
+    recorded = await record_gap(
+        body.question, language, surface=body.actor.platform or "web",
+        role=",".join(body.actor.role_ids) or None, kind="correction", note=note or None)
+    flow(f"📝 correction {'recorded' if recorded else 'not recorded'}")
+    return PlatformFeedbackResponse(recorded=recorded)
 
 
 @router.post("/closure", response_model=PlatformClosureResponse)

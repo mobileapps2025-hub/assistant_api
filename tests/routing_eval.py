@@ -85,6 +85,12 @@ LABELED = [
      "expected": "PERSONAL", "note": "follow-up, personal"},
     {"messages": [U("What is a market in MCL?"), A("A market is a store/location."), U("how many do I have?")],
      "expected": "PERSONAL", "note": "follow-up flips general->personal"},
+    {"messages": [U("How do I create a checklist?"),
+                  A("Open the Checklist Editor, then use the wizard..."),
+                  U("And can you help me creating one?")],
+     "expected": "KNOWLEDGE", "note": "'help me create' is task-guidance, not a scope question"},
+    {"messages": [U("Can you help me set up a recurring checklist?")],
+     "expected": "KNOWLEDGE", "note": "'can you help me do X' → how-to, not CHAT"},
 ]
 
 DETERMINISM_SUBSET = [

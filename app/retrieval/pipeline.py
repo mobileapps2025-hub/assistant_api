@@ -28,10 +28,11 @@ def _history_text(messages: List[Dict[str, Any]]) -> str:
 
 def run(query: str, messages: List[Dict[str, Any]], *, language: Optional[str] = None,
         device: Optional[str] = None, memory: Optional[str] = None,
-        surfaces=SEARCHABLE_BY_DEFAULT, min_score: float = 0.0) -> Dict[str, Any]:
+        surfaces=SEARCHABLE_BY_DEFAULT, min_score: float = 0.0,
+        capabilities=frozenset()) -> Dict[str, Any]:
     contextualized = contextualize(query, messages)
     flow(f"🔁 query → '{contextualized[:50]}'")
-    chunks = retrieve(contextualized, surfaces=surfaces, min_score=min_score)
+    chunks = retrieve(contextualized, surfaces=surfaces, min_score=min_score, capabilities=capabilities)
     flow(f"📄 retrieved {len(chunks)} chunk(s) from the KB index")
     return answer(contextualized, chunks, language=language, device=device,
                   history_text=_history_text(messages), memory=memory)

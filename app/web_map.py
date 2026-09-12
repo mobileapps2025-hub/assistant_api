@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+from app.kb_capabilities import EVERYONE, capability_from_requires
 from app.kb_surfaces import WEB
 
 MAP_DIR = Path(__file__).resolve().parent / "documents" / "new_app_map"
@@ -24,25 +25,34 @@ def _screen_units(screen: Dict[str, Any]) -> List[Dict[str, Any]]:
     document_name = screen["document_name"]
     refs = {s["id"]: _image_ref(s) for s in screen.get("screenshots", [])}
     aliases = ", ".join(screen.get("aliases", []))
+    # The overview stays visible to everyone: it names what the screen is and, for a restricted
+    # screen, who may use it — so a user without access is pointed to their administrator instead
+    # of getting silence. The steps and screenshots carry the real permission, so only a user who
+    # has it gets the how-to.
+    capability = capability_from_requires(screen.get("requires"), screen.get("capability"))
 
     overview_text = (
         f"Screen: {screen['screen']} (web platform). Menu: {screen['menu_label']}.\n"
         f"{screen['overview']}"
     )
+    if screen.get("requires"):
+        overview_text += (
+            f"\nWho can do this: {screen['requires']}. If your role does not have this, you will not "
+            "see the menu option; ask your company administrator to do it or to grant access.")
     if aliases:
         overview_text += f"\nAlso asked about as: {aliases}."
 
     units: List[Dict[str, Any]] = [{
         "kind": "text", "id": f"web_{_slug(screen['screen'])}_overview",
         "document_name": document_name, "text": overview_text, "images": [], "steps": [],
-        "surface": WEB,
+        "surface": WEB, "capability": EVERYONE,
     }]
 
     for shot in screen.get("screenshots", []):
         units.append({
             "kind": "image", "id": shot["id"], "document_name": document_name,
             "text": shot.get("description") or shot.get("alt", ""),
-            "images": [refs[shot["id"]]], "steps": [], "surface": WEB,
+            "images": [refs[shot["id"]]], "steps": [], "surface": WEB, "capability": capability,
         })
 
     for proc in screen.get("procedures", []):
@@ -52,7 +62,7 @@ def _screen_units(screen: Dict[str, Any]) -> List[Dict[str, Any]]:
         units.append({
             "kind": "procedure", "id": proc["id"], "document_name": document_name,
             "text": text, "title": proc["title"], "steps": steps,
-            "images": [img for s in steps for img in s["images"]], "surface": WEB,
+            "images": [img for s in steps for img in s["images"]], "surface": WEB, "capability": capability,
         })
 
     return units

@@ -39,5 +39,6 @@
         }
       ]
     }
-  ]
+  ],
+  "requires": "a Company administrator"
 }

@@ -69,12 +69,12 @@ def test_a_web_question_routed_to_web_finds_no_app_content():
         r.Unit(kind="text", id="a1", document_name="Mcl Mobile App Faq Revised.pdf",
                text="Open the MCL app and tap Tasks.", surface=APP),
     ]
-    r._index = (units, np.array([[1.0, 0.0]], dtype=np.float32))
-    old_embed = r._embed_query
+    loaded = (units, np.array([[1.0, 0.0]], dtype=np.float32))
+    old_load, old_embed = r._load_index, r._embed_query
+    r._load_index = lambda: loaded
     r._embed_query = lambda q: np.array([1.0, 0.0], dtype=np.float32)
     try:
         assert r.retrieve("how do I create a task", surfaces=WEB_SEARCH) == []
         assert len(r.retrieve("how do I create a task", surfaces=APP_SEARCH)) == 1
     finally:
-        r._embed_query = old_embed
-        r._index = None
+        r._load_index, r._embed_query = old_load, old_embed

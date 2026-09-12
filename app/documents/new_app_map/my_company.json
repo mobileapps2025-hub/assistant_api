@@ -22,5 +22,6 @@
       "description": "The MCL web 'My company' page: a company profile header, tabs Company profile, Corporate design, Functional settings and Language and regionalization, a General information form, a read-only Technical information panel with Company ID and plan, and a Save changes button."
     }
   ],
-  "procedures": []
+  "procedures": [],
+  "requires": "a Company administrator"
 }

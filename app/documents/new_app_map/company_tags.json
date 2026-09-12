@@ -21,5 +21,6 @@
       "description": "The MCL web 'Company tags' page: Market tags and Checklist tags sections, counters for Groups, Child tags and Assignments, a table of tag names with assignments and Child tag/Edit/Delete actions, and a New group button."
     }
   ],
-  "procedures": []
+  "procedures": [],
+  "requires": "a Company administrator"
 }

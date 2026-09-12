@@ -1,0 +1,95 @@
+{
+  "screen": "Temperature checks",
+  "menu_label": "Questions",
+  "route": "/modules/questions",
+  "document_name": "MCL Web Guide - Temperature checks",
+  "aliases": [
+    "temperature sensor",
+    "temperature sensors",
+    "configure temperature sensors",
+    "temperature question",
+    "temperature check",
+    "temperature limits",
+    "temperature range",
+    "fridge temperature",
+    "cooling unit temperature",
+    "freezer temperature",
+    "thermometer",
+    "temperature probe",
+    "Temperatur",
+    "Temperaturmessung",
+    "Kuehlmoebel",
+    "Tiefkuehl"
+  ],
+  "overview": "To monitor temperature in MCL you use a Temperature question, not a paired sensor device — there is no sensor hardware screen. Open Questions in the left menu, add a question whose Question type is Temperature, set the departments it applies to and the accepted range (Positive from / To), and the person running the checklist types the measured value in the MCL app. On the Question management page, temperature questions are the rows whose Question type is Temperature. The New question and Edit question windows have three parts: Question and assignment (text, Question type, Departments), Answer rules (Comment and photo evidence, Evidence required, and Positive from / To — the range that counts as a good reading), and Additional information (Help text, PDF URL). Available question types are 1 to 5, Free text, Numeric, Target and current, Temperature and Yes/No. This page was walked as a company administrator.",
+  "screenshots": [
+    {
+      "id": "web-questions",
+      "file": "web-questions.jpg",
+      "alt": "The Question management page, where temperature questions are created",
+      "description": "The MCL web Question management page. A table of questions with columns Question, Question type, Departments, Status, Checklist uses and Edit / Delete links, plus a Search questions box and a New question button. Rows with Question type Temperature are the temperature checks."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "web_create_temperature_question",
+      "title": "Set up a temperature check",
+      "steps": [
+        {
+          "text": "Open Questions in the left menu. The page is called Question management and lists every question with its type.",
+          "image": "web-questions"
+        },
+        {
+          "text": "Click New question at the top right.",
+          "image": "web-questions"
+        },
+        {
+          "text": "In Question, write what the person has to measure, for example which cooling unit to check.",
+          "image": null
+        },
+        {
+          "text": "In Question type, choose Temperature.",
+          "image": null
+        },
+        {
+          "text": "In Departments, pick the departments the check belongs to, such as the chilled or frozen areas.",
+          "image": null
+        },
+        {
+          "text": "Under Answer rules, set Positive from and To. That is the temperature range that counts as a positive answer.",
+          "image": null
+        },
+        {
+          "text": "Still under Answer rules, choose whether a comment or photo can be added and when evidence is required.",
+          "image": null
+        },
+        {
+          "text": "Optionally add Help text or a PDF URL under Additional information, then click Save.",
+          "image": null
+        }
+      ]
+    },
+    {
+      "id": "web_edit_temperature_range",
+      "title": "Change the accepted temperature range",
+      "steps": [
+        {
+          "text": "Open Questions in the left menu and look for rows whose Question type is Temperature.",
+          "image": "web-questions"
+        },
+        {
+          "text": "Click Edit at the end of that row.",
+          "image": "web-questions"
+        },
+        {
+          "text": "In the Edit question window, change Positive from and To under Answer rules.",
+          "image": null
+        },
+        {
+          "text": "Click Save.",
+          "image": null
+        }
+      ]
+    }
+  ]
+}

@@ -140,6 +140,21 @@ def test_recent_action_questions_rule_reaches_system_prompt():
     assert "not MCL documentation" in system_prompt
 
 
+def test_help_me_task_rule_reaches_system_prompt():
+    messages = [
+        {"role": "user", "content": "how do I create a checklist"},
+        {"role": "assistant", "content": "Open the Checklist Editor, then..."},
+        {"role": "user", "content": "And can you help me creating one?"},
+    ]
+    with patch("app.routing.router.client") as mock_client:
+        mock_client.chat.completions.create.return_value = _response(_decision_json("KNOWLEDGE"))
+        classify_route(messages)
+        system_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    assert '"Help me" rule' in system_prompt
+    assert "accomplish a concrete task now" in system_prompt
+    assert "and can you help me create one?" in system_prompt
+
+
 def test_system_prompt_has_default_tools_summary_without_catalog():
     with patch("app.routing.router.client") as mock_client:
         mock_client.chat.completions.create.return_value = _response(_decision_json("CHAT"))

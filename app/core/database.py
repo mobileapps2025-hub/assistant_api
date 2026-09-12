@@ -36,6 +36,8 @@ class DocumentationGap(Base):
     language = Column(String(40), nullable=True)
     surface = Column(String(20), nullable=True)   # web | app — which product the answer lives in
     role = Column(String(200), nullable=True)     # asker's role(s), so the worker walks as that role
+    kind = Column(String(20), default="missing", nullable=False, index=True)  # missing (unanswered) | correction (answered wrong)
+    note = Column(Text, nullable=True)            # for corrections: what was wrong / the answer that was flagged
     times_asked = Column(Integer, default=1, nullable=False)
     status = Column(String(20), default="pending", nullable=False, index=True)  # pending|researching|researched|discarded
     first_asked_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -34,5 +34,6 @@
         }
       ]
     }
-  ]
+  ],
+  "requires": "a Checklist editor role (Company administrator, Corporate manager, Checklist administrator or System administrator)"
 }

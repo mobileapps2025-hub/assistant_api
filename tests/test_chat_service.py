@@ -200,7 +200,7 @@ class TestHandleAgentRequest:
                 messages, messages[0], "s1", None, "", "English", ""
             )
 
-        mock_retrieve.assert_called_once_with("MCL sync", surfaces=APP_SEARCH, min_score=0.0)
+        mock_retrieve.assert_called_once_with("MCL sync", surfaces=APP_SEARCH, min_score=0.0, capabilities=frozenset())
         assert "[Source: sync_guide.md]" in result["response"]
         assert "fake.md" not in result["response"]
 
@@ -424,7 +424,7 @@ class TestAnswerOverImage:
 
         assert result["success"] is True and result["has_vision"] is True
         mock_bq.assert_called_once()
-        mock_retrieve.assert_called_once_with("checklist wizard departments", surfaces=APP_SEARCH, min_score=0.0)
+        mock_retrieve.assert_called_once_with("checklist wizard departments", surfaces=APP_SEARCH, min_score=0.0, capabilities=frozenset())
         assert "MCL Support Specialist" in sent[0]["content"]
         assert any(m["role"] == "system" and "# TEXTUAL CONTEXT" in m["content"] for m in sent)
         assert "[Source: guide.pdf]" in result["response"]

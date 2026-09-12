@@ -140,7 +140,8 @@ async def report_gap(request: Request, body: dict):
     question = str(body.get("question") or "").strip()
     if not question:
         raise HTTPException(422, "question is required")
-    recorded = await record_gap(question, body.get("language"), body.get("surface"), body.get("role"))
+    recorded = await record_gap(question, body.get("language"), body.get("surface"), body.get("role"),
+                                kind=body.get("kind") or "missing", note=body.get("note"))
     if not recorded:
         raise HTTPException(503, "Could not record the question.")
     return {"recorded": True}
@@ -161,7 +162,7 @@ async def list_gaps(request: Request, status: str = "pending", db: AsyncSession 
     return {"gaps": [
         {
             "id": row.id, "question": row.question, "language": row.language,
-            "surface": row.surface, "role": row.role,
+            "surface": row.surface, "role": row.role, "kind": row.kind, "note": row.note,
             "times_asked": row.times_asked, "status": row.status,
             "first_asked_at": row.first_asked_at.isoformat() if row.first_asked_at else None,
             "last_asked_at": row.last_asked_at.isoformat() if row.last_asked_at else None,

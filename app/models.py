@@ -59,6 +59,7 @@ class AuthContext(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
     role_ids: List[str] = Field(default_factory=list)
+    capabilities: List[str] = Field(default_factory=list)   # readable permission keys derived by MCL.Api
     platform_turn: Optional[PlatformTurn] = None    # MCL.Api callers: identity came from the session
 
 
@@ -69,6 +70,7 @@ class PlatformActor(BaseModel):
     role_ids: List[str] = Field(default_factory=list, alias="roleIds")
     language: str = "de"
     platform: str = "web"
+    capabilities: List[str] = Field(default_factory=list)
 
     model_config = {"populate_by_name": True}
 
@@ -113,6 +115,19 @@ class PlatformOutcome(BaseModel):
     task_number: Optional[int] = Field(default=None, alias="taskNumber")
 
     model_config = {"populate_by_name": True}
+
+
+class PlatformFeedbackRequest(BaseModel):
+    """A user reporting that an answer was wrong (or withdrawing that report), via MCL.Api."""
+    actor: PlatformActor
+    question: str
+    answer: Optional[str] = None
+    note: Optional[str] = None
+    withdraw: bool = False
+
+
+class PlatformFeedbackResponse(BaseModel):
+    recorded: bool
 
 
 class PlatformClosureRequest(BaseModel):
